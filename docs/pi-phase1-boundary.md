@@ -40,3 +40,16 @@ Phase 1 manages only the Pi-specific repository source paths listed below:
 ## Settings Baseline
 
 `.pi/settings.json` remains `{}` in Phase 1 so Pi can continue using `pi-mono` default discovery behavior instead of duplicating default `extensions`, `prompts`, or `themes` configuration.
+
+## Closeout Governance Extension
+
+Later `pi-config` feature or configuration changes may update repository `.pi/settings.json` away from the original empty-object baseline when the managed Pi runtime requirements change.
+
+That closeout governance does not alter the Phase 1 deployment model:
+
+- repository `.pi/settings.json` is still the managed source of truth
+- `~/.pi/agent/settings.json` is still the managed runtime target
+- deployment still uses the existing copy-based overwrite workflow
+- `.mcp.json` remains outside the managed Pi settings sync scope because it belongs to the shared cross-agent layer
+
+When a later change reaches verification closeout, global Pi deployment should still be treated as an explicit user-confirmed use of the existing managed sync path, not as a new runtime merge model.
