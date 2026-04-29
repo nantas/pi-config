@@ -289,6 +289,12 @@ class DollarSkillEditor extends CustomEditor {
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
+  // Self-dedup — prevents double registration when loaded from both
+  // project-local (.pi/extensions/) and global (~/.pi/agent/extensions/).
+  const _key = "__pi_ext_dollar_skill_invoke_loaded";
+  if ((globalThis as any)[_key]) return;
+  (globalThis as any)[_key] = true;
+
   pi.on("session_start", async (_event, ctx) => {
     // 1. Register autocomplete provider FIRST so the full chain is built
     ctx.ui.addAutocompleteProvider((current) =>

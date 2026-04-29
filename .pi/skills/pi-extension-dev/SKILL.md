@@ -179,6 +179,23 @@ export default function (pi: ExtensionAPI) {
 - Run `npm install` inside the extension directory
 - Write `index.ts` with the default export function
 
+> **Dedup Requirement:** If this extension will be deployed globally (via `scripts/sync-pi-agent.sh`),
+> it MUST include a `globalThis` self-dedup marker at the entry of its `export default function`.
+> This prevents duplicate registration when the same extension is loaded from both
+> project-local (`.pi/extensions/`) and global (`~/.pi/agent/extensions/`) paths.
+>
+> ```typescript
+> export default function (pi: ExtensionAPI) {
+>   const _key = "__pi_ext_<name>_loaded";  // unique per extension
+>   if ((globalThis as any)[_key]) return;
+>   (globalThis as any)[_key] = true;
+>   // ... rest of extension
+> }
+> ```
+>
+> Without this marker, the extension's handlers (shortcuts, commands, events) will be
+> registered twice, causing "shortcut conflict" warnings and unpredictable behavior.
+
 ### Step 2 — Follow tasks.md
 
 Implement each task from the change's `tasks.md` in order. Keep changes minimal and focused.
