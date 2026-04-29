@@ -2,5 +2,30 @@
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
     "./packages/subagent-dispatch"
-  ]
+  ],
+  "subagents": {
+    "agentOverrides": {
+      "context-builder": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "oracle": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "planner": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "researcher": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "reviewer": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "scout": {
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "worker": {
+        "model": "deepseek/deepseek-v4-flash"
+      }
+    }
+  }
 }
