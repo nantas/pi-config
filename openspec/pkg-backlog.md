@@ -30,6 +30,21 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-04-30 — global-agent-md-tool-guide
+
+- **Type:** Workflow & Configuration
+- **Development Date:** 2026-04-30
+- **Resource Types:** configuration
+- **Status:** Implemented & Verified
+- **Deliverables:**
+  - `.pi/agent/AGENTS.md` — 工具调用指导
+  - `scripts/sync-pi-agent.sh` — 新增 AGENTS.md 同步
+  - `AGENTS.md` — 新增全局指导工作流章节
+- **Capability:** `global-agent-md-sync` — 项目内管理 `.pi/agent/AGENTS.md`，通过同步脚本部署到 `~/.pi/agent/AGENTS.md`
+- **Spec Coverage:** 4/4 requirements implemented
+- **Verification:** ✅ 见 `openspec/changes/global-agent-md-tool-guide/verification.md`
+- **Notes:** 同步需用户确认后执行 `scripts/sync-pi-agent.sh`。
+
 ### 2026-04-30 — planner-toggle (extension)
 
 - **Type:** Extension (directly developed, not a package import)
