@@ -15,7 +15,7 @@ import {
   normalizeSkillNames,
   serializeTaskPlan,
   summarizeDispatchResult,
-} from "../.pi/extensions/subagent-dispatch/core.js";
+} from "../.pi/packages/subagent-dispatch/core.js";
 
 test("normalizeSkillNames accepts string, array, and false", () => {
   assert.deepEqual(normalizeSkillNames("obsidian-cli"), ["obsidian-cli"]);
@@ -179,20 +179,21 @@ test("formatDispatchSyncText includes child outputs and export paths", () => {
   assert.doesNotMatch(text, /status handle/i);
 });
 
-test("global extension yields to project-local copy in pi-config repo", () => {
+test("legacy global extension is skipped after package migration", () => {
+  const homeDir = process.env.HOME ?? "/tmp";
   assert.equal(
     shouldSkipGlobalDispatchExtensionRegistration({
-      extensionFile: "/Users/nantasmac/.pi/agent/extensions/subagent-dispatch/index.ts",
+      extensionFile: path.join(homeDir, ".pi", "agent", "extensions", "subagent-dispatch", "index.ts"),
       cwd: "/Users/nantasmac/projects/pi-config",
     }),
     true
   );
 });
 
-test("project-local extension does not skip itself", () => {
+test("package-backed entry does not skip itself", () => {
   assert.equal(
     shouldSkipGlobalDispatchExtensionRegistration({
-      extensionFile: "/Users/nantasmac/projects/pi-config/.pi/extensions/subagent-dispatch/index.ts",
+      extensionFile: "/Users/nantasmac/projects/pi-config/.pi/packages/subagent-dispatch/index.ts",
       cwd: "/Users/nantasmac/projects/pi-config",
     }),
     false

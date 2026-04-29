@@ -1,9 +1,6 @@
 {
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
-    "npm:pi-subagents@0.20.1"
-  ],
-  "extensions": [
-    ".pi/extensions/subagent-dispatch"
+    "./packages/subagent-dispatch"
   ]
 }

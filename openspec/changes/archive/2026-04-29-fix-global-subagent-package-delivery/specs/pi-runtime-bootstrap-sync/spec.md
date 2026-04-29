@@ -1,43 +1,32 @@
-# Capability: pi-runtime-bootstrap-sync
+# Specification Delta
 
-## Purpose
+## Capability 对齐（已确认）
 
-Define the one-way bootstrap and sync contract from repository-managed `.pi/` resources to `~/.pi/agent/` for Phase 1.
+- Capability: `pi-runtime-bootstrap-sync`
+- 来源: `proposal.md` / 已确认 capabilities
+- 变更类型: `modified`
+- 用户确认摘要: 用户确认全局运行时仍由 `pi-config` 受管 sync 驱动，但 global settings 需要支持绝对 local-path package 注入，而不是继续保持逐字节复制
 
-## Requirements
+## 规范真源声明
 
-### Requirement: Bootstrap Sync Must Use One-Way Repository Deployment
-The system SHALL define bootstrap and sync as a one-way deployment flow from repository-managed `.pi/` resources to `~/.pi/agent/`, and SHALL treat the repository as the only source of truth for managed Phase 1 paths.
+- 本文件是该 capability 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
 
-#### Scenario: Sync direction is reviewed
-- **WHEN** a reader evaluates the Phase 1 deployment model
-- **THEN** the reader can determine that runtime changes do not flow back into the repository automatically
+## ADDED Requirements
 
-### Requirement: Bootstrap Sync Must Be Limited To Pi Specific Managed Paths
-The system SHALL limit Phase 1 bootstrap and sync scope to Pi-specific managed `.pi/` resources and SHALL exclude `.agents/skills/`, `.mcp.json`, and other shared cross-agent resources from automated deployment.
-
-#### Scenario: Shared layer boundary is reviewed
-- **WHEN** the Phase 1 sync scope is described
-- **THEN** only Pi-specific managed paths are included in the bootstrap/sync contract
+## MODIFIED Requirements
 
 ### Requirement: Bootstrap Sync Must Define Path Mapping
 The system SHALL define the mapping from repository-managed source paths to runtime target paths, including `.pi/settings.json` to `~/.pi/agent/settings.json`, `.pi/extensions/` to `~/.pi/agent/extensions/`, `.pi/prompts/` to `~/.pi/agent/prompts/`, `.pi/themes/` to `~/.pi/agent/themes/`, and `.pi/agents/` to `~/.pi/agent/agents/`; the global settings target SHALL allow generated runtime values when required to activate a repository-managed local-path package.
 
-#### Scenario: Runtime deployment target is documented
-- **WHEN** a reader needs to deploy the managed Pi baseline
-- **THEN** the target runtime location for each managed source path is explicit
-
 #### Scenario: Runtime deployment target is documented after the packaging change
-- **WHEN** a reader needs to deploy the managed Pi baseline after the packaging change
+- **WHEN** a reader needs to deploy the managed Pi baseline
 - **THEN** the runtime target for each managed source path remains explicit
 - **AND** the reader can see that `~/.pi/agent/settings.json` may be generated from repository truth to inject runtime-only absolute package paths
 
 ### Requirement: Bootstrap Sync Must Enforce Managed Overwrite And Deletion Semantics
 The system SHALL define managed overwrite semantics for runtime targets, SHALL keep directory targets copy-based, and SHALL allow `~/.pi/agent/settings.json` to be rendered from repository-managed settings plus sync-time runtime fields before overwrite.
-
-#### Scenario: Managed runtime drift exists
-- **WHEN** a managed runtime file differs from or no longer exists in the repository source layer
-- **THEN** the next sync restores the runtime target to the repository-managed state, including deletion when applicable
 
 #### Scenario: Managed runtime settings require a machine-specific absolute path
 - **WHEN** the global runtime needs an absolute local-path package source derived from the current repository location
@@ -52,9 +41,6 @@ The system SHALL ensure that any repository-managed local-path Pi package requir
 - **THEN** the workflow verifies or installs that package's runtime dependencies first
 - **AND** the resulting global runtime does not point at a package source whose dependencies are absent
 
-### Requirement: Bootstrap Sync Must Preserve Unmanaged Runtime Content
-The system SHALL leave unmanaged runtime content untouched when it falls outside the defined Phase 1 managed path set.
+## REMOVED Requirements
 
-#### Scenario: Unmanaged runtime files exist
-- **WHEN** bootstrap or sync is executed
-- **THEN** runtime files outside the managed Phase 1 path set are preserved
+## RENAMED Requirements

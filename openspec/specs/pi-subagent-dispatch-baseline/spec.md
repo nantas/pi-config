@@ -7,18 +7,27 @@ Define the repository-owned `dispatch` subagent baseline for `pi-config`, includ
 ## Requirements
 
 ### Requirement: The Repository Must Expose A Local Dispatch Tool
-The system SHALL provide a project-local orchestration extension that exposes a repository-owned `dispatch` tool rather than asking callers to invoke the raw `pi-subagents` interface directly.
+The system SHALL provide a repository-owned `dispatch` tool through a package-backed runtime entry so that the same dispatch contract can load both inside `pi-config` and in any other repository where the global package source is enabled.
 
 #### Scenario: Contributor reviews the subagent entrypoint
 - **WHEN** a contributor inspects how multi-agent delegation is initiated in `pi-config`
-- **THEN** the contributor can identify a local `dispatch` tool as the formal repository-level entrypoint
+- **THEN** the contributor can identify a repository-owned `dispatch` tool as the formal repository-level entrypoint
+
+#### Scenario: Contributor inspects the subagent entrypoint after the packaging change
+- **WHEN** a contributor reviews how multi-agent delegation is initiated after the global delivery fix
+- **THEN** the contributor can still identify a repository-owned `dispatch` tool as the formal entrypoint
+- **AND** the contributor can see that the runtime entry is package-backed rather than a synced raw global extension directory
 
 ### Requirement: The Repository Must Expose A Dispatch Command Wrapper
-The system SHALL provide a project-local `/dispatch` command wrapper that reuses the same repository-owned dispatch behavior for interactive invocation.
+The system SHALL provide a `/dispatch` command wrapper that remains bound to the repository-owned dispatch behavior regardless of whether the runtime session starts inside `pi-config` or another repository.
 
 #### Scenario: Contributor prefers a slash command
 - **WHEN** a contributor looks for a manual entrypoint in Pi
 - **THEN** the contributor can find `/dispatch` as a convenience wrapper over the same dispatch flow
+
+#### Scenario: Contributor invokes dispatch outside pi-config
+- **WHEN** a contributor starts Pi in another repository with the global package source enabled
+- **THEN** `/dispatch` is still available as the convenience wrapper over the same repository-owned dispatch flow
 
 ### Requirement: Dispatch Command Must Accept Natural-Language Requests
 The system SHALL make `/dispatch` a natural-language user entrypoint rather than requiring callers to hand-author the structured `tasks[]` payload.
@@ -106,11 +115,16 @@ The system SHALL hide backend-specific execution details behind the repository-o
 - **THEN** the dispatch contract remains stable because backend-specific invocation details are not exposed as the repository API
 
 ### Requirement: Dispatch Must Bridge To Real Pi-Subagents Execution
-The system SHALL bridge the repository-owned `dispatch` tool to real `pi-subagents` execution semantics rather than using a placeholder transport that merely shells into generic Pi JSON mode.
+The system SHALL bridge the repository-owned `dispatch` tool to real `pi-subagents` execution through package-owned dependency resolution rather than through a filesystem assumption tied to `~/.pi/agent/npm/`.
 
 #### Scenario: Contributor inspects the execution path
 - **WHEN** a contributor reviews how `dispatch` actually runs delegated tasks
 - **THEN** the contributor can identify a real bridge to `pi-subagents` execution rather than a generic spawn adapter
+
+#### Scenario: Contributor reviews the execution path after the delivery fix
+- **WHEN** a contributor inspects how `dispatch` resolves the `pi-subagents` substrate
+- **THEN** the execution path can be traced to package-managed imports
+- **AND** the bridge no longer requires a mirrored `~/.pi/agent/npm/node_modules/pi-subagents` directory to exist
 
 ### Requirement: Dispatch Must Support Skill-Sensitive Task Planning
 The system SHALL allow the repository-owned dispatch plan to carry skill-sensitive execution intent without requiring end users to write raw `skill` task overrides.

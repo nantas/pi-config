@@ -10,23 +10,73 @@ TARGET_ROOT="${PI_AGENT_HOME:-${HOME}/.pi/agent}"
 declare -a MAPPINGS=(
   "settings.json:settings.json:file"
   "extensions:extensions:dir"
-  "npm:npm:dir"
   "prompts:prompts:dir"
   "themes:themes:dir"
   "agents:agents:dir"
 )
 
-sync_file() {
+LOCAL_PACKAGE_REL="packages/subagent-dispatch"
+LOCAL_PACKAGE_SOURCE="./packages/subagent-dispatch"
+LOCAL_PACKAGE_ROOT="${SOURCE_ROOT}/${LOCAL_PACKAGE_REL}"
+
+ensure_local_package_dependencies() {
+  if [[ ! -f "${LOCAL_PACKAGE_ROOT}/package.json" ]]; then
+    return
+  fi
+
+  if [[ -d "${LOCAL_PACKAGE_ROOT}/node_modules/pi-subagents" ]]; then
+    return
+  fi
+
+  npm install --no-package-lock --ignore-scripts --prefix "${LOCAL_PACKAGE_ROOT}"
+}
+
+render_settings_file() {
   local source_path="$1"
   local target_path="$2"
 
   mkdir -p "$(dirname "${target_path}")"
 
-  if [[ -f "${source_path}" ]]; then
-    cp "${source_path}" "${target_path}"
-  else
+  if [[ ! -f "${source_path}" ]]; then
     rm -f "${target_path}"
+    return
   fi
+
+  SOURCE_PATH="${source_path}" \
+  TARGET_PATH="${target_path}" \
+  LOCAL_PACKAGE_SOURCE="${LOCAL_PACKAGE_SOURCE}" \
+  LOCAL_PACKAGE_ROOT="${LOCAL_PACKAGE_ROOT}" \
+  node <<'EOF'
+const fs = require("node:fs");
+
+const sourcePath = process.env.SOURCE_PATH;
+const targetPath = process.env.TARGET_PATH;
+const localPackageSource = process.env.LOCAL_PACKAGE_SOURCE;
+const localPackageRoot = process.env.LOCAL_PACKAGE_ROOT;
+
+const settings = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+const packages = Array.isArray(settings.packages) ? settings.packages : [];
+
+settings.packages = packages.map((entry) => {
+  if (entry === localPackageSource) {
+    return localPackageRoot;
+  }
+
+  if (entry && typeof entry === "object" && entry.source === localPackageSource) {
+    return { ...entry, source: localPackageRoot };
+  }
+
+  return entry;
+});
+
+fs.writeFileSync(targetPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+EOF
+}
+
+sync_file() {
+  local source_path="$1"
+  local target_path="$2"
+  render_settings_file "${source_path}" "${target_path}"
 }
 
 sync_dir() {
@@ -42,6 +92,8 @@ sync_dir() {
     rm -rf "${target_path}"
   fi
 }
+
+ensure_local_package_dependencies
 
 for mapping in "${MAPPINGS[@]}"; do
   IFS=":" read -r source_rel target_rel kind <<< "${mapping}"
@@ -64,8 +116,10 @@ to:
 Managed mappings:
   .pi/settings.json -> ~/.pi/agent/settings.json
   .pi/extensions/   -> ~/.pi/agent/extensions/
-  .pi/npm/          -> ~/.pi/agent/npm/
   .pi/prompts/      -> ~/.pi/agent/prompts/
   .pi/themes/       -> ~/.pi/agent/themes/
   .pi/agents/       -> ~/.pi/agent/agents/
+
+Rendered runtime values:
+  ./packages/subagent-dispatch -> ${LOCAL_PACKAGE_ROOT}
 EOF

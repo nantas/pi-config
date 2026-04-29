@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "@sinclair/typebox";
-import { discoverAgentsAll } from "../../npm/node_modules/pi-subagents/agents.ts";
-import { getArtifactsDir } from "../../npm/node_modules/pi-subagents/artifacts.ts";
-import { createSubagentExecutor } from "../../npm/node_modules/pi-subagents/subagent-executor.ts";
+import { discoverAgentsAll } from "pi-subagents/agents.ts";
+import { getArtifactsDir } from "pi-subagents/artifacts.ts";
+import { createSubagentExecutor } from "pi-subagents/subagent-executor.ts";
 import {
   buildAvailableAgentsSummary,
   buildDispatchToolDescription,

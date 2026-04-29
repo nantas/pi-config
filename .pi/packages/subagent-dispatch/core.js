@@ -190,15 +190,21 @@ export function formatDispatchSyncText(dispatchResult) {
 
 export function shouldSkipGlobalDispatchExtensionRegistration(input) {
   const extensionFile = path.resolve(String(input?.extensionFile ?? ""));
+  const legacyGlobalPrefix = path.join(
+    process.env.HOME ?? "",
+    ".pi",
+    "agent",
+    "extensions",
+    "subagent-dispatch"
+  );
   const cwd = path.resolve(String(input?.cwd ?? process.cwd()));
-  const globalPrefix = path.join(process.env.HOME ?? "", ".pi", "agent", "extensions", "subagent-dispatch");
-  const projectExtensionFile = path.join(cwd, ".pi", "extensions", "subagent-dispatch", "index.ts");
+  const projectPackageFile = path.join(cwd, ".pi", "packages", "subagent-dispatch", "index.ts");
 
-  if (!extensionFile || !cwd || !globalPrefix) return false;
-  if (!extensionFile.startsWith(globalPrefix)) return false;
-  if (extensionFile === projectExtensionFile) return false;
+  if (!extensionFile || !cwd || !legacyGlobalPrefix) return false;
+  if (extensionFile === projectPackageFile) return false;
+  if (!extensionFile.startsWith(legacyGlobalPrefix)) return false;
 
-  return fs.existsSync(projectExtensionFile);
+  return true;
 }
 
 export function serializeTaskPlan(task, agentDefinition, runId, taskId) {

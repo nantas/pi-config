@@ -1,0 +1,16 @@
+{
+  "name": "subagent-dispatch",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "pi-subagents": "0.20.1"
+  },
+  "peerDependencies": {
+    "@sinclair/typebox": "*"
+  }
+}
