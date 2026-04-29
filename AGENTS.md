@@ -4,6 +4,17 @@
 
 This repository stores `pi-config` workspace configuration and OpenSpec artifacts.
 
+## Package Management
+
+Pi package research and management follows a structured workflow defined in the `pkg-research` skill:
+
+- **Skill-driven**: All package research, evaluation, and installation decisions must go through the workflow defined in `.pi/skills/pkg-research/SKILL.md`.
+- **Security review first**: No package may be installed (project-level or global) before completing a security source review (Phase 1).
+- **User-driven decisions**: All three outcomes (add to global / backlog / discard) are chosen by the user; the agent never auto-selects.
+- **Global sync requires confirmation**: Updating `~/.pi/agent/` via `scripts/sync-pi-agent.sh` requires explicit user confirmation per the global-runtime-sync-confirmation rule.
+- **Backlog persistence**: Non-global packages are recorded in `openspec/pkg-backlog.md` with structured entries for future reference.
+- **Temp isolation**: Security review clones use `mktemp -d` and are unconditionally cleaned up after review.
+
 ## Working Rules
 
 - Default language: Chinese for discussion, English for code and filenames unless the repo already uses Chinese.

@@ -1,8 +1,13 @@
 {
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
-    "./packages/subagent-dispatch"
+    "./packages/subagent-dispatch",
+    "npm:pi-ask-tool-extension"
   ],
+  "lastChangelogVersion": "0.70.6",
+  "defaultThinkingLevel": "high",
+  "defaultProvider": "deepseek",
+  "defaultModel": "deepseek-v4-pro",
   "subagents": {
     "agentOverrides": {
       "context-builder": {
