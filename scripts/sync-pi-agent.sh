@@ -10,6 +10,7 @@ TARGET_ROOT="${PI_AGENT_HOME:-${HOME}/.pi/agent}"
 declare -a MAPPINGS=(
   "settings.json:settings.json:file"
   "extensions:extensions:dir"
+  "npm:npm:dir"
   "prompts:prompts:dir"
   "themes:themes:dir"
   "agents:agents:dir"
@@ -63,6 +64,7 @@ to:
 Managed mappings:
   .pi/settings.json -> ~/.pi/agent/settings.json
   .pi/extensions/   -> ~/.pi/agent/extensions/
+  .pi/npm/          -> ~/.pi/agent/npm/
   .pi/prompts/      -> ~/.pi/agent/prompts/
   .pi/themes/       -> ~/.pi/agent/themes/
   .pi/agents/       -> ~/.pi/agent/agents/
