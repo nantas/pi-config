@@ -2,22 +2,23 @@
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
     "./packages/subagent-dispatch",
-    "npm:pi-ask-tool-extension"
+    "npm:pi-ask-tool-extension",
+    "npm:@tmustier/pi-tab-status"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",
   "defaultProvider": "deepseek",
-  "defaultModel": "deepseek-v4-pro",
+  "defaultModel": "deepseek-v4-flash",
   "subagents": {
     "agentOverrides": {
       "context-builder": {
         "model": "deepseek/deepseek-v4-flash"
       },
       "oracle": {
-        "model": "deepseek/deepseek-v4-flash"
+        "model": "deepseek/deepseek-v4-pro"
       },
       "planner": {
-        "model": "deepseek/deepseek-v4-flash"
+        "model": "deepseek/deepseek-v4-pro"
       },
       "researcher": {
         "model": "deepseek/deepseek-v4-flash"
