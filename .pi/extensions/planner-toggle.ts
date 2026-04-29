@@ -247,6 +247,13 @@ async function togglePlannerMode(ctx: ExtensionContext): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export default function (piInstance: ExtensionAPI): void {
+  // Deduplication — prevents double registration when the same extension
+  // is loaded from both project-local (.pi/extensions/) and
+  // global (~/.pi/agent/extensions/). Only the first-loaded copy registers.
+  const _key = "__pi_ext_planner_toggle_loaded";
+  if ((globalThis as any)[_key]) return;
+  (globalThis as any)[_key] = true;
+
   pi = piInstance;
 
   // ========================================================================

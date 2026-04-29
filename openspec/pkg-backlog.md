@@ -30,6 +30,26 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-04-30 — npm:@tmustier/pi-tab-status
+
+- **Version:** 0.1.3
+- **Research Date:** 2026-04-30
+- **Resource Types:** extensions (tab status indicator)
+- **Decision:** global
+- **Reason:** 多个 terminal tab 同时运行 pi 时，tab 标题显示 agent 执行状态（:new / :running... / :✅ / :🚧 / :🛑），方便区分各 tab 进度
+- **Notes:** 源仓库 github.com/tmustier/pi-extensions/tree/main/tab-status。纯 TypeScript 135 行，0 依赖，安全审查通过。状态图标硬编码，暂不支持配置。
+
+### 2026-04-30 — planner-toggle-dedup
+
+- **Type:** Bugfix
+- **Development Date:** 2026-04-30
+- **Deliverables:**
+  - `.pi/extensions/planner-toggle.ts` — 新增 `globalThis` 自去重标记
+  - `scripts/sync-pi-agent.sh` — 撤回排除逻辑恢复正常全局同步
+- **Capability:** `extension-self-dedup` — 扩展运行时自去重，消除从全局和项目本地同时加载时的冲突警告
+- **Spec Coverage:** 4/4 scenarios covered
+- **Verification:** ✅ 见 `openspec/changes/planner-toggle-dedup/verification.md`
+
 ### 2026-04-30 — global-agent-md-tool-guide
 
 - **Type:** Workflow & Configuration
