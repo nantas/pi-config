@@ -93,6 +93,19 @@ sync_dir() {
   fi
 }
 
+sync_agents_md() {
+  local source_path="${REPO_ROOT}/.pi/agent/AGENTS.md"
+  local target_path="${TARGET_ROOT}/AGENTS.md"
+
+  mkdir -p "${TARGET_ROOT}"
+
+  if [[ -f "${source_path}" ]]; then
+    cp "${source_path}" "${target_path}"
+  else
+    rm -f "${target_path}"
+  fi
+}
+
 ensure_local_package_dependencies
 
 for mapping in "${MAPPINGS[@]}"; do
@@ -107,6 +120,9 @@ for mapping in "${MAPPINGS[@]}"; do
   fi
 done
 
+# Sync AGENTS.md (plain file copy, not via render_settings_file which processes JSON)
+sync_agents_md
+
 cat <<EOF
 Synced managed Pi paths from:
   ${SOURCE_ROOT}
@@ -114,11 +130,12 @@ to:
   ${TARGET_ROOT}
 
 Managed mappings:
-  .pi/settings.json -> ~/.pi/agent/settings.json
-  .pi/extensions/   -> ~/.pi/agent/extensions/
-  .pi/prompts/      -> ~/.pi/agent/prompts/
-  .pi/themes/       -> ~/.pi/agent/themes/
-  .pi/agents/       -> ~/.pi/agent/agents/
+  .pi/settings.json       -> ~/.pi/agent/settings.json
+  .pi/extensions/         -> ~/.pi/agent/extensions/
+  .pi/prompts/            -> ~/.pi/agent/prompts/
+  .pi/themes/             -> ~/.pi/agent/themes/
+  .pi/agents/             -> ~/.pi/agent/agents/
+  .pi/agent/AGENTS.md     -> ~/.pi/agent/AGENTS.md
 
 Rendered runtime values:
   ./packages/subagent-dispatch -> ${LOCAL_PACKAGE_ROOT}
