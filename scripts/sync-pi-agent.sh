@@ -7,14 +7,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SOURCE_ROOT="${PI_SOURCE_ROOT:-${REPO_ROOT}/.pi}"
 TARGET_ROOT="${PI_AGENT_HOME:-${HOME}/.pi/agent}"
 
-# Extensions in this list are NOT synced to the global Pi runtime.
-# They remain project-local to avoid shortcut conflicts or duplicate
-# registration with the globally-synced copy.
-# Add filenames (without path) to keep project-specific extensions local.
-declare -a EXTENSIONS_EXCLUDE=(
-  "planner-toggle.ts"
-)
-
 declare -a MAPPINGS=(
   "settings.json:settings.json:file"
   "extensions:extensions:dir"
@@ -125,12 +117,6 @@ for mapping in "${MAPPINGS[@]}"; do
     sync_file "${source_path}" "${target_path}"
   else
     sync_dir "${source_path}" "${target_path}"
-    # Remove project-local extensions from the global target
-    if [[ "${source_rel}" == "extensions" ]]; then
-      for exclude_file in "${EXTENSIONS_EXCLUDE[@]}"; do
-        rm -f "${target_path}/${exclude_file}"
-      done
-    fi
   fi
 done
 
