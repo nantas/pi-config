@@ -9,6 +9,7 @@ import {
   buildDispatchUserMessage,
   formatDispatchSyncText,
   buildMissingAgentDiagnostic,
+  shouldSkipGlobalDispatchExtensionRegistration,
   sanitizeAgentDefinition,
   normalizeProjectContext,
   normalizeSkillNames,
@@ -176,4 +177,24 @@ test("formatDispatchSyncText includes child outputs and export paths", () => {
   assert.match(text, /Session: `\/tmp\/task1\.jsonl`/);
   assert.match(text, /Task 2: scout \(COMPLETED\)/);
   assert.doesNotMatch(text, /status handle/i);
+});
+
+test("global extension yields to project-local copy in pi-config repo", () => {
+  assert.equal(
+    shouldSkipGlobalDispatchExtensionRegistration({
+      extensionFile: "/Users/nantasmac/.pi/agent/extensions/subagent-dispatch/index.ts",
+      cwd: "/Users/nantasmac/projects/pi-config",
+    }),
+    true
+  );
+});
+
+test("project-local extension does not skip itself", () => {
+  assert.equal(
+    shouldSkipGlobalDispatchExtensionRegistration({
+      extensionFile: "/Users/nantasmac/projects/pi-config/.pi/extensions/subagent-dispatch/index.ts",
+      cwd: "/Users/nantasmac/projects/pi-config",
+    }),
+    false
+  );
 });

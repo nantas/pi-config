@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 export function normalizeStringList(input) {
   if (input === false) return false;
@@ -185,6 +186,19 @@ export function formatDispatchSyncText(dispatchResult) {
   });
 
   return [...header, ...sections].join("\n\n");
+}
+
+export function shouldSkipGlobalDispatchExtensionRegistration(input) {
+  const extensionFile = path.resolve(String(input?.extensionFile ?? ""));
+  const cwd = path.resolve(String(input?.cwd ?? process.cwd()));
+  const globalPrefix = path.join(process.env.HOME ?? "", ".pi", "agent", "extensions", "subagent-dispatch");
+  const projectExtensionFile = path.join(cwd, ".pi", "extensions", "subagent-dispatch", "index.ts");
+
+  if (!extensionFile || !cwd || !globalPrefix) return false;
+  if (!extensionFile.startsWith(globalPrefix)) return false;
+  if (extensionFile === projectExtensionFile) return false;
+
+  return fs.existsSync(projectExtensionFile);
 }
 
 export function serializeTaskPlan(task, agentDefinition, runId, taskId) {

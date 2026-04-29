@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { discoverAgentsAll } from "../../npm/node_modules/pi-subagents/agents.ts";
 import { getArtifactsDir } from "../../npm/node_modules/pi-subagents/artifacts.ts";
@@ -13,10 +14,12 @@ import {
   formatDispatchSyncText,
   sanitizeAgentDefinition,
   serializeTaskPlan,
+  shouldSkipGlobalDispatchExtensionRegistration,
   summarizeDispatchResult,
 } from "./core.js";
 
 const PROJECT_ROOT = process.cwd();
+const EXTENSION_FILE = fileURLToPath(import.meta.url);
 
 const DispatchTaskSchema = Type.Object({
   agent: Type.String({ minLength: 1 }),
@@ -314,6 +317,15 @@ async function delegateDispatch(pi, ctx, signal, onUpdate, request) {
 }
 
 export default function registerSubagentDispatchExtension(pi) {
+  if (
+    shouldSkipGlobalDispatchExtensionRegistration({
+      extensionFile: EXTENSION_FILE,
+      cwd: PROJECT_ROOT,
+    })
+  ) {
+    return;
+  }
+
   const availableAgents = loadAgentDefinitions(PROJECT_ROOT);
 
   pi.registerTool({
