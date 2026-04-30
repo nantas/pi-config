@@ -15,6 +15,15 @@ Pi package research and management follows a structured workflow defined in the 
 - **Backlog persistence**: Non-global packages are recorded in `openspec/pkg-backlog.md` with structured entries for future reference.
 - **Temp isolation**: Security review clones use `mktemp -d` and are unconditionally cleaned up after review.
 
+## Agent Extension
+
+When the task requires creating a new dispatch agent or modifying an existing agent's behavior (model, thinking level, tools, system prompt):
+
+- **Scenarios**: Adding a new specialized subagent (e.g., config auditor, migration helper), overriding builtin agent settings via `subagents.agentOverrides`, or creating a project-level agent file for repo-specific delegation.
+- **Reference**: See `docs/reference/pi-subagents-extend-agent.md` for the full frontmatter reference, creation workflows (TUI / manual / programmatic), and prompt assembly rules.
+- **Convention**: Project agents go in `.pi/agents/{name}.md`. Overrides go in `.pi/settings.json` under `subagents.agentOverrides`.
+- **Validation**: After creating, verify via `/agents` list and `/run {name}` before marking the task done.
+
 ## Working Rules
 
 - Default language: Chinese for discussion, English for code and filenames unless the repo already uses Chinese.
