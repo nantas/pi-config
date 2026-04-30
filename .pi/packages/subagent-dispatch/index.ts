@@ -279,7 +279,7 @@ async function delegateDispatch(pi, ctx, signal, onUpdate, request) {
           tasks: group.plans.map((plan) => ({
             agent: plan.syntheticAgent,
             task: plan.task,
-            cwd: plan.cwd,
+            cwd: plan.cwd ? path.resolve(PROJECT_ROOT, plan.cwd) : PROJECT_ROOT,
             ...(plan.reads !== undefined ? { reads: plan.reads } : {}),
             ...(plan.skills !== undefined ? { skill: plan.skills } : {}),
             ...(plan.model ? { model: plan.model } : {}),
@@ -287,7 +287,6 @@ async function delegateDispatch(pi, ctx, signal, onUpdate, request) {
           context: group.context,
           async: false,
           clarify: false,
-          cwd: PROJECT_ROOT,
         },
         signal,
         onUpdate,
