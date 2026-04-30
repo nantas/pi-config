@@ -21,8 +21,7 @@ Pi package research and management follows a structured workflow defined in the 
 - Keep changes small and targeted.
 - Use OpenSpec files in `openspec/` as the primary project context when relevant.
 - When `pi-config` work needs confirmation from Pi source code or official Pi docs, use `$cross-repo-research` against `repo://pi-mono` in-session and read local repository evidence; do not use web search for that Pi source/doc confirmation path.
-- For any `pi-config` feature or configuration change closeout, explicitly assess whether repository `.pi/settings.json` must change; if required, update the repository file before verification is considered complete.
-- After verification for a `pi-config` feature or configuration change, ask whether the repository-managed Pi settings should be synced to global Pi runtime; only sync to `~/.pi/agent/settings.json` after explicit confirmation, using the existing managed workflow rather than ad hoc runtime edits.
+- Feature and configuration change closeout follows the workflow defined in `docs/pi-change-closeout-governance.md`. When a change reaches verification phase, read that document and follow its required closeout sequence.
 - OpenSpec writeback targets are resolved via `repo://` virtual paths through the global repo registry at `~/.config/orbitos/repo_registry.json`. Before executing writeback, resolve the target path via `repo-registry` skill (`resolve --repo-ref repo://<id>`), then edit the target file directly. Writeback content must be a concise summary (conclusion, status, deliverables, verification result), not a copy of full artifacts.
 
 ## Global Agent Guidance
