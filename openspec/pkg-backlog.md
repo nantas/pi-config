@@ -30,6 +30,15 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-04-30 — npm:pi-powerline-footer
+
+- **Version:** 0.4.20
+- **Research Date:** 2026-04-30
+- **Resource Types:** extensions (powerline-style status bar, welcome overlay, bash mode, working vibes)
+- **Decision:** global
+- **Reason:** 功能丰富的 statusline 替代方案，0 运行时依赖，支持多种预设/可定制主题/分隔符/Custom Items 与其他扩展联动。提供 rounded box 顶部边框渲染、git 集成、bash mode、working vibes 等增强体验。
+- **Notes:** 仓库 github.com/nicobailon/pi-powerline-footer。安全审查通过：所有 spawn 调用均为 git/shell 合法行为，无网络外发。配置可通过 theme.json 自定义颜色和图标。
+
 ### 2026-04-30 — npm:lsp-pi
 
 - **Version:** 1.0.4

@@ -4,7 +4,9 @@
     "./packages/subagent-dispatch",
     "npm:pi-ask-tool-extension",
     "npm:@tmustier/pi-tab-status",
-    "npm:lsp-pi"
+    "npm:lsp-pi",
+    "git:github.com/MasuRii/pi-tool-display",
+    "npm:pi-powerline-footer"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",
