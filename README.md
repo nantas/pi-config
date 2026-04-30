@@ -114,6 +114,84 @@ cat .pi/settings.json
 - **解决的问题**: 同时管理多个 Pi 会话时难以区分各 tab 状态的痛点。本包通过终端转义序列动态更新 tab 标题。
 - **引用**: `.pi/settings.json` → `packages`
 
+#### `pi-powerline-footer`
+
+- **来源**: `npm:pi-powerline-footer` | [GitHub](https://github.com/nicobailon/pi-powerline-footer)
+- **描述**: 自定义 Pi editor 底部状态栏，提供 powerline 风格的状态栏、欢迎覆盖层、Git 状态、thinking 级别指示器、AI 主题加载语（Working Vibes）、编辑器 stash、bash mode 等功能。支持多个预设主题（`default`、`minimal`、`compact`、`full`、`nerd`、`ascii`）。
+- **解决的问题**: Pi 原生状态栏信息有限，无法直观查看模型、成本、令牌消耗、Git 状态等关键运行时信息。本扩展将所有这些信息整合到编辑器顶部边框的 powerline 状态栏中。
+- **引用**: `.pi/settings.json` → `packages`
+- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
+
+##### Nerd Font 配置工作流
+
+pi-powerline-footer 的 Nerd Font 图标和 powerline 分隔符需要 Nerd Font 字体支持。以下是完整配置流程：
+
+**1. 安装 Nerd Font**
+
+```bash
+# 以 JetBrainsMono Nerd Font 为例（推荐）
+brew install --cask font-jetbrains-mono-nerd-font
+
+# 其他选项（Meslo / FiraCode）
+# brew install --cask font-meslo-lg-nerd-font
+# brew install --cask font-fira-code-nerd-font
+```
+
+**2. 配置终端字体**
+
+在终端模拟器中设置字体为 Nerd Font 变体：
+
+| 终端 | 配置方式 |
+|------|---------|
+| **Ghostty** | `~/.config/ghostty/config.ghostty` 中加 `font-family = JetBrainsMono Nerd Font` |
+| **iTerm2** | `Preferences → Profiles → Text → Font` 选择 `JetBrainsMonoNerdFont-Regular` |
+| **Kitty** | `~/.config/kitty/kitty.conf` 中加 `font_family JetBrainsMono Nerd Font` |
+| **Alacritty** | `~/.config/alacritty/alacritty.toml` 中加 `font.normal.family = "JetBrainsMono Nerd Font"` |
+| **WezTerm** | `~/.config/wezterm/wezterm.lua` 中设 `font = wezterm.font("JetBrainsMono Nerd Font")` |
+
+**3. 设置环境变量（可选，推荐）**
+
+扩展会自动检测常见终端（iTerm2、WezTerm、Kitty、Ghostty、Alacritty）。对于 tmux、Warp、VS Code 集成终端等不在自动检测列表的终端，需要手动强制启用：
+
+```bash
+# ~/.zshrc（或其他 shell 配置）
+export POWERLINE_NERD_FONTS=1
+```
+
+**4. 在 Pi 中切换到 Nerd 预设**
+
+```bash
+/powerline nerd    # 最大信息量预设
+```
+
+**5. 自定义图标（可选）**
+
+创建 `~/.pi/agent/extensions/powerline-footer/theme.json` 覆盖任意图标：
+
+```json
+{
+  "icons": {
+    "pi": "🍕",
+    "model": "🧠",
+    "folder": "📁",
+    "branch": "🌿",
+    "git": "⎇",
+    "tokens": "T",
+    "context": "▣",
+    "cost": "$",
+    "time": "◷",
+    "agents": "AG",
+    "cache": "◇",
+    "input": "→",
+    "output": "←",
+    "host": "💻",
+    "session": "#",
+    "auto": "⚡",
+    "warning": "⚠"
+  }
+}
+```
+
 ---
 
 ### Agent 定义
