@@ -8,7 +8,7 @@
  * - `/` prefix autocomplete filters out skill:xxx entries (delegate→filter)
  * - `input` event transforms `$skill-name` tokens into a consolidated `<skill>` block
  * - `\$` escape supported; unknown skills / read failures left unchanged
- * - Custom editor auto-triggers autocomplete on `$` (like builtin `@` / `#`)
+ * - `$` autocomplete via Tab (addAutocompleteProvider chain; compatible with any editor)
  *
  * Spec: openspec/changes/dollar-skill-invoke/specs/
  *   - dollar-skill-autocomplete/spec.md
@@ -16,7 +16,7 @@
  *   - slash-skill-filter/spec.md
  */
 
-import { CustomEditor, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   type AutocompleteItem,
   type AutocompleteProvider,
@@ -245,46 +245,6 @@ function handleInputTransform(
 }
 
 // ---------------------------------------------------------------------------
-// Custom editor — adds $ as an autocomplete trigger character
-// ---------------------------------------------------------------------------
-
-/**
- * Extends the default CustomEditor to auto-trigger autocomplete
- * when `$` is typed at a token boundary (like `@` and `#`).
- *
- * The built-in TUI editor only auto-triggers for `/` (slash commands),
- * `@` (file attach), and `#` (custom providers). This subclass adds `$`
- * so that our skill autocomplete provider is invoked automatically.
- */
-class DollarSkillEditor extends CustomEditor {
-  handleInput(data: string): void {
-    const isDollar = data.length === 1 && data === "$";
-
-    // Let parent handle the character insertion and existing triggers
-    super.handleInput(data);
-
-    // After insertion, auto-trigger for $ at token boundaries.
-    // Using (this as any) because tryTriggerAutocomplete is TS-private
-    // but accessible at runtime (JavaScript classes don't enforce private).
-    if (isDollar && !(this as any).autocompleteState) {
-      const cursor = this.getCursor();
-      const lines = this.getLines();
-      const line = lines[cursor.line] ?? "";
-      const textBeforeCursor = line.slice(0, cursor.col);
-      const charBeforeDollar = textBeforeCursor[textBeforeCursor.length - 2];
-
-      if (
-        textBeforeCursor.length === 1 ||
-        charBeforeDollar === " " ||
-        charBeforeDollar === "\t"
-      ) {
-        (this as any).tryTriggerAutocomplete();
-      }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Extension entry point
 // ---------------------------------------------------------------------------
 
@@ -301,20 +261,19 @@ export default function (pi: ExtensionAPI): void {
     delete (globalThis as any)[_key];
   });
 
+  // Register input event handler ONCE at top level ($skill-name expansion).
+  // This MUST be outside session_start to prevent handler accumulation
+  // across /new and /reload.
+  pi.on("input", async (event) => {
+    return handleInputTransform(event.text, pi);
+  });
+
   pi.on("session_start", async (_event, ctx) => {
-    // 1. Register autocomplete provider FIRST so the full chain is built
+    // Register autocomplete provider for the new session context.
+    // The provider chain detects `$` prefix (Tab to trigger) and filters
+    // `skill:` entries from `/` autocomplete.
     ctx.ui.addAutocompleteProvider((current) =>
       createAutocompleteProvider(current, () => getSkills(pi)),
     );
-
-    // 2. Replace editor with auto-$-trigger variant.
-    ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      return new DollarSkillEditor(tui, theme, keybindings);
-    });
-
-    // 3. Register input event handler ($skill-name expansion)
-    pi.on("input", async (event) => {
-      return handleInputTransform(event.text, pi);
-    });
   });
 }

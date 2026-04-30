@@ -88,6 +88,18 @@ Pi provides 20+ lifecycle events. Use this guidance to select the right one:
 
 > **Action:** Propose the event(s) to the user and confirm before proceeding.
 
+### ⚠️ Editor Constraint — `ctx.ui.setEditorComponent()`
+
+If your extension needs `ctx.ui.setEditorComponent()`, note that **this is an exclusive-replace API**:
+
+- The last extension to call `setEditorComponent()` wins — all previous custom editors are silently replaced.
+- There is no composition/decorator API for editor customization.
+- If two extensions both call `setEditorComponent()` in their `session_start` handlers, the one that loads later (usually from `packages` array in `.pi/settings.json`) overwrites the earlier one.
+
+**Preferred alternative**: Use `ctx.ui.addAutocompleteProvider()` when you only need to customize autocomplete behavior. The `addAutocompleteProvider` chain is compositional — multiple extensions can safely stack wrappers.
+
+See [docs/reference/pi-extension-editor-conflict.md](../../docs/reference/pi-extension-editor-conflict.md) for detailed explanation, diagnostic traces, compatibility strategies, and code patterns.
+
 ### B2 — Tool vs Command vs Shortcut vs Flag
 
 Use this decision matrix:
