@@ -1,6 +1,8 @@
 # Extension dependencies (install locally)
 .pi/extensions/*/node_modules/
 .pi/packages/*/node_modules/
+.pi/git/
+.pi/npm/
 
 # OS files
 .DS_Store
