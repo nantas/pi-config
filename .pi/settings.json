@@ -3,7 +3,8 @@
     "npm:pi-mcp-adapter@2.5.1",
     "./packages/subagent-dispatch",
     "npm:pi-ask-tool-extension",
-    "npm:@tmustier/pi-tab-status"
+    "npm:@tmustier/pi-tab-status",
+    "npm:lsp-pi"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",

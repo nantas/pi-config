@@ -30,6 +30,15 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-04-30 — npm:lsp-pi
+
+- **Version:** 1.0.4
+- **Research Date:** 2026-04-30
+- **Resource Types:** extensions (LSP Tool + Hook auto-diagnostics)
+- **Decision:** global
+- **Reason:** LSP 集成扩展，agent 可主动调用 definition/references/hover/symbols/diagnostics 等 9 种语义操作替代文本搜索，显著提升编码和代码分析效率。Hook 提供自动诊断反馈。支持 TS/JS/Vue/Svelte/Dart/Python/Go/Kotlin/Swift/Rust。
+- **Notes:** 前置条件：需安装对应语言的 LSP 服务（如 typescript-language-server）。安全审查通过：所有 spawn/fetch 均为合法 LSP 行为。
+
 ### 2026-04-30 — npm:@tmustier/pi-tab-status
 
 - **Version:** 0.1.3

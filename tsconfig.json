@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "baseUrl": ".",
+    "paths": {
+      "@mariozechner/pi-ai": [".pi/npm/node_modules/@mariozechner/pi-ai/dist/index.d.ts"],
+      "@mariozechner/pi-coding-agent": [".pi/npm/node_modules/@mariozechner/pi-coding-agent/dist/index.d.ts"],
+      "@mariozechner/pi-tui": [".pi/npm/node_modules/@mariozechner/pi-tui/dist/index.d.ts"],
+      "@mariozechner/pi-agent-core": [".pi/npm/node_modules/@mariozechner/pi-agent-core/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    ".pi/extensions/**/*.ts",
+    ".pi/skills/**/*.ts",
+    ".pi/prompts/**/*.ts"
+  ],
+  "exclude": [
+    ".pi/npm/node_modules"
+  ]
+}
