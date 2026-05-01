@@ -24,7 +24,8 @@
       },
       "planner": {
         "model": "deepseek/deepseek-v4-pro",
-        "thinking": "high"
+        "thinking": "high",
+        "tools": "read, grep, find, ls, bash, lsp, obsidian_search, obsidian_cli, mcp, subagent"
       },
       "researcher": {
         "model": "deepseek/deepseek-v4-flash",
