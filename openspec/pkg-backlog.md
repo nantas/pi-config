@@ -3,32 +3,64 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
-Each entry tracks the package source, version, research date, resource types provided,
-the decision reason, and any follow-up notes.
+Each entry tracks the resource name/version, research date, resource types,
+the decision, decision reason, source metadata, and follow-up notes.
 
 ---
 
 ## How to Add an Entry
 
-When recording a package to the backlog (via the `pkg-research` skill), append a new entry
+When recording a resource to the backlog (via the `pkg-research` skill), append a new entry
 at the top of this file using the following format:
 
 ```markdown
-### <research-date> — <package-source>
+### <research-date> — <resource-name>
 
-- **Version:** <pinned-version or "latest">
+- **Version:** <version or "latest">
 - **Research Date:** <YYYY-MM-DD>
 - **Resource Types:** <extensions / skills / prompts / themes / mixed>
-- **Decision:** <backlog / discarded>
-- **Reason:** <why not added to global>
+- **Decision:** <global / catalog / backlog / discarded>
+- **Source Type:** <npm-package | git-package | raw-extension>
+- **Source Repo:** <URL>
+- **Install Method:** <pi-install | raw-copy>
+- **Has Dependencies:** <true | false>
+- **Reason:** <decision rationale>
 - **Notes:** <follow-up items or observations>
 ```
+
+> **向后兼容：** 新字段（Source Type、Source Repo、Install Method、Has Dependencies）为可选字段。已有条目保持不变，无需迁移。
 
 ---
 
 ## Entries
 
 <!-- New entries go here, inserted at the top above this comment -->
+
+### 2026-05-02 — session-replay (raw extension)
+
+- **Version:** latest
+- **Research Date:** 2026-05-02
+- **Resource Types:** extensions (session timeline viewer via /replay command)
+- **Decision:** backlog
+- **Source Type:** raw-extension
+- **Source Repo:** https://github.com/disler/pi-vs-claude-code
+- **Install Method:** raw-copy
+- **Has Dependencies:** false
+- **Reason:** 对每个节点无法预览完整信息，意义不大。仅记录留档，后续不安装。
+- **Notes:** 单文件扩展 (session-replay.ts)，注册 `/replay` 命令展示可滚动 session 时间线。
+
+### 2026-05-02 — tool-counter-widget (raw extension)
+
+- **Version:** latest
+- **Research Date:** 2026-05-02
+- **Resource Types:** extensions (live tool-call counter widget)
+- **Decision:** global
+- **Source Type:** raw-extension
+- **Source Repo:** https://github.com/disler/pi-vs-claude-code
+- **Install Method:** raw-copy
+- **Has Dependencies:** false
+- **Reason:** 实时工具调用计数 widget，每个工具独立颜色，干净无依赖，适合全局使用。
+- **Notes:** 单文件扩展 (tool-counter-widget.ts)，通过 `tool_execution_end` 事件实时累积，已安装到 `.pi/extensions/`。
 
 ### 2026-04-30 — npm:pi-powerline-footer
 

@@ -12,6 +12,7 @@ global:
     - planner-toggle
     - output-scroll-viewer
     - subagent-dispatch
+    - tool-counter-widget
 
   # Agents synced to ~/.pi/agent/agents/
   agents:
