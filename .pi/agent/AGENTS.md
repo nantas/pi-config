@@ -3,6 +3,14 @@
 该文件通过 `scripts/sync-pi-agent.sh` 同步到 `~/.pi/agent/AGENTS.md`，对所有 Pi session 生效。
 如需更新，先修改此文件并提交到版本管理，再运行同步脚本。
 
+---
+
+## Core Rules
+
+- 默认语言：中文
+- 保持输出简洁
+- 展示文件路径时清晰标注
+
 ## Tool Call Guidelines
 
 ### Edit Tool
@@ -25,26 +33,20 @@
 
 ### MCP Tool / Dispatch
 
-- Dispatch agent 的 task 描述要具体，包含足够上下文。
-- MCP 工具调用前先确认 server 已连接。
+涉及以下场景时，请先阅读 [AGENTS.d/tool-mcp.md](./AGENTS.d/tool-mcp.md)：
+- 需要创建或调用 Dispatch agent
+- 需要通过 MCP 操作外部工具
 
 ## Markdown Output Quality
 
-### Wiki Link in Tables（Markdown 表格内的 Obsidian Wiki Link）
+输出内容包含 Markdown 表格时（尤其是 Obsidian Wiki 链接），请先阅读 [AGENTS.d/output-quality.md](./AGENTS.d/output-quality.md)。
 
-当在 Markdown 表格单元格内写入 `[[页面名|显示文本]]` 时，`|` 会被标准 Markdown 解析器误判为表格列分隔符，导致渲染错乱和链接失效。
+## LSP 代码智能
 
-**强制规则：** 表格中的 Wiki 链接必须将内部的 `|` 转义为 `\|`。
+涉及代码理解、检索或诊断时，优先用 `lsp` 工具而非 `grep` + `read`。完整指南参见 [AGENTS.d/lsp-guide.md](./AGENTS.d/lsp-guide.md)。
 
-**正确写法：**
-```markdown
-| [[str-01-competitive-games\|Competitive Games]] | Game Structure |
-```
-
-**注意：**
-- 仅表格内的 Wiki 链接需要转义。列表项（如 `- 参见 — [[xxx|yyy]]`）不受影响。
-- 子章节 index.md 如使用列表而非表格时无需处理。
-
-### 非表格场景下的 Wiki Link
-
-表格外的 `[[页面名|显示文本]]` 无需转义，`|` 在此处是合法的 Obsidian Wiki 链接语法。
+以下场景**必须**阅读：
+- 第一次在当前项目中使用 `lsp` 工具
+- 需要理解某个符号的定义、引用或类型
+- 修改代码前需要检查影响范围
+- 编辑完成后需要验证无新增错误

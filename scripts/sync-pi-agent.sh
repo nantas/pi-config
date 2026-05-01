@@ -638,10 +638,12 @@ sync_prompts_and_themes() {
   fi
 }
 
-# --- Sync AGENTS.md (plain file copy) ---
+# --- Sync AGENTS.md + AGENTS.d/ ---
 sync_agents_md() {
   local source_path="${REPO_ROOT}/.pi/agent/AGENTS.md"
   local target_path="${TARGET_ROOT}/AGENTS.md"
+  local source_dir="${REPO_ROOT}/.pi/agent/AGENTS.d"
+  local target_dir="${TARGET_ROOT}/AGENTS.d"
 
   mkdir -p "${TARGET_ROOT}"
 
@@ -650,6 +652,15 @@ sync_agents_md() {
     echo "  Synced AGENTS.md"
   else
     rm -f "${target_path}"
+  fi
+
+  # Sync AGENTS.d/ directory (on-demand detail files)
+  if [[ -d "${source_dir}" ]]; then
+    rm -rf "${target_dir}"
+    cp -R "${source_dir}" "${target_dir}"
+    echo "  Synced AGENTS.d/"
+  else
+    rm -rf "${target_dir}"
   fi
 }
 
@@ -709,4 +720,5 @@ Unchanged (full directory copy):
   prompts/        -> ~/.pi/agent/prompts/
   themes/         -> ~/.pi/agent/themes/
   AGENTS.md       -> ~/.pi/agent/AGENTS.md
+  AGENTS.d/       -> ~/.pi/agent/AGENTS.d/      (on-demand detail files)
 EOF

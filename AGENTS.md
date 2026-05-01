@@ -10,10 +10,10 @@ Pi package research and management follows a structured workflow defined in the 
 
 - **Skill-driven**: All package research, evaluation, and installation decisions must go through the workflow defined in `.pi/skills/pkg-research/SKILL.md`.
 - **Security review first**: No package may be installed (project-level or global) before completing a security source review (Phase 1).
-- **User-driven decisions**: All three outcomes (add to global / backlog / discard) are chosen by the user; the agent never auto-selects.
+- **User-driven decisions**: All outcomes (A: add to repo → sub-decision global/catalog / B: backlog only / C: discard) are chosen by the user; the agent never auto-selects.
 - **Global sync requires confirmation**: Updating `~/.pi/agent/` via `scripts/sync-pi-agent.sh` requires explicit user confirmation per the global-runtime-sync-confirmation rule.
-- **Backlog persistence**: Non-global packages are recorded in `openspec/pkg-backlog.md` with structured entries for future reference.
-- **Temp isolation**: Security review clones use `mktemp -d` and are unconditionally cleaned up after review.
+- **Backlog persistence**: All decisions (A, B, optionally C) record entries in `openspec/pkg-backlog.md` with structured schema for future reference.
+- **Clone lifecycle**: Security review clones are retained through Phase 2 (test reuse) and cleaned up in Phase 3 after decision execution (not immediately after Phase 1).
 
 ## Agent Extension
 
@@ -53,15 +53,15 @@ corresponding update to `.pi/capabilities.yaml`:
 | Add new extension (optional scope) | Append to `catalog.extensions` |
 | Remove an extension | Remove from `global.extensions` or `catalog.extensions` |
 | Add package to global config | Append to `global.settings.packages` |
-| Add package to backlog | Append to `catalog.packages` with `type: settings-entry` |
+| Add package to backlog (pure record) | Only write to `openspec/pkg-backlog.md` (no manifest update) |
 | Remove a package | Remove from `global.settings.packages` or `catalog.packages` |
 | Add/remove an agent | Update `global.agents` |
 | Add/remove a skill | Update `global.skills` or `catalog.skills` |
 
 ### Enforcement
 
-- The `pkg-research` skill automatically writes to `capabilities.yaml` during Phase 3
-  (Decision).
+- The `pkg-research` skill automatically writes to `capabilities.yaml` only during Option A
+  (Phase 3 sub-decision global/catalog). Options B and C do NOT modify manifest.
 - The `pi-extension-dev` skill automatically writes to `capabilities.yaml` during Phase F
   (Deployment).
 - Manual changes to `.pi/` resources without updating `capabilities.yaml` will cause
@@ -73,12 +73,16 @@ corresponding update to `.pi/capabilities.yaml`:
 
 Cross-session agent behavior guidance (tool call rules, agent workflow constraints) is managed through a version-controlled workflow:
 
-1. **Update source**: Modify `.pi/agent/AGENTS.md` in the repository (not `~/.pi/agent/AGENTS.md` directly).
-2. **Version control**: Commit changes to `.pi/agent/AGENTS.md` so they are tracked and reviewable.
+1. **Update source**: Modify `.pi/agent/AGENTS.md` (or files in `.pi/agent/AGENTS.d/`) in the repository (not `~/.pi/agent/` directly).
+2. **Version control**: Commit changes to `.pi/agent/AGENTS.md` and `AGENTS.d/` so they are tracked and reviewable.
 3. **User confirms sync**: Before deploying to global, obtain explicit user confirmation.
-4. **Sync to global**: Run `scripts/sync-pi-agent.sh` to copy `.pi/agent/AGENTS.md` → `~/.pi/agent/AGENTS.md`.
+4. **Sync to global**: Run `scripts/sync-pi-agent.sh` to sync `.pi/agent/AGENTS.md` + `AGENTS.d/` → `~/.pi/agent/`.
 
-This ensures all global agent guidance changes are auditable, reversible, and follow the same workflow as other managed Pi configurations.
+### On-demand Loading
+
+`AGENTS.md` 包含核心规则和高频工具规则（Edit Tool、Bash Tool、Error Recovery）。低频或篇幅较长的指南拆分到 `AGENTS.d/*.md` 中，这些文件**不会自动注入**到 system prompt，agent 在收到含链接的 AGENTS.md 后，根据当前任务按需调用 `read` 工具加载相应文件。这避免了低频规则稀释核心指引的注意力。
+
+这种设计确保了所有全局 agent 指导变更可审计、可回退，且遵循与其他 Pi 配置管理相同的工作流。
 
 ## Done Definition
 
