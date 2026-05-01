@@ -298,8 +298,9 @@ export default function (pi: ExtensionAPI): void {
 		// Edge case 2.5.2: assistant message has only tool calls, no text → silent return
 		if (!lastAssistantText) return;
 
-		// Edge case 2.5.5: default terminal rows to 24 if unknown
-		const terminalRows = 24;
+		// Edge case 2.5.5: default terminal rows to 36 if unknown
+		// (user-configured threshold; change this value to adjust sensitivity)
+		const terminalRows = 36;
 
 		// Phase 1: Quick estimation — raw newline count
 		const rawLineCount = lastAssistantText.split("\n").length;
