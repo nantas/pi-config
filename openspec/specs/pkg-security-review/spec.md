@@ -59,9 +59,25 @@ The system SHALL produce a structured security review summary and require explic
 - **WHEN** user decides to abort after seeing security review findings
 - **THEN** the system SHALL clean up the temporary clone directory and record the package in backlog with reason "security review rejected"
 
-### Requirement: Temporary Artifact Cleanup
-The system SHALL clean up temporary clone directories after review, regardless of outcome.
+### Requirement: Security Review Clone Retention Through Phase 3
+The system SHALL retain the temporary clone directory created in Phase 1 through the completion of Phase 3, instead of cleaning it up immediately after the security review. This enables the clone to be reused for Phase 2 raw extension testing and Phase 3 decision execution.
 
-#### Scenario: cleanup after review completion
-- **WHEN** security review is complete (whether user proceeds or aborts)
-- **THEN** the system SHALL remove the temporary clone directory
+#### Scenario: clone retained after Phase 1
+- **WHEN** Phase 1 security review completes and user approves proceeding
+- **THEN** the temporary clone directory is NOT cleaned up
+- **AND** the clone path is recorded for Phase 2 reuse
+
+### Requirement: Security Review Clone Retention Notification
+The system SHALL inform the user during the security review summary that the clone will be retained for Phase 2 testing.
+
+#### Scenario: user told about clone retention
+- **WHEN** Phase 1 security review summary is presented
+- **THEN** the summary includes a note: "克隆保留用于 Phase 2 测试，在 Phase 3 决策完成后清理"
+
+#### Scenario: clone available for Phase 2
+- **WHEN** Phase 2 raw extension branch begins
+- **THEN** the system reuses the existing clone at `/tmp/<rand>/` for `pi -e` testing and npm dependency resolution
+
+#### Scenario: clone cleaned up after Phase 3
+- **WHEN** Phase 3 decision is executed (any of A/B/C)
+- **THEN** the temporary clone directory is unconditionally removed

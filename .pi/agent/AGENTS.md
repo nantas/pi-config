@@ -43,7 +43,7 @@
 
 ## LSP 代码智能
 
-涉及代码理解、检索或诊断时，优先用 `lsp` 工具而非 `grep` + `read`。完整指南参见 [AGENTS.d/lsp-guide.md](./AGENTS.d/lsp-guide.md)。
+涉及复杂仓库的代码理解、检索或诊断时，优先用 `lsp` 工具而非 `grep` + `read`。完整指南参见 [AGENTS.d/lsp-guide.md](./AGENTS.d/lsp-guide.md)。
 
 以下场景**必须**阅读：
 - 第一次在当前项目中使用 `lsp` 工具
