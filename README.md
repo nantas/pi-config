@@ -80,6 +80,13 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/planner-toggle.ts`
 - **OpenSpec Spec**: `openspec/specs/planner-toggle/spec.md`
 
+#### `output-scroll-viewer`
+
+- **描述**: Agent 完成长篇输出后，检测文本是否超过一屏，弹窗确认是否从开头查看，并提供全屏可滚动 overlay 查看器。支持 Markdown 渲染和完整键盘导航（↑↓/jk 逐行滚动、PgUp/Dn/Ctrl+u/d 翻页、Home/g/End/G 跳转、Esc/q 关闭）。
+- **解决的问题**: 长篇 Agent 输出超过终端可见范围时，用户需手动向上滚动 scrollback 才能从开头阅读，打断阅读流。本扩展自动检测并弹出可选择的可滚动查看器。
+- **源文件**: `.pi/extensions/output-scroll-viewer.ts`
+- **OpenSpec Spec**: `openspec/specs/output-scroll-viewer/spec.md`
+
 ---
 
 ### 外部 Pi 包
