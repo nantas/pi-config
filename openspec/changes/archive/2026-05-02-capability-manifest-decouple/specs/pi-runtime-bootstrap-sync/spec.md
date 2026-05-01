@@ -1,10 +1,19 @@
-# Capability: pi-runtime-bootstrap-sync
+# Specification Delta: pi-runtime-bootstrap-sync
 
-## Purpose
+## Capability 对齐（已确认）
 
-Define the one-way bootstrap and sync contract from repository-managed `.pi/` resources to `~/.pi/agent/`, driven by `.pi/capabilities.yaml` as the source of truth for which resources are deployed, filtered, and published.
+- Capability: `pi-runtime-bootstrap-sync`
+- 来源: `proposal.md` — Modified Capabilities
+- 变更类型: `modified`
+- 用户确认摘要: 已确认从全量目录覆盖改为按 capabilities.yaml 选择性同步 + settings 过滤 + catalog 发布
 
-## Requirements
+## 规范真源声明
+
+- 本文件是 `pi-runtime-bootstrap-sync` 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
+
+## MODIFIED Requirements
 
 ### Requirement: Bootstrap Sync Must Use One-Way Repository Deployment
 The system SHALL define bootstrap and sync as a one-way deployment flow from repository-managed `.pi/` resources to `~/.pi/agent/`, and SHALL treat the repository as the only source of truth for managed paths. The deployment SHALL be driven by `.pi/capabilities.yaml` rather than a hardcoded mapping array.
@@ -18,7 +27,7 @@ The system SHALL define bootstrap and sync as a one-way deployment flow from rep
 - **THEN** it reads `global` declarations from `.pi/capabilities.yaml` to determine which paths to sync
 
 ### Requirement: Bootstrap Sync Must Define Selective Path Mapping Via Manifest
-The system SHALL define the mapping from repository-managed source paths to runtime target paths through `.pi/capabilities.yaml` rather than a hardcoded MAPPINGS array. The sync script SHALL sync only resources declared in `global.extensions`, `global.agents`, `global.skills`, `global.settings.packages`, and `agent_md`. Directory targets SHALL use copy-based semantics with managed overwrite.
+The system SHALL define the mapping from repository-managed source paths to runtime target paths through `.pi/capabilities.yaml` rather than a hardcoded MAPPINGS array. The sync script SHALL sync only resources declared in `global.extensions`, `global.agents`, `global.skills`, `global.settings.packages`, and `agent_md`.
 
 #### Scenario: Global extension is synced
 - **WHEN** `global.extensions` lists `planner-toggle`
@@ -31,10 +40,6 @@ The system SHALL define the mapping from repository-managed source paths to runt
 #### Scenario: Global skill is synced
 - **WHEN** `global.skills` lists `install-from-pi-config`
 - **THEN** `install-from-pi-config/` is copied to `~/.pi/agent/skills/`
-
-#### Scenario: Managed runtime drift exists
-- **WHEN** a managed runtime file differs from or no longer exists in the repository source layer
-- **THEN** the next sync restores the runtime target to the repository-managed state, including deletion when applicable
 
 ### Requirement: Bootstrap Sync Must Filter Settings By Manifest Rules
 The system SHALL apply `global.settings.packages` as a whitelist and `global.settings.exclude_keys` as a removal list when rendering `~/.pi/agent/settings.json` from `.pi/settings.json`.
@@ -66,13 +71,14 @@ The system SHALL publish the `catalog` section of `.pi/capabilities.yaml` to `~/
 - **WHEN** the sync script runs again
 - **THEN** the catalog file is overwritten with the latest catalog content
 
-### Requirement: Bootstrap Sync Must Prepare Extension Runtime Dependencies
-The system SHALL ensure that any repository-managed extension with a `package.json` has its npm dependencies installed before the sync completes.
+### Requirement: Bootstrap Sync Must Preserve Unmanaged Runtime Content
+The system SHALL leave unmanaged runtime content untouched when it falls outside the defined managed path set.
 
-#### Scenario: Managed sync prepares extension dependencies
-- **WHEN** the sync workflow runs and an extension directory under `.pi/extensions/` contains a `package.json`
-- **THEN** the workflow runs `npm install --no-package-lock --ignore-scripts` inside that directory if `node_modules/` is missing or empty
-- **AND** the sync is not blocked by missing extension dependencies
+#### Scenario: Unmanaged runtime files exist
+- **WHEN** sync is executed
+- **THEN** runtime files outside the manifest-declared global paths are preserved
+
+## ADDED Requirements
 
 ### Requirement: Bootstrap Sync Must Clear Stale Global Resources
 The system SHALL remove resources from the global target that were previously synced but are no longer declared in `global` sections of the manifest.
@@ -84,10 +90,3 @@ The system SHALL remove resources from the global target that were previously sy
 #### Scenario: Agent removed from global
 - **WHEN** an agent is removed from `global.agents`
 - **THEN** the next sync removes it from `~/.pi/agent/agents/`
-
-### Requirement: Bootstrap Sync Must Preserve Unmanaged Runtime Content
-The system SHALL leave unmanaged runtime content untouched when it falls outside the defined managed path set.
-
-#### Scenario: Unmanaged runtime files exist
-- **WHEN** sync is executed
-- **THEN** runtime files outside the manifest-declared global paths are preserved

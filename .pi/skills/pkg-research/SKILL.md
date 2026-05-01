@@ -256,6 +256,7 @@ After research summary is complete, present:
 
 ### Option A: Add to Global Config
 - Retains `.pi/settings.json` modification from Phase 2 install
+- Updates `.pi/capabilities.yaml`: appends package source to `global.settings.packages`
 - Also writes a backlog entry in `openspec/pkg-backlog.md` (backlog serves as durable record of all approved packages)
 - Syncs to `~/.pi/agent/` via scripts/sync-pi-agent.sh (with confirmation)
 - Package becomes available across all projects
@@ -263,12 +264,14 @@ After research summary is complete, present:
 ### Option B: Record to Backlog
 - Rolls back `.pi/settings.json` modification (remove package from `packages` array)
 - Cleans up project install (`pi remove <source>`)
+- Updates `.pi/capabilities.yaml`: adds a new entry to `catalog.packages` with `type: settings-entry`
 - Records entry in `openspec/pkg-backlog.md`
-- Package can be revisited later
+- Package can be revisited later for promotion to global
 
 ### Option C: Discard
 - Rolls back `.pi/settings.json` modification (remove package from `packages` array)
 - Cleans up project install (`pi remove <source>`)
+- Does NOT modify `.pi/capabilities.yaml`
 - Optional: record rejection note in backlog
 
 Which option would you like? (A/B/C)
@@ -281,7 +284,18 @@ If the system cannot confidently recommend an option, present findings with note
 **Option A (Add to Global):**
 1. The `.pi/settings.json` modification from Phase 2 is retained (no rollback needed).
 2. Write a backlog entry in `openspec/pkg-backlog.md` with decision "global" (see Option B for entry format).
-3. Proceed to Phase 4.
+3. **Update `.pi/capabilities.yaml`:** If the package source is already in `catalog.packages`, remove it from there first. Then append the package source string to `global.settings.packages` in `.pi/capabilities.yaml`. If the source already exists in `global.settings.packages`, skip the update and report the package is already listed.
+
+   **Example edit** (append to `global.settings.packages`):
+   ```yaml
+   global:
+     settings:
+       packages:
+         - npm:pi-mcp-adapter@2.5.1
+         - ./packages/subagent-dispatch
+         - <new-package-source>  # ← appended here
+   ```
+4. Proceed to Phase 4.
 
 **Option B (Backlog):**
 1. Roll back `.pi/settings.json`: use the `edit` tool to remove the package source string from the `packages` array.
@@ -294,7 +308,18 @@ If the system cannot confidently recommend an option, present findings with note
    - Resource types provided
    - Decision reason (why backlog, not global)
    - Follow-up notes
-5. Confirm entry written.
+5. **Update `.pi/capabilities.yaml`:** Append a new entry to `catalog.packages` with `name`, `source`, `description`, and `type: "settings-entry"`. If the source already exists in `catalog.packages`, skip the update and report.
+
+   **Example catalog package entry:**
+   ```yaml
+   catalog:
+     packages:
+       - name: my-package
+         source: npm:my-package@1.0.0
+         description: "Brief description of the package"
+         type: settings-entry
+   ```
+6. Confirm entry written.
 
 **Option C (Discard):**
 1. Roll back `.pi/settings.json`: use the `edit` tool to remove the package source string from the `packages` array.
@@ -302,6 +327,7 @@ If the system cannot confidently recommend an option, present findings with note
 3. If yes: append a backlog entry with status "discarded" and the rejection reason.
 4. Execute `pi remove <source>` to clean up installed resources.
 5. If no note: clean up without creating any record.
+6. Do NOT modify `.pi/capabilities.yaml`.
 
 ---
 
@@ -368,6 +394,7 @@ scripts/sync-pi-agent.sh
 | `.pi/settings.json` | Global package configuration |
 | `openspec/pkg-backlog.md` | Package backlog file |
 | `scripts/sync-pi-agent.sh` | Sync to `~/.pi/agent/` |
+| `.pi/capabilities.yaml` | Capability manifest (must stay in sync with decisions) |
 
 ## Constraints
 
@@ -378,4 +405,7 @@ scripts/sync-pi-agent.sh
 - **Temp directories must be cleaned up** — unconditionally remove after review
 - **Settings rollback for non-global decisions** — when user chooses Option B or C, always roll back `.pi/settings.json` modification made during Phase 2 install
 - **Backlog for all approved packages** — when user chooses Option A or B, always write a backlog entry as durable record
+- **Manifest update for global/backlog decisions** — Option A updates `global.settings.packages`; Option B updates `catalog.packages`; Option C does NOT modify manifest
+- **Duplicate check before manifest write** — always check if the package source already exists in the target manifest section before appending
+- **Catalog-to-global promotion** — when promoting a package from catalog to global, remove it from `catalog.packages` before adding to `global.settings.packages`
 - **All paths repo-relative** — works from pi-config repository root

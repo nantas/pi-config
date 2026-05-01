@@ -1,0 +1,68 @@
+# Pi-Config Capability Manifest
+# Single source of truth for which .pi/ resources are globally synced
+# and which are available for on-demand installation by other repositories.
+
+global:
+  # AGENTS.md is always synced to ~/.pi/agent/
+  agent_md: true
+
+  # Extensions synced to ~/.pi/agent/extensions/ (single-file .ts)
+  extensions:
+    - dollar-skill-invoke
+    - planner-toggle
+    - output-scroll-viewer
+    - subagent-dispatch
+
+  # Agents synced to ~/.pi/agent/agents/
+  agents:
+    - dispatch-planner
+    - code-writer
+
+  # Skills synced to ~/.pi/agent/skills/
+  skills:
+    - install-from-pi-config
+
+  # Settings filtering rules
+  settings:
+    # Whitelist: only these packages appear in ~/.pi/agent/settings.json
+    packages:
+      - npm:pi-ask-tool-extension
+      - npm:@tmustier/pi-tab-status
+      - npm:pi-powerline-footer
+    # Keys to exclude from ~/.pi/agent/settings.json
+    # (empty = sync all keys except those filtered by packages whitelist)
+    exclude_keys: []
+
+catalog:
+  # Skills available for on-demand installation by other repositories
+  skills:
+    - name: obsidian-search
+      source: obsidian-search
+      description: "Intelligent Obsidian vault retrieval via obsidian_search and obsidian_cli tools"
+      requires:
+        extensions:
+          - obsidian-tools
+    - name: pi-extension-dev
+      source: pi-extension-dev
+      description: "Guide the LLM through the complete lifecycle of developing a Pi extension"
+    - name: pkg-research
+      source: pkg-research
+      description: "Structured workflow for researching, evaluating, and managing third-party Pi packages"
+
+  # Extensions available for on-demand installation
+  extensions:
+    - name: obsidian-tools
+      source: obsidian-tools
+      description: "Obsidian integration tools for Pi agent"
+      has_package_json: true
+
+  # Packages available for on-demand installation (settings-entry type)
+  packages:
+    - name: pi-mcp-adapter
+      source: npm:pi-mcp-adapter@2.5.1
+      description: "Pi MCP adapter for external tool integration"
+      type: settings-entry
+    - name: lsp-pi
+      source: npm:lsp-pi
+      description: "LSP integration for Pi coding agent"
+      type: settings-entry

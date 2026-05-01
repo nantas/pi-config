@@ -1,10 +1,19 @@
-# Capability: pkg-global-sync
+# Specification Delta: pkg-global-sync
 
-## Purpose
+## Capability 对齐（已确认）
 
-Handle global configuration updates when a package is added to global config: verify/append `.pi/settings.json` packages array, update `.pi/capabilities.yaml`, confirm with user, execute `scripts/sync-pi-agent.sh` with whitelist filtering, and verify sync success.
+- Capability: `pkg-global-sync`
+- 来源: `proposal.md` — Modified Capabilities
+- 变更类型: `modified`
+- 用户确认摘要: 已确认从同步全部 packages 改为只同步 capabilities.yaml 中 global.settings.packages 声明的包
 
-## Requirements
+## 规范真源声明
+
+- 本文件是 `pkg-global-sync` 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
+
+## MODIFIED Requirements
 
 ### Requirement: Global Pi Sync Must Use Whitelist Filtering For Packages
 The system SHALL filter `.pi/settings.json` packages to only those listed in `global.settings.packages` in `.pi/capabilities.yaml` when deploying to `~/.pi/agent/settings.json`, rather than syncing all packages.
@@ -38,25 +47,3 @@ The system SHALL continue to render local-path package sources (e.g., `./package
 #### Scenario: Local path is rendered as absolute
 - **WHEN** `./packages/subagent-dispatch` is in the whitelist
 - **THEN** the global output contains the absolute path to that package
-
-### Requirement: Settings Update for Package Addition
-The system SHALL verify the package is present in `.pi/settings.json` `packages` array (normally added by `pi install -l` during Phase 2), and add it only if missing.
-
-#### Scenario: package already present from Phase 2 install
-- **WHEN** the package source already exists in `.pi/settings.json` `packages` array (from Phase 2 install)
-- **THEN** the system SHALL confirm the entry and proceed to sync without modification
-
-#### Scenario: package missing from settings
-- **WHEN** the package source is not in `.pi/settings.json` `packages` array
-- **THEN** the system SHALL append the package source string without modifying existing entries
-
-### Requirement: Sync Success Verification
-The system SHALL verify the sync operation completed successfully and confirm the package is available globally.
-
-#### Scenario: sync success
-- **WHEN** `scripts/sync-pi-agent.sh` exits with code 0
-- **THEN** the system SHALL report successful sync and confirm the target paths
-
-#### Scenario: sync failure
-- **WHEN** `scripts/sync-pi-agent.sh` exits with non-zero code
-- **THEN** the system SHALL report the failure, preserve the error output, and advise the user on manual recovery

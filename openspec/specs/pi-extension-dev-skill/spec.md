@@ -1,19 +1,10 @@
-# Specification Delta
+# Capability: pi-extension-dev-skill
 
-## Capability 对齐（已确认）
+## Purpose
 
-- Capability: `pi-extension-dev-skill`
-- 来源: `proposal.md` / 讨论中确认
-- 变更类型: `new`
-- 用户确认摘要: 用户确认 skill 放置在 `.pi/skills/pi-extension-dev/SKILL.md`，知识模式为引用型（指向 reference doc 和 pi-mono 源），产出为本仓库 `.pi/extensions/` 资产并通过 `scripts/sync-pi-agent.sh` 同步到全局，流程管控走完整 OpenSpec change
+Guide the LLM through the complete lifecycle of developing a Pi extension within the pi-config repository. Covers requirements clarification, design decisions (events, Tool vs Command, file organization), OpenSpec-governed change creation, implementation, verification, deployment sync, capability manifest update, and archival.
 
-## 规范真源声明
-
-- 本文件是该 capability 在本次 change 中的行为规范真源
-- design / tasks / verification 必须引用本文件
-- 项目页面回写不得替代本文件
-
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Skill placement and discovery
 The skill SHALL be located at `.pi/skills/pi-extension-dev/SKILL.md` within the pi-config repository, following the Agent Skills standard with valid YAML frontmatter (`name`, `description`). Pi SHALL auto-discover this skill when running from the pi-config working directory without requiring settings.json changes.
@@ -104,8 +95,8 @@ The skill SHALL guide the LLM through verification steps: (a) run the openspec-v
 - **WHEN** functional testing passes
 - **THEN** the skill instructs the LLM to run openspec-verify-change to validate change artifact completeness
 
-### Requirement: Deployment sync guidance
-The skill SHALL instruct the LLM to deploy the extension by running `./scripts/sync-pi-agent.sh` which copies `.pi/extensions/` to `~/.pi/agent/extensions/`. The skill SHALL reference the existing sync script without modifying it.
+### Requirement: Deployment sync guidance (includes manifest update)
+The skill SHALL instruct the LLM to: (1) determine extension scope (global vs catalog), (2) run `./scripts/sync-pi-agent.sh` to copy the extension from `.pi/extensions/` to `~/.pi/agent/extensions/`, (3) update `.pi/capabilities.yaml` according to scope, and (4) run openspec-archive-change. The skill SHALL reference the existing sync script without modifying it.
 
 #### Scenario: Syncing extension to global runtime
 - **WHEN** verification is complete and the extension is approved
@@ -114,6 +105,46 @@ The skill SHALL instruct the LLM to deploy the extension by running `./scripts/s
 #### Scenario: Sync script handles all managed paths
 - **WHEN** `./scripts/sync-pi-agent.sh` is executed
 - **THEN** extensions, settings, prompts, themes, and agents are all synced to `~/.pi/agent/` as a single operation
+
+#### Scenario: Manifest update is part of deployment workflow
+- **WHEN** Phase F (Deployment + Archive) is executed
+- **THEN** the workflow includes the following sub-steps in order: verification, sync, manifest update, archive
+
+### Requirement: Deployment Must Write Global Extension To Manifest
+The system SHALL add the extension name to `global.extensions` in `.pi/capabilities.yaml` when the extension is designated as global scope.
+
+#### Scenario: Global extension is recorded
+- **WHEN** a new extension is designated as global scope during design
+- **THEN** in Phase F, the extension name is appended to `global.extensions` in `.pi/capabilities.yaml`
+
+#### Scenario: Duplicate global extension is not added
+- **WHEN** the extension name already exists in `global.extensions`
+- **THEN** the workflow skips the update
+
+### Requirement: Deployment Must Write Catalog Extension To Manifest
+The system SHALL append a catalog entry to `catalog.extensions` in `.pi/capabilities.yaml` when the extension is designated as optional (catalog) scope.
+
+#### Scenario: Catalog extension is recorded
+- **WHEN** a new extension is designated as optional scope during design
+- **THEN** in Phase F, a new entry is added to `catalog.extensions` with `name`, `source`, and `description`
+
+#### Scenario: Catalog extension entry includes metadata
+- **WHEN** the catalog entry is created
+- **THEN** it includes `has_package_json: true` if the extension directory contains a `package.json`
+
+### Requirement: Manifest Update Must Happen Before Archive
+The system SHALL perform the capabilities.yaml update before the OpenSpec archive step to ensure the archive reflects the final repository state.
+
+#### Scenario: Update before archive
+- **WHEN** Phase F executes
+- **THEN** manifest update occurs after the global sync step and before the archive step
+
+### Requirement: Manifest Update Must Be Documented In Verification
+The system SHALL record the capabilities.yaml update in the verification evidence for the change.
+
+#### Scenario: Verification includes manifest update
+- **WHEN** verifying the extension change
+- **THEN** the verification evidence records whether `global.extensions` or `catalog.extensions` was updated
 
 ### Requirement: Archival guidance
 The skill SHALL instruct the LLM to run openspec-archive-change after successful verification and deployment sync.

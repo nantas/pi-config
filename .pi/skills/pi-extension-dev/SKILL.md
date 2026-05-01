@@ -276,21 +276,70 @@ This validates that all change artifacts are implemented and complete. Address a
 
 **Goal:** Make the extension available globally and finalize the change.
 
-### Step 1 — Deploy to global runtime
+### Step 1 — Determine extension scope
 
-Run the managed sync script to copy extensions to `~/.pi/agent/`:
+If the scope was not explicitly documented during Phase B (Design Decisions), ask:
+
+```
+Is this extension:
+A) **Global** — synced to all projects via ~/.pi/agent/
+B) **Optional (Catalog)** — available for on-demand install by other repositories
+```
+
+Record the decision for use in Step 3.
+
+### Step 2 — Deploy to global runtime
+
+Run the managed sync script to deploy extensions to `~/.pi/agent/`:
 
 ```bash
 ./scripts/sync-pi-agent.sh
 ```
 
-> **Note:** This copies `.pi/extensions/`, `.pi/settings.json`, `.pi/prompts/`, `.pi/themes/`, and `.pi/agents/` to `~/.pi/agent/` in a single operation. Do **not** manually edit `~/.pi/agent/settings.json`.
+> **Note:** The sync script uses `.pi/capabilities.yaml` to determine which resources to sync.
+> Extensions declared in `global.extensions` are synced; catalog extensions are not.
+> Do **not** manually edit `~/.pi/agent/settings.json`.
 
-### Step 2 — Ask for confirmation
+### Step 3 — Update capability manifest
 
-Ask the user to confirm that the global sync is acceptable before proceeding.
+Update `.pi/capabilities.yaml` based on the extension's scope decision, **after** the sync completes.
 
-### Step 3 — Archive the change
+#### If Global scope:
+
+Append the extension name to `global.extensions` in `.pi/capabilities.yaml`. If the name already exists, skip.
+
+**Example:**
+```yaml
+# In global.extensions:
+global:
+  extensions:
+    - dollar-skill-invoke
+    - planner-toggle
+    - output-scroll-viewer
+    - <new-extension-name>   # ← appended here
+```
+
+#### If Optional (Catalog) scope:
+
+Add a new entry to `catalog.extensions` in `.pi/capabilities.yaml` with `name`, `source`, `description`, and `has_package_json` (if applicable). If the entry already exists, skip.
+
+**Example:**
+```yaml
+catalog:
+  extensions:
+    - name: my-extension
+      source: my-extension
+      description: "Brief description of the extension"
+      # Include has_package_json: true if the extension has a package.json
+```
+
+If the extension directory contains a `package.json`, set `has_package_json: true`.
+
+### Step 4 — Ask for confirmation
+
+Ask the user to confirm that the global sync and manifest update are acceptable before proceeding.
+
+### Step 5 — Archive the change
 
 Run the OpenSpec archive skill:
 
@@ -347,6 +396,7 @@ This finalizes the change and updates the project progress page.
 | `.pi/extensions/<name>/index.ts` | Subdirectory extension entry |
 | `.pi/extensions/<name>/package.json` | Extension npm dependencies |
 | `scripts/sync-pi-agent.sh` | Deploy to `~/.pi/agent/` |
+| `.pi/capabilities.yaml` | Capability manifest (update in Phase F based on scope) |
 | `docs/plans/pi-customization-reference.md` | Extension system reference (Section 3) |
 | `repo://pi-mono/packages/coding-agent/docs/extensions.md` | Full ExtensionAPI reference |
 
@@ -356,3 +406,5 @@ This finalizes the change and updates the project progress page.
 - **No `.pi/settings.json` changes for extension discovery** — auto-discovered from `.pi/extensions/`
 - **All paths repo-relative** — works from pi-config repository root
 - **OpenSpec workflow required** — no ad hoc extension development outside the change workflow
+- **Manifest update required before archive** — Phase F must write to `.pi/capabilities.yaml` before the archive step
+- **Duplicate check before manifest write** — always check if the extension name already exists in the target manifest section before appending

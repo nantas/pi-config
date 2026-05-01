@@ -33,6 +33,42 @@ When the task requires creating a new dispatch agent or modifying an existing ag
 - Feature and configuration change closeout follows the workflow defined in `docs/pi-change-closeout-governance.md`. When a change reaches verification phase, read that document and follow its required closeout sequence.
 - OpenSpec writeback targets are resolved via `repo://` virtual paths through the global repo registry at `~/.config/orbitos/repo_registry.json`. Before executing writeback, resolve the target path via `repo-registry` skill (`resolve --repo-ref repo://<id>`), then edit the target file directly. Writeback content must be a concise summary (conclusion, status, deliverables, verification result), not a copy of full artifacts.
 
+## Capability Manifest Governance
+
+`.pi/capabilities.yaml` is the single source of truth for which `.pi/` resources are
+globally synced and which are available for on-demand installation. All additions,
+removals, or scope changes of the following resource types MUST be accompanied by a
+corresponding update to `.pi/capabilities.yaml`:
+
+- **Extensions** — Single-file `.ts` or directory with `package.json`
+- **Skills** — Directories under `.pi/skills/` containing `SKILL.md`
+- **Agents** — `.md` files under `.pi/agents/`
+- **Packages** — Entries in `.pi/settings.json` `packages` array
+
+### Workflow Guidance
+
+| Action | Manifest Update Required |
+|--------|--------------------------|
+| Add new extension (global scope) | Append to `global.extensions` |
+| Add new extension (optional scope) | Append to `catalog.extensions` |
+| Remove an extension | Remove from `global.extensions` or `catalog.extensions` |
+| Add package to global config | Append to `global.settings.packages` |
+| Add package to backlog | Append to `catalog.packages` with `type: settings-entry` |
+| Remove a package | Remove from `global.settings.packages` or `catalog.packages` |
+| Add/remove an agent | Update `global.agents` |
+| Add/remove a skill | Update `global.skills` or `catalog.skills` |
+
+### Enforcement
+
+- The `pkg-research` skill automatically writes to `capabilities.yaml` during Phase 3
+  (Decision).
+- The `pi-extension-dev` skill automatically writes to `capabilities.yaml` during Phase F
+  (Deployment).
+- Manual changes to `.pi/` resources without updating `capabilities.yaml` will cause
+  sync drift and MUST be corrected before the next sync.
+
+---
+
 ## Global Agent Guidance
 
 Cross-session agent behavior guidance (tool call rules, agent workflow constraints) is managed through a version-controlled workflow:

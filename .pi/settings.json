@@ -1,7 +1,6 @@
 {
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
-    "./packages/subagent-dispatch",
     "npm:pi-ask-tool-extension",
     "npm:@tmustier/pi-tab-status",
     "npm:lsp-pi",
@@ -25,7 +24,7 @@
       "planner": {
         "model": "deepseek/deepseek-v4-pro",
         "thinking": "high",
-        "tools": "read, grep, find, ls, bash, lsp, obsidian_search, obsidian_cli, mcp, subagent"
+        "tools": ["read", "grep", "find", "ls", "bash", "lsp", "obsidian_search", "obsidian_cli", "mcp", "subagent"]
       },
       "researcher": {
         "model": "deepseek/deepseek-v4-flash",
