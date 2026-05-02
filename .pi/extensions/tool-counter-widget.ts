@@ -9,7 +9,6 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Box, Text } from "@mariozechner/pi-tui";
-import { applyExtensionDefaults } from "./themeMap.ts";
 
 const palette = [
 	[12, 40, 80],    // deep navy
@@ -42,7 +41,6 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		applyExtensionDefaults(import.meta.url, ctx);
 		ctx.ui.setWidget("tool-counter", (_tui, theme) => {
 			const text = new Text("", 1, 1);
 
