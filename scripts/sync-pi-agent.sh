@@ -462,6 +462,7 @@ function extractItems(sectionName, keyword) {
 const globalExts = extractItems("global", "extensions");
 const globalAgents = extractItems("global", "agents");
 const globalSkills = extractItems("global", "skills");
+const globalPrompts = extractItems("global", "prompts");
 
 // --- SYNC EXTENSIONS ---
 console.log("\n--- Syncing global extensions ---");
@@ -563,6 +564,36 @@ for (const entry of existingSkills) {
   }
 }
 
+// --- SYNC PROMPTS ---
+console.log("\n--- Syncing global prompts ---");
+for (const promptName of globalPrompts) {
+  const sourceFile = path.join(sourceRoot, "prompts", promptName + ".md");
+  const targetFile = path.join(targetRoot, "prompts", promptName + ".md");
+
+  if (fs.existsSync(sourceFile)) {
+    fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+    fs.cpSync(sourceFile, targetFile, { force: true });
+    console.log("  Synced prompt:", promptName + ".md");
+  } else {
+    console.log("  WARNING: Prompt not found:", promptName);
+  }
+}
+
+// --- STALE PROMPT CLEANUP ---
+const existingPrompts = fs.existsSync(path.join(targetRoot, "prompts"))
+  ? fs.readdirSync(path.join(targetRoot, "prompts"), { withFileTypes: true })
+  : [];
+for (const entry of existingPrompts) {
+  const name = entry.name;
+  if (name === ".gitkeep") continue;
+  const baseName = name.endsWith(".md") ? name.slice(0, -3) : name;
+  if (!globalPrompts.includes(baseName)) {
+    const fullPath = path.join(targetRoot, "prompts", name);
+    fs.rmSync(fullPath, { recursive: true, force: true });
+    console.log("  Removed stale prompt:", name);
+  }
+}
+
 // --- CATALOG PUBLISH ---
 console.log("\n--- Publishing catalog ---");
 // Extract catalog section (everything under "catalog:")
@@ -615,18 +646,8 @@ console.log("  Source repo path:", sourceRepoPath);
 NODEEOF
 }
 
-# --- Sync prompts and themes (unchanged, not catalog'd) ---
+# --- Sync themes (unchanged, full directory copy) ---
 sync_prompts_and_themes() {
-  # prompts: full directory copy
-  if [[ -d "${SOURCE_ROOT}/prompts" ]]; then
-    rm -rf "${TARGET_ROOT}/prompts"
-    cp -R "${SOURCE_ROOT}/prompts" "${TARGET_ROOT}/prompts"
-    find "${TARGET_ROOT}/prompts" -name ".gitkeep" -delete
-    echo "  Synced prompts/"
-  else
-    rm -rf "${TARGET_ROOT}/prompts"
-  fi
-
   # themes: full directory copy
   if [[ -d "${SOURCE_ROOT}/themes" ]]; then
     rm -rf "${TARGET_ROOT}/themes"
@@ -684,7 +705,7 @@ export REPO_ROOT
 export SOURCE_PATH="${SOURCE_ROOT}/settings.json"
 export TARGET_PATH="${TARGET_ROOT}/settings.json"
 
-# 1. Sync manifest-driven resources (extensions, agents, skills)
+# 1. Sync manifest-driven resources (extensions, agents, skills, prompts)
 sync_from_manifest
 
 # 2. Sync settings.json with manifest filtering
@@ -693,9 +714,9 @@ echo "--- Syncing settings.json ---"
 render_settings_file "${SOURCE_PATH}" "${TARGET_PATH}"
 echo "  Synced settings.json (filtered by manifest)"
 
-# 3. Sync prompts and themes (unchanged, full copy)
+# 3. Sync themes (unchanged, full copy)
 echo ""
-echo "--- Syncing prompts and themes ---"
+echo "--- Syncing themes ---"
 sync_prompts_and_themes
 
 # 4. Sync AGENTS.md
@@ -713,11 +734,11 @@ Managed by manifest (.pi/capabilities.yaml):
   extensions/     -> ~/.pi/agent/extensions/  (whitelist: global.extensions)
   agents/         -> ~/.pi/agent/agents/      (whitelist: global.agents)
   skills/         -> ~/.pi/agent/skills/      (whitelist: global.skills)
+  prompts/        -> ~/.pi/agent/prompts/     (whitelist: global.prompts)
   settings.json   -> ~/.pi/agent/settings.json (filtered: packages whitelist + exclude_keys)
   catalog/        -> ~/.pi/agent/catalog/pi-config.yaml
 
 Unchanged (full directory copy):
-  prompts/        -> ~/.pi/agent/prompts/
   themes/         -> ~/.pi/agent/themes/
   AGENTS.md       -> ~/.pi/agent/AGENTS.md
   AGENTS.d/       -> ~/.pi/agent/AGENTS.d/      (on-demand detail files)

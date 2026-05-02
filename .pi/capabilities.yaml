@@ -23,6 +23,19 @@ global:
   skills:
     - install-from-pi-config
 
+  # Prompts synced to ~/.pi/agent/prompts/
+  prompts:
+    - opsx-apply
+    - opsx-archive
+    - opsx-bulk-archive
+    - opsx-continue
+    - opsx-explore
+    - opsx-ff
+    - opsx-new
+    - opsx-propose
+    - opsx-sync
+    - opsx-verify
+
   # Settings filtering rules
   settings:
     # Whitelist: only these packages appear in ~/.pi/agent/settings.json

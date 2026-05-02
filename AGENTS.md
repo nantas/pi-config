@@ -43,6 +43,7 @@ corresponding update to `.pi/capabilities.yaml`:
 - **Extensions** — Single-file `.ts` or directory with `package.json`
 - **Skills** — Directories under `.pi/skills/` containing `SKILL.md`
 - **Agents** — `.md` files under `.pi/agents/`
+- **Prompts** — `.md` files under `.pi/prompts/`
 - **Packages** — Entries in `.pi/settings.json` `packages` array
 
 ### Workflow Guidance
@@ -57,6 +58,16 @@ corresponding update to `.pi/capabilities.yaml`:
 | Remove a package | Remove from `global.settings.packages` or `catalog.packages` |
 | Add/remove an agent | Update `global.agents` |
 | Add/remove a skill | Update `global.skills` or `catalog.skills` |
+| Add/remove a prompt | Append to / Remove from `global.prompts` |
+
+### Precedence Rule
+
+Global (`~/.pi/agent/`) resources take precedence over project (`.pi/`) resources for the following types:
+
+- **Prompts**: When a prompt template exists in both `~/.pi/agent/prompts/` and `.pi/prompts/`, the runtime loads the global version; the project version is silently shadowed.
+- **Skills**: When a skill exists in both `~/.pi/agent/skills/` and `.pi/skills/`, the global version is loaded; pi-core emits collision diagnostics.
+
+To modify global resources, edit the source files in the pi-config repository (under `.pi/`) and run `scripts/sync-pi-agent.sh` to propagate changes. Modifications to project-local copies under `.pi/` that have a global counterpart will be silently ignored.
 
 ### Enforcement
 
