@@ -13,6 +13,7 @@ global:
     - output-scroll-viewer
     - subagent-dispatch
     - tool-counter-widget
+    - init-command
 
   # Agents synced to ~/.pi/agent/agents/
   agents:
