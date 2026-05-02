@@ -1,10 +1,21 @@
-# planner-toggle
+# Specification Delta
 
-## Purpose
+## Capability 对齐（已确认）
 
-Provide a planner mode toggle via `Ctrl+Alt+P` shortcut and `/planner` command that switches the active model to `deepseek/deepseek-v4-pro` and enforces read-only behavior through system prompt instructions (not tool restriction). State persistence, UI status indicator, and toast notifications are retained.
+- Capability: `planner-toggle`
+- 来源: `proposal.md` / 已确认 capabilities
+- 变更类型: modified
+- 用户确认摘要: 改造现有 `planner-toggle.ts`，从 whitelist-based（`setActiveTools` + bash regex allowlist）重构为 prompt-based（通过 `before_agent_start` → `systemPrompt` 注入完整 plan mode 指令）。删除工具白名单和 bash regex，改为纯 prompt 指令驱动的只读约束。保留快捷键、命令、模型切换、状态指示、持久化等辅助功能。
 
-## Requirements
+## 规范真源声明
+
+- 本文件是该 capability 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
+
+## KEPT Requirements
+
+以下 requirements 行为不变，仅实现细节调整：
 
 ### Requirement: Shortcut Toggle
 The system SHALL toggle between default mode and planner mode when the user presses `Ctrl+Alt+P`.
@@ -65,6 +76,8 @@ The system SHALL display a persistent status indicator when planner mode is acti
 - **WHEN** planner mode deactivates
 - **THEN** a toast notification SHALL display the deactivation message
 
+## MODIFIED Requirements
+
 ### Requirement: Planner Mode System Instruction
 The system SHALL inject comprehensive plan mode instructions into the system prompt when planner mode is active, using `before_agent_start` → `event.systemPrompt` rather than a custom message. The instruction SHALL contain:
 
@@ -95,3 +108,25 @@ The system SHALL persist planner mode state across session restarts and restore 
 #### Scenario: State restored on resume
 - **WHEN** a session starts or resumes and a persisted planner state entry exists
 - **THEN** planner mode SHALL be restored to the persisted state
+
+## REMOVED Requirements
+
+### Requirement: Read-Only Tool Restriction
+**Reason**: This change eliminates the tool whitelist approach. All tools remain available in planner mode; the LLM is trusted to follow the system prompt instructions to avoid mutations. No `pi.setActiveTools` filtering occurs.
+
+**Migration**: The `PLANNER_TOOLS` and `DEFAULT_TOOLS` constants are deleted. No tool switching happens on plan mode toggle.
+
+### Requirement: Bash Command Whitelist
+**Reason**: The bash regex allowlist (both `DESTRUCTIVE_PATTERNS` and `SAFE_PATTERNS`) is deleted. Bash remains fully available in plan mode; the LLM is instructed via system prompt to only use non-mutating commands.
+
+**Migration**: The `isSafeCommand` function and all pattern constants are removed. The `tool_call` handler no longer blocks bash commands.
+
+### Requirement: Write Tool Blocked in Planner Mode
+**Reason**: The explicit `write`/`edit` blocking in `tool_call` handler is removed. The LLM is expected to refrain from file writing based on system prompt instructions.
+
+**Migration**: The `tool_call` handler block for `write`/`edit` tools is removed.
+
+### Requirement: Stale Context Cleanup
+**Reason**: Since instructions are now injected via `systemPrompt` (not custom assistant messages), there are no stale custom messages to filter from history.
+
+**Migration**: The `context` event filtering logic for `planner-mode-context` messages is removed.

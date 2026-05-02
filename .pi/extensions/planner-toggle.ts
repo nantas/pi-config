@@ -1,26 +1,30 @@
 /**
  * planner-toggle
  *
- * Pi extension that toggles between default mode and read-only planner mode.
+ * Pi extension that toggles between default mode and planner mode.
  * In planner mode, the model switches to deepseek/deepseek-v4-pro and
- * tools are restricted to a read-only set. File-modifying tools (write/edit)
- * are blocked, and bash commands are filtered by an allowlist.
+ * plans are enforced via a system prompt instruction rather than tool
+ * restriction. All tools remain available; the LLM is trusted to follow
+ * the plan mode instructions encoded in the system prompt.
+ *
+ * Design: prompt-based (not whitelist-based)
+ * - No tool whitelist: all tools available in planner mode
+ * - No bash regex allowlist: bash fully available
+ * - Plan mode instructions injected via event.systemPrompt
+ * - Codex-style three-phase workflow: ground → intent → plan
  *
  * Features:
  * - Ctrl+Alt+P keyboard shortcut to toggle
  * - /planner command as alternative
  * - Model switches to deepseek/deepseek-v4-pro in planner mode
  * - Restores previous model when exiting planner mode
- * - Read-only tool set: read, bash, grep, find, ls
- * - Bash command allowlist (safe commands only)
+ * - System prompt instruction for read-only behavior (no tool restriction)
  * - Status bar indicator and toast notifications
  * - State persistence via appendEntry (survives session resume)
- * - Context injection and cleanup
  *
- * Spec: openspec/changes/planner-toggle/specs/planner-toggle/spec.md
+ * Spec: openspec/changes/prompt-based-plan-mode/specs/planner-toggle/spec.md
  */
 
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Key } from "@mariozechner/pi-tui";
 
@@ -31,121 +35,97 @@ import { Key } from "@mariozechner/pi-tui";
 const PLANNER_MODEL_PROVIDER = "deepseek";
 const PLANNER_MODEL_ID = "deepseek-v4-pro";
 
-const PLANNER_TOOLS = ["read", "bash", "grep", "find", "ls"];
-const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
-
 // Persistent state entry type
 const STATE_ENTRY_TYPE = "planner-toggle-state";
 
 // ---------------------------------------------------------------------------
-// Bash allowlist: safe commands allowed in planner mode
+// Plan Mode System Prompt
+//
+// Injected into the system prompt (not as a custom message) when planner
+// mode is active. Follows Codex-style three-phase workflow design.
+//
+// Design principles:
+// - Behavioral boundaries (not tool-name listing)
+// - Self-contained: no dependency on tool enumeration
+// - High authority: positioned at the end of system prompt
 // ---------------------------------------------------------------------------
 
-// Destructive patterns — if matched, command is blocked
-const DESTRUCTIVE_PATTERNS: RegExp[] = [
-  /\brm\b/i,
-  /\brmdir\b/i,
-  /\bmv\b/i,
-  /\bcp\b/i,
-  /\bmkdir\b/i,
-  /\btouch\b/i,
-  /\bchmod\b/i,
-  /\bchown\b/i,
-  /\bchgrp\b/i,
-  /\bln\b/i,
-  /\btee\b/i,
-  /\btruncate\b/i,
-  /\bdd\b/i,
-  /\bshred\b/i,
-  /(^|[^<])>(?!>)/,        // file redirection > (but not >> comparison)
-  />>/,                     // append redirection
-  /\bnpm\s+(install|uninstall|update|ci|link|publish)/i,
-  /\byarn\s+(add|remove|install|publish)/i,
-  /\bpnpm\s+(add|remove|install|publish)/i,
-  /\bpip\s+(install|uninstall)/i,
-  /\bapt(-get)?\s+(install|remove|purge|update|upgrade)/i,
-  /\bbrew\s+(install|uninstall|upgrade)/i,
-  /\bgit\s+(add|commit|push|pull|merge|rebase|reset|checkout|branch\s+-[dD]|stash|cherry-pick|revert|tag|init|clone)/i,
-  /\bsudo\b/i,
-  /\bsu\b/i,
-  /\bkill\b/i,
-  /\bpkill\b/i,
-  /\bkillall\b/i,
-  /\breboot\b/i,
-  /\bshutdown\b/i,
-  /\bsystemctl\s+(start|stop|restart|enable|disable)/i,
-  /\bservice\s+\S+\s+(start|stop|restart)/i,
-  /\b(vim?|nano|emacs|code|subl)\b/i,
-];
+const PLAN_MODE_SYSTEM_PROMPT = `\
+===== PLAN MODE ACTIVE =====
 
-// Safe read-only patterns — if matched and not destructive, command is allowed
-const SAFE_PATTERNS: RegExp[] = [
-  /^\s*cat\b/,
-  /^\s*head\b/,
-  /^\s*tail\b/,
-  /^\s*less\b/,
-  /^\s*more\b/,
-  /^\s*grep\b/,
-  /^\s*find\b/,
-  /^\s*ls\b/,
-  /^\s*pwd\b/,
-  /^\s*echo\b/,
-  /^\s*printf\b/,
-  /^\s*wc\b/,
-  /^\s*sort\b/,
-  /^\s*uniq\b/,
-  /^\s*diff\b/,
-  /^\s*file\b/,
-  /^\s*stat\b/,
-  /^\s*du\b/,
-  /^\s*df\b/,
-  /^\s*tree\b/,
-  /^\s*which\b/,
-  /^\s*whereis\b/,
-  /^\s*type\b/,
-  /^\s*command\s+-v\b/,
-  /^\s*env\b/,
-  /^\s*printenv\b/,
-  /^\s*uname\b/,
-  /^\s*whoami\b/,
-  /^\s*id\b/,
-  /^\s*date\b/,
-  /^\s*cal\b/,
-  /^\s*uptime\b/,
-  /^\s*ps\b/,
-  /^\s*top\b/,
-  /^\s*free\b/,
-  /^\s*git\s+(status|log|diff|show|branch|remote|config\s+--get)/i,
-  /^\s*git\s+ls-/i,
-  /^\s*git\s+blame\b/i,
-  /^\s*git\s+stash\s+list\b/i,
-  /^\s*git\s+tag\s*(-l|--list)?/i,
-  /^\s*git\s+describe\b/i,
-  /^\s*npm\s+(list|ls|view|info|search|outdated|audit)/i,
-  /^\s*yarn\s+(list|info|why|audit)/i,
-  /^\s*pip\s+(list|show|search)/i,
-  /^\s*brew\s+(list|info|search)/i,
-  /^\s*node\s+--version/i,
-  /^\s*python\s+--version/i,
-  /^\s*curl\s(?!.*\s(-o|-O|--output)\b)/i,   // curl without file output
-  /^\s*wget\s+(?!.*-O\b)/i,                     // wget without file output
-  /^\s*jq\b/,
-  /^\s*rg\b/,
-  /^\s*fd\b/,
-  /^\s*bat\b/,
-  /^\s*eza\b/,
-  /^\s*locate\b/,
-];
+You are currently in **Plan Mode** — a focused analysis and planning mode for
+safe code exploration. This mode persists for the entire conversation until
+you or the user explicitly toggles it off (via /planner or Ctrl+Alt+P).
 
-/**
- * Check if a bash command is safe for planner mode.
- * Returns true if the command is in the read-only allowlist.
- */
-function isSafeCommand(command: string): boolean {
-  const isDestructive = DESTRUCTIVE_PATTERNS.some((p) => p.test(command));
-  const isSafe = SAFE_PATTERNS.some((p) => p.test(command));
-  return !isDestructive && isSafe;
-}
+### What You CAN Do (Allowed Actions)
+
+- Read and explore any file in the workspace
+- Run read-only bash commands (cat, ls, grep, find, head, tail, diff, etc.)
+- Use grep, find, ls, and other search/recon tools to understand the codebase
+- Ask clarifying questions about the user's intent and requirements
+- Propose implementation plans and architectures
+- Create structured analysis documents in your responses
+- Discuss code patterns, dependencies, and design trade-offs
+
+### What You Should NOT Do (Restricted Actions)
+
+- Write or edit any file — do not use write, edit, or any tool that modifies files
+- Run destructive bash commands — do not use rm, mv, cp, mkdir, sed -i, or any
+  command that mutates the filesystem
+- Install or uninstall packages (npm install, pip install, brew install, etc.)
+- Modify git history (git commit, git push, git reset, git rebase, etc.)
+- Modify system state (sudo, systemctl, service, etc.)
+- Create or delete files or directories
+- Run commands that have side effects on external systems
+
+### Three-Phase Exploration Workflow
+
+Follow this workflow for each planning request:
+
+**Phase 1 — Ground: Understand Existing State**
+Before making any proposal, explore the relevant parts of the codebase.
+Read key files, understand the current architecture, and identify patterns.
+Confirm your understanding with the user before proceeding.
+
+**Phase 2 — Intent: Clarify Requirements**
+Propose your understanding of what needs to be done. Ask clarifying questions
+if the request is ambiguous. Discuss trade-offs and alternatives. Only move
+to Phase 3 when the user confirms the intent is correct.
+
+**Phase 3 — Implement: Produce the Plan**
+Once intent is confirmed, produce a detailed implementation plan. The plan
+should include:
+- Files that need to be created or modified
+- The order of changes (dependencies)
+- Key design decisions and rationale
+- Any risks or considerations
+
+### Plan Format
+
+When presenting a plan, use this structure:
+
+\\\`\\\`\\\`
+## Implementation Plan
+
+### Summary
+<brief overview of what will be done>
+
+### Files to Modify
+1. \`path/to/file.ts\` — <what changes>
+2. \`path/to/new-file.md\` — <create>
+
+### Change Order
+1. <first step>
+2. <second step>
+...
+
+### Risks
+- <any risks or considerations>
+\\\`\\\`\\\`
+
+Remember: You are in plan mode. Do NOT implement changes — only analyze, discuss
+and plan. The user will toggle out of plan mode when ready to implement.
+`;
 
 // ---------------------------------------------------------------------------
 // Planner State (closure variables)
@@ -208,7 +188,6 @@ async function togglePlannerMode(ctx: ExtensionContext): Promise<void> {
       // If model is no longer available, don't crash — user can set manually
     }
 
-    pi.setActiveTools(DEFAULT_TOOLS);
     updateStatus(ctx);
     persistState();
     previousModelKey = null;
@@ -230,15 +209,14 @@ async function togglePlannerMode(ctx: ExtensionContext): Promise<void> {
     // Save current model key before switching
     previousModelKey = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
 
-    // Switch model and tools
+    // Switch model
     await pi.setModel(plannerModel);
-    pi.setActiveTools(PLANNER_TOOLS);
     plannerEnabled = true;
 
     updateStatus(ctx);
     persistState();
 
-    ctx.ui.notify(`Planner mode enabled. Tools: ${PLANNER_TOOLS.join(", ")}`, "info");
+    ctx.ui.notify("Planner mode enabled. All tools available, file modifications restricted by instructions.", "info");
   }
 }
 
@@ -263,7 +241,7 @@ export default function (piInstance: ExtensionAPI): void {
   });
 
   // ========================================================================
-  // 2.3.1: Register Ctrl+Alt+P shortcut
+  // Register Ctrl+Alt+P shortcut
   // ========================================================================
   pi.registerShortcut(Key.ctrlAlt("p"), {
     description: "Toggle planner mode",
@@ -273,7 +251,7 @@ export default function (piInstance: ExtensionAPI): void {
   });
 
   // ========================================================================
-  // 2.3.2: Register /planner command
+  // Register /planner command
   // ========================================================================
   pi.registerCommand("planner", {
     description: "Toggle planner mode (read-only exploration)",
@@ -282,75 +260,25 @@ export default function (piInstance: ExtensionAPI): void {
     },
   });
 
-  // ========================================================================
-  // 2.4.1: tool_call handler — block write/edit in planner mode
-  // 2.4.2: Bash whitelist logic
-  // ========================================================================
-  pi.on("tool_call", async (event) => {
-    if (!plannerEnabled) return; // Non-planner mode: pass through
-
-    // Write/edit tools: block completely
-    if (event.toolName === "write" || event.toolName === "edit") {
-      return {
-        block: true,
-        reason: `Planner mode: tool "${event.toolName}" is blocked. Planner mode restricts file modifications. Use /planner to disable planner mode first.`,
-      };
-    }
-
-    // Bash: check against allowlist
-    if (event.toolName === "bash") {
-      const command = (event.input as { command?: string }).command ?? "";
-      if (!isSafeCommand(command)) {
-        return {
-          block: true,
-          reason: `Planner mode: bash command blocked (not in allowlist). Use /planner to disable planner mode first.\nCommand: ${command}`,
-        };
-      }
-    }
-  });
+  // No tool_call handler — all tools remain available in planner mode.
+  // The LLM is trusted to follow the system prompt instructions.
 
   // ========================================================================
-  // 2.5.1: before_agent_start handler — inject planner mode context
+  // before_agent_start handler — inject plan mode instructions via systemPrompt
   // ========================================================================
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start", async (event) => {
     if (plannerEnabled) {
       return {
-        message: {
-          customType: "planner-mode-context",
-          content:
-            `[PLANNER MODE ACTIVE]
-You are in planner mode — a read-only analysis mode for safe code exploration.
-
-Restrictions:
-- Available tools: ${PLANNER_TOOLS.join(", ")}
-- You CANNOT use: write, edit (file modifications are disabled)
-- Bash is restricted to a read-only allowlist (e.g., cat, ls, grep, find, git log/status/diff)
-- All destructive commands (rm, mv, mkdir, sudo, etc.) are blocked
-
-Your task is to analyze code, explore the codebase, and provide insights.
-Do NOT attempt to make any file modifications.`,
-          display: false,
-        },
+        systemPrompt: (event.systemPrompt ?? "") + "\n\n" + PLAN_MODE_SYSTEM_PROMPT,
       };
     }
   });
 
-  // ========================================================================
-  // 2.5.2: context handler — filter stale planner-mode messages
-  // ========================================================================
-  pi.on("context", async (event) => {
-    if (plannerEnabled) return; // Keep messages when planner is active
-
-    return {
-      messages: event.messages.filter((m) => {
-        const msg = m as AgentMessage & { customType?: string };
-        return msg.customType !== "planner-mode-context";
-      }),
-    };
-  });
+  // No context handler needed — instructions are in the system prompt,
+  // not as custom assistant messages that need filtering.
 
   // ========================================================================
-  // 2.6.1: session_start handler — restore persisted state
+  // session_start handler — restore persisted state
   // ========================================================================
   pi.on("session_start", async (_event, ctx) => {
     const entries = ctx.sessionManager.getEntries();
@@ -369,10 +297,9 @@ Do NOT attempt to make any file modifications.`,
       previousModelKey = stateEntry.data.previousModelKey ?? null;
     }
 
-    // If planner mode was active on resume, restore tools and status
-    if (plannerEnabled) {
-      pi.setActiveTools(PLANNER_TOOLS);
-    }
+    // No tool restore needed — all tools remain available.
+    // Planner mode behavior is enforced by the system prompt injection
+    // in the before_agent_start handler.
     updateStatus(ctx);
   });
 }
