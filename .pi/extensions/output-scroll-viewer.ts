@@ -121,9 +121,53 @@ class ScrollableOutputViewer implements Component {
 		if (this.lines.length === 0) {
 			this.lines = [""];
 		}
+
+		// Enable SGR mouse mode for mouse wheel scrolling
+		this.enableMouseMode();
+
+		// Wrap done() to disable mouse mode before closing
+		const originalDone = this.done;
+		this.done = () => {
+			this.disableMouseMode();
+			originalDone();
+		};
+	}
+
+	/**
+	 * Enable SGR extended mouse mode (DECSET 1000 + 1006) so the terminal
+	 * sends button events including mouse wheel scroll events.
+	 */
+	private enableMouseMode(): void {
+		this.tui.terminal.write("\x1b[?1000h\x1b[?1006h");
+	}
+
+	/**
+	 * Disable SGR mouse mode (DECRST 1000 + 1006) to restore the terminal
+	 * to its default mouse event behavior.
+	 */
+	private disableMouseMode(): void {
+		this.tui.terminal.write("\x1b[?1000l\x1b[?1006l");
 	}
 
 	handleInput(data: string): void {
+		// ── SGR mouse event detection (mouse wheel scrolling) ──
+		const sgrMatch = data.match(/^\x1b\[<(\d+);\d+;\d+[Mm]$/);
+		if (sgrMatch) {
+			const button = parseInt(sgrMatch[1], 10);
+			if (button === 64) {
+				// Mouse wheel up: scroll up 3 lines
+				this.scrollOffset = Math.max(0, this.scrollOffset - 3);
+				this.tui.requestRender();
+			} else if (button === 65) {
+				// Mouse wheel down: scroll down 3 lines
+				const maxOffset = Math.max(0, this.lines.length - this.maxVisibleLines);
+				this.scrollOffset = Math.min(maxOffset, this.scrollOffset + 3);
+				this.tui.requestRender();
+			}
+			// Non-wheel mouse events (button !== 64/65) silently ignored
+			return;
+		}
+
 		// Close: Escape, q, Ctrl+C
 		if (
 			matchesKey(data, Key.escape) ||
@@ -300,7 +344,7 @@ export default function (pi: ExtensionAPI): void {
 
 		// Edge case 2.5.5: default terminal rows to 36 if unknown
 		// (user-configured threshold; change this value to adjust sensitivity)
-		const terminalRows = 36;
+		const terminalRows = 90;
 
 		// Phase 1: Quick estimation — raw newline count
 		const rawLineCount = lastAssistantText.split("\n").length;

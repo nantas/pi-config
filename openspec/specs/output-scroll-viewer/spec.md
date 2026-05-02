@@ -4,7 +4,7 @@
 
 - Capability: `output-scroll-viewer`
 - 来源: `proposal.md` / 已确认 capabilities
-- 变更类型: `new`
+- 变更类型: `modified`
 - 用户确认摘要: 仅针对最后一条 assistant 消息，需要 Markdown 渲染，不覆盖 tool result
 
 ## 规范真源声明
@@ -65,7 +65,7 @@ The extension SHALL present a `ctx.ui.confirm()` dialog to the user before showi
 
 ### Requirement: scrollable-overlay-viewer
 
-The extension SHALL render the captured assistant text in a `ctx.ui.custom({ overlay: true })` component that supports keyboard-driven vertical scrolling and Markdown formatting.
+The extension SHALL render the captured assistant text in a `ctx.ui.custom({ overlay: true })` component that supports keyboard-driven vertical scrolling, Markdown formatting, **and mouse wheel scrolling via SGR mouse protocol**.
 
 #### Scenario: markdown-rendering
 - **WHEN** the overlay is displayed
@@ -106,6 +106,26 @@ The extension SHALL render the captured assistant text in a `ctx.ui.custom({ ove
 #### Scenario: full-viewport-usage
 - **WHEN** the overlay is displayed
 - **THEN** it SHALL use the full terminal width and available height (with appropriate border/padding) for maximum readability
+
+#### Scenario: mouse-wheel-scroll-up
+- **WHEN** the user scrolls the mouse wheel upward while the overlay has focus
+- **THEN** the viewport SHALL scroll up by 3 lines (or to the start if fewer lines remain)
+
+#### Scenario: mouse-wheel-scroll-down
+- **WHEN** the user scrolls the mouse wheel downward while the overlay has focus
+- **THEN** the viewport SHALL scroll down by 3 lines (or to the end if fewer lines remain)
+
+#### Scenario: mouse-mode-enable-on-open
+- **WHEN** the overlay is displayed
+- **THEN** SGR extended mouse mode (DECSET 1000 + 1006) SHALL be enabled via terminal write so the terminal sends mouse button events to the application
+
+#### Scenario: mouse-mode-disable-on-close
+- **WHEN** the overlay is closed (user presses Esc/q/Ctrl+c)
+- **THEN** SGR mouse mode SHALL be disabled (DECRST 1000 + 1006) via terminal write
+
+#### Scenario: mouse-other-buttons-ignored
+- **WHEN** a mouse button event with a button code other than 64 (scroll up) or 65 (scroll down) is received
+- **THEN** the event SHALL be silently ignored and the overlay continues functioning normally
 
 ### Requirement: dedup-and-lifecycle
 
