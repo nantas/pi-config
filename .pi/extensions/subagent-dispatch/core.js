@@ -101,8 +101,20 @@ export function buildDispatchToolDescription(agentDefinitions) {
     "Repository-owned subagent entrypoint.",
     "Only execute agents listed in the current dispatch scope; do not invent agent names.",
     "If unsure which agent fits, choose from the available list below instead of guessing.",
+    "",
+    "Execution modes (use exactly one):",
+    "- tasks[]: parallel agent tasks with optional output, count, and concurrency",
+    "- chain[]: sequential pipeline where each step's output feeds into the next via {previous}; supports parallel fan-out per step",
+    "- action: management operations (list, get, status)",
+    "",
+    "Parameters:",
+    "- mode: 'sync' (default) or 'async' (background execution)",
+    "- tasks[].output: file path to save results; tasks[].count: repeat the task N times",
+    "- chain[].task: supports {task}, {previous}, {chain_dir} template variables",
+    "- concurrency: limit concurrent execution for tasks or parallel chain steps",
+    "- agentScope: 'user' | 'project' | 'both' (default) to filter agent discovery",
     buildAvailableAgentsSummary(agentDefinitions),
-  ].join("\n\n");
+  ].join("\n");
 }
 
 export function buildMissingAgentDiagnostic(agentName, agentDefinitions) {
@@ -167,8 +179,15 @@ export function formatDispatchSyncText(dispatchResult) {
     dispatchResult.aggregateSummary,
   ];
 
+  const isManagement = dispatchResult.executionMode === "management";
+  const isChain = dispatchResult.executionMode === "chain";
+  const label = isManagement ? "" : isChain ? "Step" : "Task";
+
   const sections = (dispatchResult.results ?? []).map((item) => {
-    const lines = [`## Task ${item.taskId}: ${item.agent} (${String(item.status ?? "").toUpperCase()})`];
+    const title = label
+      ? `## ${label} ${item.taskId}: ${item.agent} (${String(item.status ?? "").toUpperCase()})`
+      : `## ${item.agent} (${String(item.status ?? "").toUpperCase()})`;
+    const lines = [title];
     const outputText = getDispatchResultText(item);
     lines.push(outputText || item.summary || "(no output)");
 
@@ -198,13 +217,24 @@ export function shouldSkipGlobalDispatchExtensionRegistration(input) {
     "subagent-dispatch"
   );
   const cwd = path.resolve(String(input?.cwd ?? process.cwd()));
-  const projectPackageFile = path.join(cwd, ".pi", "packages", "subagent-dispatch", "index.ts");
 
   if (!extensionFile || !cwd || !legacyGlobalPrefix) return false;
-  if (extensionFile === projectPackageFile) return false;
   if (!extensionFile.startsWith(legacyGlobalPrefix)) return false;
 
-  return true;
+  // Global extension: skip only if the project has its own local copy
+  // (extension dir or package) that will handle registration.
+  // Otherwise register — makes dispatch available in all repos.
+  const projectExtensionIndex = path.join(
+    cwd, ".pi", "extensions", "subagent-dispatch", "index.ts"
+  );
+  const projectPackageIndex = path.join(
+    cwd, ".pi", "packages", "subagent-dispatch", "index.ts"
+  );
+  if (fs.existsSync(projectExtensionIndex) || fs.existsSync(projectPackageIndex)) {
+    return true;
+  }
+
+  return false;
 }
 
 export function serializeTaskPlan(task, agentDefinition, runId, taskId) {
@@ -252,6 +282,17 @@ export function buildDispatchUserMessage(args, agentDefinitions) {
       type: "text",
       text:
         "Dispatch request from /dispatch. Interpret the following user task in natural language, decide whether it should stay local or be decomposed into one or more delegated subagent tasks, and if delegation is needed call the repository-owned dispatch tool yourself. Do not ask the user to write JSON or hand-author tasks[]. Do not bypass the repository-owned dispatch tool with ad-hoc subagent flows. Only choose agents that are explicitly listed in the current dispatch scope below.",
+    },
+    {
+      type: "text",
+      text:
+        "Available dispatch capabilities:\n" +
+        "- tasks[]: parallel execution of multiple agents; use count to repeat a task, output to save results to a file\n" +
+        "- chain[]: sequential pipeline where each step feeds into the next via {previous}; supports {task}, {chain_dir} templates and parallel fan-out per step\n" +
+        "- mode: 'async' for background execution (returns a runId for status queries)\n" +
+        "- action: 'list' to see agents, 'get' for agent details, 'status' for run status\n" +
+        "- concurrency: limit how many tasks run simultaneously\n" +
+        "- agentScope: 'user' | 'project' | 'both' to filter which agents are visible",
     },
     {
       type: "text",
