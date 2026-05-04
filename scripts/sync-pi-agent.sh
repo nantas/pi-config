@@ -270,7 +270,31 @@ for (const key of excludeKeys) {
   delete settings[key];
 }
 
-fs.writeFileSync(targetPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
+// --- Merge user-managed keys from target (pre-sync cache) ---
+const USER_MANAGED_KEYS = ["enabledModels"];
+const cache = {};
+try {
+  const targetSettings = JSON.parse(fs.readFileSync(targetPath, "utf8"));
+  for (const key of USER_MANAGED_KEYS) {
+    if (key in targetSettings) {
+      cache[key] = targetSettings[key];
+    }
+  }
+} catch {
+  // Target doesn't exist or is unreadable — cache stays empty
+}
+
+// Merge cached values back (target wins)
+for (const key of USER_MANAGED_KEYS) {
+  if (key in cache) {
+    settings[key] = cache[key];
+  }
+}
+
+// Atomic write via temp file
+const tempPath = targetPath + ".tmp";
+fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
+fs.renameSync(tempPath, targetPath);
 NODEEOF
 }
 
