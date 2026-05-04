@@ -1,3 +1,6 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 interface ProviderModelConfig {
@@ -16,12 +19,34 @@ interface ProviderModelConfig {
 	api?: string;
 }
 
-interface PersistedProviderConfig {
-	v: number;
-	name: string;
+interface ModelsJsonProvider {
 	baseUrl: string;
+	api: string;
 	apiKey: string;
 	models: ProviderModelConfig[];
+}
+
+interface ModelsJson {
+	providers: Record<string, ModelsJsonProvider>;
+}
+
+function getModelsJsonPath(): string {
+	return join(homedir(), ".pi", "agent", "models.json");
+}
+
+function readModelsJson(): ModelsJson {
+	const path = getModelsJsonPath();
+	try {
+		const raw = readFileSync(path, "utf-8");
+		return JSON.parse(raw) as ModelsJson;
+	} catch {
+		return { providers: {} };
+	}
+}
+
+function writeModelsJson(data: ModelsJson): void {
+	const path = getModelsJsonPath();
+	writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
 export default function (pi: ExtensionAPI) {
@@ -33,32 +58,6 @@ export default function (pi: ExtensionAPI) {
 	// REQUIRED: clear flag on session end so session replacements work
 	pi.on("session_shutdown", () => {
 		delete (globalThis as any)[_key];
-	});
-
-	// Reload persisted providers on every session start
-	pi.on("session_start", async (_event, ctx) => {
-		const entries = ctx.sessionManager.getEntries();
-		let reloaded = 0;
-		for (const entry of entries) {
-			if (entry.type === "custom" && (entry as any).customType === "add-provider") {
-				const config = (entry as any).data as PersistedProviderConfig | undefined;
-				if (!config?.name) continue;
-				try {
-					pi.registerProvider(config.name, {
-						baseUrl: config.baseUrl,
-						apiKey: config.apiKey || undefined,
-						api: "openai-completions",
-						models: config.models,
-					});
-					reloaded++;
-				} catch {
-					// Provider may already be registered — skip silently
-				}
-			}
-		}
-		if (reloaded > 0) {
-			ctx.ui.notify(`Reloaded ${reloaded} custom provider(s)`, "info");
-		}
 	});
 
 	// /add-provider interactive command
@@ -80,8 +79,8 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 
-				// Step 3: API key (optional)
-				const apiKey = (await ctx.ui.input("API key (optional):", "")) || "";
+				// Step 3: API key (optional — local providers like Ollama don't need one)
+				const apiKey = (await ctx.ui.input("API key (optional, enter for local):", "")) || "";
 
 				// Step 4: Discover models from /v1/models
 				let models: ProviderModelConfig[] = [];
@@ -141,25 +140,35 @@ export default function (pi: ExtensionAPI) {
 					];
 				}
 
-				// Step 6: Register provider (takes effect immediately)
-				pi.registerProvider(name.trim(), {
-					baseUrl: baseUrl.trim(),
-					apiKey: apiKey || undefined,
+				const trimmedName = name.trim();
+				const trimmedBaseUrl = baseUrl.trim();
+				// Use a placeholder value for apiKey if empty (local providers don't need it,
+				// but Pi's validateProviderConfig requires apiKey or oauth to be set)
+				const effectiveApiKey = apiKey || "none";
+
+				// Step 6: Register provider in current session (takes effect immediately)
+				pi.registerProvider(trimmedName, {
+					baseUrl: trimmedBaseUrl,
+					apiKey: effectiveApiKey,
 					api: "openai-completions",
 					models,
 				});
 
-				// Step 7: Persist configuration
-				pi.appendEntry("add-provider", {
-					v: 1,
-					name: name.trim(),
-					baseUrl: baseUrl.trim(),
-					apiKey,
+				// Step 7: Persist to models.json (Pi-native config file)
+				// models.json is loaded by Pi on startup via loadModels() -> loadCustomModels(),
+				// so the provider will be available in all future sessions.
+				// It is NOT managed by sync-pi-agent.sh, so it won't be overwritten.
+				const config = readModelsJson();
+				config.providers[trimmedName] = {
+					baseUrl: trimmedBaseUrl,
+					api: "openai-completions",
+					apiKey: effectiveApiKey,
 					models,
-				});
+				};
+				writeModelsJson(config);
 
 				ctx.ui.notify(
-					`Provider "${name.trim()}" added with ${models.length} model(s)`,
+					`Provider "${trimmedName}" added with ${models.length} model(s) (persisted to models.json)`,
 					"success",
 				);
 			} catch (err) {
