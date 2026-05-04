@@ -5,7 +5,7 @@
     "npm:@tmustier/pi-tab-status",
     "npm:lsp-pi",
     "git:github.com/MasuRii/pi-tool-display",
-    "npm:pi-powerline-footer"
+    "git:github.com/jwu/pi-powerline"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",

@@ -36,6 +36,19 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-05-03 — git:github.com/jwu/pi-powerline
+
+- **Version:** 0.1.0
+- **Research Date:** 2026-05-03
+- **Resource Types:** extensions (custom editor, breadcrumb, footer, header)
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/jwu/pi-powerline
+- **Install Method:** pi-install
+- **Has Dependencies:** false (peer deps only: pi-coding-agent, pi-ai, pi-tui)
+- **Reason:** 轻量级 powerline 风格 UI 套件，替换 npm:pi-powerline-footer。仅 7 个文件 ~18KB，提供简洁 footer（tokens/context/cost/git/thinking）、渐变 header、breadcrumb widget、带 ❯ 前缀的 editor。无 bash mode / fixed editor / shortcuts 等重型功能，渲染更轻量、启动更快。
+- **Notes:** 安装时需移除 package.json 中的 `prepare: husky` 脚本（husky 为 devDependency，Pi 的 `--omit=dev` 安装会失败）。配置通过顶层键 `breadcrumb`/`footer`/`header` 控制，支持 `/powerline` 命令动态切换。Nerd Font 自动检测。
+
 ### 2026-05-02 — session-replay (raw extension)
 
 - **Version:** latest
@@ -68,8 +81,9 @@ at the top of this file using the following format:
 - **Research Date:** 2026-04-30
 - **Resource Types:** extensions (powerline-style status bar, welcome overlay, bash mode, working vibes)
 - **Decision:** global
-- **Reason:** 功能丰富的 statusline 替代方案，0 运行时依赖，支持多种预设/可定制主题/分隔符/Custom Items 与其他扩展联动。提供 rounded box 顶部边框渲染、git 集成、bash mode、working vibes 等增强体验。
-- **Notes:** 仓库 github.com/nicobailon/pi-powerline-footer。安全审查通过：所有 spawn 调用均为 git/shell 合法行为，无网络外发。配置可通过 theme.json 自定义颜色和图标。
+- **Decision:** replaced
+- **Reason:** 2026-05-03 被 jwu/pi-powerline 替代。原包功能丰富但代码量过大（340KB），包含 bash mode / fixed editor / working vibes 等大量非必需功能，且 `setEditorComponent()` 与其他扩展存在覆盖冲突。
+- **Notes:** 仓库 github.com/nicobailon/pi-powerline-footer。安全审查通过：所有 spawn 调用均为 git/shell 合法行为，无网络外发。配置可通过 theme.json 自定义颜色和图标。已从 global 移除，不再同步。
 
 ### 2026-04-30 — npm:lsp-pi
 

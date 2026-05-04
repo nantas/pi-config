@@ -43,7 +43,7 @@ global:
     packages:
       - npm:pi-ask-tool-extension
       - npm:@tmustier/pi-tab-status
-      - npm:pi-powerline-footer
+      - git:github.com/jwu/pi-powerline
     # Keys to exclude from ~/.pi/agent/settings.json
     # (empty = sync all keys except those filtered by packages whitelist)
     exclude_keys: []
