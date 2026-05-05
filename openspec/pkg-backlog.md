@@ -36,6 +36,19 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-05-04 — git:github.com/lucasmeijer/pi-terminal-signals
+
+- **Version:** 0.1.0
+- **Research Date:** 2026-05-04
+- **Resource Types:** extensions (terminal OSC signals)
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/lucasmeijer/pi-terminal-signals
+- **Install Method:** pi-install
+- **Has Dependencies:** false (peer deps only: pi-coding-agent)
+- **Reason:** 零依赖、零风险的轻量级扩展，通过标准 OSC escape sequence 向终端报告 agent 生命周期（agent_start / agent_end / session_shutdown / session_switch）。支持 Ghostty/WezTerm/iTerm2/Kitty/WT/VS Code terminal，不支持的终端静默忽略。提升多终端协作体验。
+- **Notes:** 监听 4 个事件，发送 OSC 9;4 (进度指示) 和 OSC 133 (语义提示/完成通知)。MIT 许可证，作者 Lucas Meijer。
+
 ### 2026-05-03 — git:github.com/jwu/pi-powerline
 
 - **Version:** 0.1.0

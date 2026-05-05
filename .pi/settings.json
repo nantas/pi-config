@@ -5,7 +5,8 @@
     "npm:@tmustier/pi-tab-status",
     "npm:lsp-pi",
     "git:github.com/MasuRii/pi-tool-display",
-    "git:github.com/jwu/pi-powerline"
+    "git:github.com/jwu/pi-powerline",
+    "git:github.com/lucasmeijer/pi-terminal-signals"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",
@@ -24,7 +25,18 @@
       "planner": {
         "model": "deepseek/deepseek-v4-pro",
         "thinking": "high",
-        "tools": ["read", "grep", "find", "ls", "bash", "lsp", "obsidian_search", "obsidian_cli", "mcp", "subagent"]
+        "tools": [
+          "read",
+          "grep",
+          "find",
+          "ls",
+          "bash",
+          "lsp",
+          "obsidian_search",
+          "obsidian_cli",
+          "mcp",
+          "subagent"
+        ]
       },
       "researcher": {
         "model": "deepseek/deepseek-v4-flash",
