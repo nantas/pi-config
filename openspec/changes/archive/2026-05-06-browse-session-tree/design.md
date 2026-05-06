@@ -26,9 +26,56 @@ Pi 内置 `/tree` 命令使用 `TreeSelectorComponent`（`packages/coding-agent/
 - 高度 = `3 + maxLines`（2 边框 + 1 指示器 + maxLines 内容行），始终不变
 - 折叠时显示占位文字 "Press Space for detail"
 - 展开时内容超过 maxLines 通过 scroll offset 控制可见范围
-- 键盘滚动：↑/↓ (±1)、PageUp/PageDown (±page)
+- 键盘滚动：j/k (±1)、PageUp/PageDown (±page)
 - 鼠标滚轮：SGR mouse mode，±3 行/次
 - 内容提取：`allText()` 支持 `type: "text"` 和 `"input_text"`，`wrapLines()` 按 100 字符换行
+
+### 输入路由：三态状态机
+
+BrowseComponent 维护一个状态机，管理三种模式：
+
+```
+                  ┌──────────┐
+                  │ Normal   │  ← detail 折叠/展开，导航树，阅读详情
+                  └────┬─────┘
+                       │
+              ┌────────┴────────┐
+     ┌───────┤  按 / 进入搜索    ├──────────┐
+     │       └─────────────────┘          │
+     │                                     │
+     ▼                                     ▼
+┌──────────┐                        ┌──────────┐
+│  Search  │   Escape/Enter 退出    │ Reading  │  ← detail 展开时
+│ (detail  │ ──────────────────→   │ (detail  │
+│  折叠)   │                        │  展开)   │
+└──────────┘                        └────┬─────┘
+     │                                    │
+     └── Space/↑↓ 退出 Reading ───────────┘
+         回到 Normal
+```
+
+**Normal 模式**（detail 可折叠或展开）：
+- ↑/↓：detail 展开时折叠 + 导航树；折叠时直接导航树
+- Space：切换 detail 折叠/展开
+- j/k：detail 展开时滚动 detail（±1行）；折叠时无操作
+- PgUp/PgDn：detail 展开时滚动 detail（±1页）；折叠时导航树（分页）
+- 鼠标滚轮：detail 展开时滚动 detail
+- /：进入搜索模式（自动折叠 detail）
+- Enter：跳转到选中节点
+- Escape：有搜索残留时清空，否则退出 /browse
+- 其他可打印字符：忽略（不触发 TreeList 的隐式搜索）
+
+**Reading 模式**（与 Normal 的 detail 展开态行为相同，强调阅读体验）：
+- 与 Normal 模式共享同一状态变量 `detail.expanded`，没有独立状态位
+- 仅 routing 行为不同：↑/↓ 折叠 + 导航，而不是导航树
+
+**Search 模式**（detail 始终折叠）：
+- 可打印字符：追加到搜索词，树实时筛选
+- Backspace：删除末位搜索词字符
+- ↑/↓：在筛选结果中导航
+- Enter：退出搜索模式（保留当前筛选状态）
+- Escape：退出搜索模式（清空筛选，恢复全树）
+- Space、/ 等：忽略
 
 ## Goals / Non-Goals
 
@@ -36,8 +83,11 @@ Pi 内置 `/tree` 命令使用 `TreeSelectorComponent`（`packages/coding-agent/
 - 注册 `/browse` 命令，启动自定义 TUI 浏览器
 - 实现完整子树折叠（任意有子节点的节点均可折叠）
 - 实现 DetailPanel 预览（默认折叠，Space 展开/折叠）
-- 支持搜索过滤和 filter mode 循环
+- 显式搜索模式（`/` 进入，Escape/Enter 退出）
 - 支持 Enter 跳转导航和 Escape/q 取消
+- 消除 ↑/↓ 路由冲突：↑/↓ 在 detail 展开时关闭 panel + 导航树
+- 消除隐式搜索：detail 展开时，可打印字符不触发搜索
+- 消除 DetailPanel 宽行显示残影：所有渲染行用 `pad=true` 确保严格对齐
 - 包含 `globalThis` dedup 和 `session_shutdown` 清理
 - 单文件扩展模式（`.pi/extensions/browse-session-tree.ts`）
 - 全局同步（通过 `scripts/sync-pi-agent.sh` + `capabilities.yaml`）
@@ -78,9 +128,32 @@ Pi 内置 `/tree` 命令使用 `TreeSelectorComponent`（`packages/coding-agent/
 
 **Rationale**: 参考 `output-scroll-viewer.ts`。
 
-### D6: 输入路由
+### D6: DetailPanel 滚动键映射
 
-**Decision**: BrowseComponent.handleInput 先检查 Space（toggle detail），再路由详情展开时的 scroll/mouse 键到 DetailPanel，其余委托给 TreeList。
+**Decision**: ↑/↓ 不再路由到 DetailPanel（改为折叠 + 导航树），替换为 j/k（±1 行）。PgUp/PgDn 保留作页面滚动。
+
+**Rationale**: 
+- ↑/↓ 是标准的树导航键，在 detail 展开时路由到面板会阻止用户移动光标
+- j/k 在 detail 上下文中是"读"的操作，语义清晰
+- 参考 vim/less 的滚动习惯
+
+### D7: 搜索模式 — 显式触发
+
+**Decision**: 按 `/` 进入搜索模式，可打印字符追加搜索词，Escape 退出（清空筛选），Enter 退出（保留筛选）。搜索模式下 detail 自动折叠。Normal 模式下的可打印字符（非快捷键）不再转发到 TreeList，禁止隐式搜索。
+
+**Rationale**:
+- 隐式搜索在 detail 存在时与 j/k 冲突（'j' 既是搜索字符又是 detail 滚动键）
+- 显式触发让用户明确知道当前处于搜索状态
+- 搜索模式下 detail 折叠避免了"边搜边看"的混淆状态
+- Enter/Escape 的退出策略提供了"保留结果"和"清除结果"两种选择
+
+### D8: 渲染行严格对齐 — truncateToWidth pad=true
+
+**Decision**: DetailPanel 和 BrowseComponent 的所有 `truncateToWidth()` 调用使用 `pad=true`，确保每行严格等于 `width` 可见宽度。
+
+**Rationale**: 内容行的 visible width 可能因宽字符（emoji/CJK）而小于 panel 宽度。缺少 `pad=true` 时，TUI diff 引擎输出短行，终端不自动清除旧帧残影字符，导致视觉上"边框撑爆"。`pad=true` 补齐空格到精确宽度，消除残影。
+
+**Future improvement**: 宽字符的精确换行需要替换 `padEnd`/`slice` 为 visibleWidth 感知方案（用 `sliceByColumn`），当前不在 scope 内。
 
 ## 遇到的问题与经验
 
@@ -94,6 +167,9 @@ Pi 内置 `/tree` 命令使用 `TreeSelectorComponent`（`packages/coding-agent/
 | 初始光标在 model_change 条目上 | default filter 未过滤系统类型 entry | filter mode 添加 `isSettingsEntry` 检查 |
 | 详情面板高度不稳定 | 折叠时 `render()` 返回空数组，展开返回内容 | 改为始终返回固定行数，折叠时显示占位文字 |
 | 滚动键未路由到 DetailPanel | handleInput 只委托给 treeList | 添加详情展开时的 scroll/mouse 键路由 |
+| ↑/↓ 在 detail 展开时与导航冲突 | 面板占用 ↑/↓ 导致用户无法移动光标 | ↑/↓ 折叠 + 导航树，j/k 替换为面板滚动 |
+| 隐式搜索与 j/k 键冲突 | TreeList 的 fallthrough 把所有字符都当搜索词 | `/` 显式搜索模式，normal 模式不转发可打印字符 |
+| Detail 面板文字内容撑爆 | 宽字符行 visible width 不足，`truncateToWidth` 无 pad | 所有渲染行加 `pad=true` 严格对齐 |
 
 ## Risks / Migration
 
@@ -120,6 +196,12 @@ Pi 内置 `/tree` 命令使用 `TreeSelectorComponent`（`packages/coding-agent/
 **Risk**: assistant 的完整回复可能数百行，DetailPanel 渲染全部内容可能影响 TUI 性能。
 
 **Mitigation**: 实现惰性渲染——只渲染可见区域内的文本行。由于 `ui.custom()` 组件的 `render()` 每次只渲染当前帧，通过控制 DetailPanel 高度限制实际渲染行数。
+
+### Risk 5: 搜索模式视觉反馈不足
+
+**Risk**: 用户按下 `/` 后没有明显反馈，不知道自己进入了搜索模式。
+
+**Mitigation**: BrowseComponent.render() 在搜索模式下追加搜索提示行，格式为 `/用户输入`，显示在 DetailPanel 上方。
 
 ### Migration
 

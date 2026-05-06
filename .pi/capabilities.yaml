@@ -15,6 +15,7 @@ global:
     - tool-counter-widget
     - init-command
     - add-provider
+    - browse-session-tree
 
   # Agents synced to ~/.pi/agent/agents/
   agents:

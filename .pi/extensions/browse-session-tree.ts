@@ -4,15 +4,16 @@
  * Pi extension that registers `/browse` command. Uses the built-in
  * TreeSelectorComponent for ALL tree rendering (same as `/tree`).
  * Adds a scrollable DetailPanel below the tree, toggled with Space.
- * Mouse wheel supported for DetailPanel scrolling.
+ * Mouse wheel + j/k + PgUp/PgDn supported for DetailPanel scrolling.
+ * Search mode via `/`, cancel via Escape/Enter.
  *
  * Capability: `browse-session-tree`
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { SessionTreeNode } from "@mariozechner/pi-coding-agent";
-import { Container, Key, matchesKey, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import type { Component, TUI } from "@mariozechner/pi-tui";
+import { Container, Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { TUI } from "@mariozechner/pi-tui";
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { TreeSelectorComponent } from "@mariozechner/pi-coding-agent";
 
@@ -135,8 +136,8 @@ class DetailPanel {
 		if (m) { const b = parseInt(m[1], 10); if (b === 64) this.scroll(-3); else if (b === 65) this.scroll(3); return; }
 		if (matchesKey(data, Key.pageUp)) this.scroll(-this.maxLines);
 		else if (matchesKey(data, Key.pageDown)) this.scroll(this.maxLines);
-		else if (matchesKey(data, Key.up)) this.scroll(-1);
-		else if (matchesKey(data, Key.down)) this.scroll(1);
+		else if (data === 'k') this.scroll(-1);
+		else if (data === 'j') this.scroll(1);
 	}
 
 	render(width: number): string[] {
@@ -144,28 +145,28 @@ class DetailPanel {
 		const B = (c: string) => `\x1b[2m${c}\x1b[22m`;
 		const iw = width - 2;
 
-		l.push(truncateToWidth(B("┌") + "─".repeat(iw) + B("┐"), width));
+		l.push(truncateToWidth(B("┌") + "─".repeat(iw) + B("┐"), width, "...", true));
 
 		if (!this.visible || !this.entry) {
 			// Collapsed or no entry — show placeholder, keep fixed height
-			l.push(truncateToWidth(B("│") + "┄ Press Space for detail ┄".padEnd(iw) + B("│"), width));
+			l.push(truncateToWidth(B("│") + "┄ Press Space for detail ┄".padEnd(iw) + B("│"), width, "...", true));
 			for (let i = 1; i < this.maxLines + 1; i++) {
-				l.push(truncateToWidth(B("│") + " ".repeat(iw) + B("│"), width));
+				l.push(truncateToWidth(B("│") + " ".repeat(iw) + B("│"), width, "...", true));
 			}
 		} else {
 			// Expanded — show content with scroll offset
-			l.push(truncateToWidth(B("│") + `┄ Detail ${this.offset}/${Math.max(0, this.lines.length - this.maxLines)} ──`.padEnd(iw) + B("│"), width));
+			l.push(truncateToWidth(B("│") + `┄ Detail ${this.offset}/${Math.max(0, this.lines.length - this.maxLines)} ──`.padEnd(iw) + B("│"), width, "...", true));
 			const end = Math.min(this.offset + this.maxLines, this.lines.length);
 			for (let i = this.offset; i < end; i++) {
 				const s = this.lines[i];
-				l.push(truncateToWidth(B("│") + s.padEnd(iw, " ").slice(0, iw) + B("│"), width));
+				l.push(truncateToWidth(B("│") + s.padEnd(iw, " ").slice(0, iw) + B("│"), width, "...", true));
 			}
 			for (let i = end - this.offset; i < this.maxLines; i++) {
-				l.push(truncateToWidth(B("│") + " ".repeat(iw) + B("│"), width));
+				l.push(truncateToWidth(B("│") + " ".repeat(iw) + B("│"), width, "...", true));
 			}
 		}
 
-		l.push(truncateToWidth(B("└") + "─".repeat(iw) + B("┘"), width));
+		l.push(truncateToWidth(B("└") + "─".repeat(iw) + B("┘"), width, "...", true));
 		return l;
 	}
 }
@@ -201,6 +202,7 @@ class BrowseComponent extends Container {
 	private treeList: any;  // TreeList from built-in TreeSelectorComponent
 	private detail: DetailPanel;
 	private selector: TreeSelectorComponent; // kept for TreeList lifecycle
+	private searchMode = false;
 
 	constructor(
 		tree: SessionTreeNode[],
@@ -234,6 +236,24 @@ class BrowseComponent extends Container {
 	}
 
 	handleInput(data: string): void {
+		// ── Search mode ──
+		if (this.searchMode) {
+			if (matchesKey(data, Key.escape)) {
+				this.searchMode = false;
+				this.treeList.handleInput(data); // clears search query
+				return;
+			}
+			if (matchesKey(data, "tui.select.confirm")) {
+				this.searchMode = false;
+				// Don't forward Enter to treeList (would trigger onSelect → navigate)
+				return;
+			}
+			// ↑/↓ navigates filtered results; printable chars build query
+			this.treeList.handleInput(data);
+			return;
+		}
+
+		// ── Space: toggle detail ──
 		if (matchesKey(data, Key.space)) {
 			this.detail.toggle();
 			if (this.detail.expanded) {
@@ -243,17 +263,37 @@ class BrowseComponent extends Container {
 			return;
 		}
 
-		// Route scroll/mouse to detail when expanded
+		// ── /: enter search mode (auto-collapse detail) ──
+		if (data === '/') {
+			this.searchMode = true;
+			if (this.detail.expanded) this.detail.toggle();
+			return;
+		}
+
 		if (this.detail.expanded) {
+			// ── Reading: route scroll keys to detail ──
 			if (/^\x1b\[</.test(data) ||
 				matchesKey(data, Key.pageUp) || matchesKey(data, Key.pageDown) ||
-				matchesKey(data, Key.up) || matchesKey(data, Key.down)) {
+				data === 'j' || data === 'k') {
 				this.detail.handleInput(data);
+				return;
+			}
+			// ↑/↓: collapse detail, then navigate tree
+			if (matchesKey(data, Key.up) || matchesKey(data, Key.down)) {
+				this.detail.toggle();
+				// Fall through to tree navigation below
+			} else {
+				// Non-navigation key while reading: ignore
 				return;
 			}
 		}
 
-		// Tree navigation
+		// ── Tree navigation ──
+		// Only forward keys that aren't plain printable chars (prevent implicit search)
+		const isPlainChar = data.length === 1 && !/^\x1b/.test(data) &&
+			data.charCodeAt(0) >= 32 && data.charCodeAt(0) <= 126;
+		if (isPlainChar) return;
+
 		const prev = this.treeList.getSelectedNode?.()?.entry?.id;
 		this.treeList.handleInput(data);
 		const curr = this.treeList.getSelectedNode?.()?.entry?.id;
@@ -272,9 +312,16 @@ class BrowseComponent extends Container {
 	}
 
 	render(width: number): string[] {
-		// TreeList provides tree lines (NO chrome)
 		const treeLines = this.treeList.render(width);
-		// DetailPanel provides detail lines (always same height)
+
+		if (this.searchMode) {
+			const query = this.treeList.getSearchQuery();
+			const searchPrompt = `  /${query || ""}  ⏎ confirm  ⎋ cancel`;
+			const searchLine = truncateToWidth(searchPrompt, width, "...", true);
+			const detailLines = this.detail.render(width);
+			return [...treeLines, searchLine, ...detailLines];
+		}
+
 		const detailLines = this.detail.render(width);
 		return [...treeLines, ...detailLines];
 	}
