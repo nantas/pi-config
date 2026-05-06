@@ -18,7 +18,6 @@ global:
   # Agents synced to ~/.pi/agent/agents/
   agents:
     - dispatch-planner
-    - code-writer
 
   # Skills synced to ~/.pi/agent/skills/
   skills:

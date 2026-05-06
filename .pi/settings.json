@@ -19,39 +19,27 @@
         "thinking": "high"
       },
       "oracle": {
-        "model": "deepseek/deepseek-v4-pro",
+        "model": "deepseek/deepseek-v4-flash",
         "thinking": "medium"
       },
       "planner": {
-        "model": "deepseek/deepseek-v4-pro",
-        "thinking": "high",
-        "tools": [
-          "read",
-          "grep",
-          "find",
-          "ls",
-          "bash",
-          "lsp",
-          "obsidian_search",
-          "obsidian_cli",
-          "mcp",
-          "subagent"
-        ]
+        "model": "deepseek/deepseek-v4-flash",
+        "thinking": "high"
       },
       "researcher": {
-        "model": "deepseek/deepseek-v4-flash",
+        "model": "zhipuai-coding-plan/glm-5.1",
         "thinking": "high"
       },
       "reviewer": {
-        "model": "deepseek/deepseek-v4-flash",
+        "model": "zhipuai-coding-plan/glm-5.1",
         "thinking": "high"
       },
       "scout": {
-        "model": "deepseek/deepseek-v4-flash",
+        "model": "zhipuai-coding-plan/glm-4.5-air",
         "thinking": "minimal"
       },
       "worker": {
-        "model": "deepseek/deepseek-v4-flash",
+        "model": "zhipuai-coding-plan/glm-5.1",
         "thinking": "low"
       }
     }
