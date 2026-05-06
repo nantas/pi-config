@@ -51,6 +51,10 @@
 - 修改代码前需要检查影响范围
 - 编辑完成后需要验证无新增错误
 
+## README 维护
+
+当变更涉及仓库能力的增删（扩展、包、Agent、技能）时，必须按 [AGENTS.d/readme-governance.md](./AGENTS.d/readme-governance.md) 评估并更新 README.md 和 `docs/getting-started.md` 的能力描述，保持与 `capabilities.yaml` 一致。
+
 ## Pi 供应商与模型配置
 
 当用户需要设置自定义供应商、添加模型或配置 `enabledModels` 时，先阅读 [AGENTS.d/pi-provider-model.md](./AGENTS.d/pi-provider-model.md)：

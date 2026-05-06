@@ -103,11 +103,11 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 6 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`subagent-dispatch`、`tool-counter-widget`、`init-command` |
-| **Agent** | 2 | `dispatch-planner`、`code-writer` |
+| **扩展** | 7 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`subagent-dispatch`、`init-command`、`tool-counter-widget`、`add-provider` |
+| **Agent** | 1 | `dispatch-planner` |
 | **技能** | 1 | `install-from-pi-config` |
 | **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
-| **外部包** | 4 | `pi-ask`（交互提问）、`pi-tab-status`（tab 状态图标）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号） |
+| **外部包** | 5 | `pi-ask`（交互提问）、`pi-tab-status`（tab 状态图标）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化） |
 
 ### 按需安装能力（Catalog）
 

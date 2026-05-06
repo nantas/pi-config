@@ -95,31 +95,56 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/output-scroll-viewer.ts`
 - **OpenSpec Spec**: `openspec/specs/output-scroll-viewer/spec.md`
 
+#### `subagent-dispatch`
+
+- **描述**: Subagent 调度扩展，支持在单次会话中并行或串行派生子 agent 执行独立任务。提供 `dispatch` 工具，支持 single / parallel / chain 三种模式。
+- **解决的问题**: Pi 原生不支持多 agent 协作。该扩展使主 agent 可以委派子任务给专用子 agent，实现并行开发、多视角审查等模式。
+- **源文件**: `.pi/extensions/subagent-dispatch/`
+- **OpenSpec Spec**: `openspec/specs/add-pi-subagent-baseline/spec.md`
+
+#### `init-command`
+
+- **描述**: 提供 `/init` 命令，交互式初始化当前项目的 `.pi/` 目录配置，包括 AGENTS.md、settings.json 等基础文件。
+- **解决的问题**: 新项目接入 Pi 时缺乏引导式初始化，需要手动创建配置文件。本扩展提供一键初始化体验。
+- **源文件**: `.pi/extensions/init-command.ts`
+
+#### `tool-counter-widget`
+
+- **描述**: 在 Pi 界面中显示当前会话的工具调用计数 widget，实时追踪工具使用情况。
+- **解决的问题**: 长 session 中难以追踪工具调用频率和模式，本扩展提供直观的工具使用统计。
+- **源文件**: `.pi/extensions/tool-counter-widget.ts`
+
+#### `add-provider`
+
+- **描述**: 提供 `/add-provider` 命令，交互式添加自定义模型供应商到 `models.json`，支持输入 base URL、API key、模型列表等。
+- **解决的问题**: 手动编辑 `models.json` 配置自定义供应商容易出错。本扩展通过交互式向导引导完成供应商配置。
+- **源文件**: `.pi/extensions/add-provider.ts`
+
 ---
 
 ### 外部 Pi 包
 
 定义在 `.pi/settings.json` 的 `packages` 数组中，通过 Pi 的包管理机制加载。
 
-#### `pi-mcp-adapter`
+#### `@eko24ive/pi-ask`
 
-- **来源**: `npm:pi-mcp-adapter@2.5.1`
-- **描述**: MCP（Model Context Protocol）适配器，使 Pi 能够与 MCP 服务器通信并调用其工具。
-- **解决的问题**: 扩展 Pi 的工具调用能力，接入外部 MCP 生态系统（文件系统、数据库、API 等）。
-- **引用**: `.pi/settings.json` → `packages`
-
-#### `subagent-dispatch`
-
-- **来源**: `.pi/extensions/subagent-dispatch`
-- **描述**: Subagent 调度扩展，支持在单次会话中并行或串行派生子 agent 执行独立任务。
-- **解决的问题**: Pi 原生不支持多 agent 协作。该扩展提供 `dispatch` 工具，使主 agent 可以委派子任务给专用子 agent，实现并行开发、多视角审查等模式。
-- **引用**: `.pi/extensions/subagent-dispatch/`
-
-#### `pi-ask-tool-extension`
-
-- **来源**: `npm:pi-ask-tool-extension`
+- **来源**: `npm:@eko24ive/pi-ask`
 - **描述**: 提供 `ask` 工具，允许 agent 在运行时向用户发起结构化多选/确认问题。
 - **解决的问题**: 当 agent 需要用户决策时（如选择实现方案），无需中断对话，可通过 `ask` 工具发起即时交互。
+- **引用**: `.pi/settings.json` → `packages`
+
+#### `pi-terminal-signals`
+
+- **来源**: `git:github.com/lucasmeijer/pi-terminal-signals`
+- **描述**: 捕获终端信号（如 SIGINT），在 Pi 中提供更优雅的中断处理。
+- **解决的问题**: 默认终端信号处理可能导致 Pi 状态不一致，本包提供可靠的中断信号捕获。
+- **引用**: `.pi/settings.json` → `packages`
+
+#### `pi-tool-display`
+
+- **来源**: `git:github.com/MasuRii/pi-tool-display`
+- **描述**: 在 Pi 界面中显示工具调用详情的可视化扩展。
+- **解决的问题**: 工具调用的输入输出在默认界面中不易查看，本扩展提供更直观的工具执行展示。
 - **引用**: `.pi/settings.json` → `packages`
 
 #### `pi-tab-status`
@@ -129,9 +154,9 @@ cat .pi/settings.json
 - **解决的问题**: 同时管理多个 Pi 会话时难以区分各 tab 状态的痛点。本包通过终端转义序列动态更新 tab 标题。
 - **引用**: `.pi/settings.json` → `packages`
 
-#### `pi-powerline-footer`
+#### `pi-powerline`
 
-- **来源**: `npm:pi-powerline-footer` | [GitHub](https://github.com/nicobailon/pi-powerline-footer)
+- **来源**: `git:github.com/jwu/pi-powerline`
 - **描述**: 自定义 Pi editor 底部状态栏，提供 powerline 风格的状态栏、欢迎覆盖层、Git 状态、thinking 级别指示器、AI 主题加载语（Working Vibes）、编辑器 stash、bash mode 等功能。支持多个预设主题（`default`、`minimal`、`compact`、`full`、`nerd`、`ascii`）。
 - **解决的问题**: Pi 原生状态栏信息有限，无法直观查看模型、成本、令牌消耗、Git 状态等关键运行时信息。本扩展将所有这些信息整合到编辑器顶部边框的 powerline 状态栏中。
 - **引用**: `.pi/settings.json` → `packages`
@@ -213,16 +238,10 @@ export POWERLINE_NERD_FONTS=1
 
 位于 `.pi/agents/` 下，定义仓库专用的 Agent 角色和委托合约。
 
-#### `code-writer`
-
-- **角色**: 仓库本地实现专家。专注于小型、目标明确的编码任务。
-- **解决的问题**: 为 dispatch 系统提供专用的实现 Agent，避免主 Agent 上下文被实现细节污染。
-- **源文件**: `.pi/agents/code-writer.md`
-
 #### `dispatch-planner`
 
 - **角色**: 规划委托 Agent。专注于任务分解和执行规划。
-- **解决的问题**: 在 dispatch 流程中，将规划工作分离给专用 Agent，利用 `pi-subagents` skill 进行结构化任务分解。
+- **解决的问题**: 在 dispatch 流程中，将规划工作分离给专用 Agent，进行结构化任务分解。
 - **源文件**: `.pi/agents/dispatch-planner.md`
 
 ---
@@ -392,43 +411,16 @@ openspec/
 
 ## README 维护工作流
 
-本 README 是仓库的"活文档"，需要随仓库能力演化而持续更新。以下定义了自动维护治理工作流。
-
-### 触发条件
-
-当以下任一场景发生时，当前变更的实施者**必须**评估是否需要更新 README：
-
-| 触发场景 | 条件 | 操作 |
-|---|---|---|
-| **新增扩展** | 新文件添加到 `.pi/extensions/` | 更新"自定义扩展"节 |
-| **新增全局包** | 通过 `pkg-research` 将包加入 `settings.json` `packages` | 更新"外部 Pi 包"节 |
-| **仅待定包** | 包被记录到 `pkg-backlog.md` 而非全局添加 | **不更新** README |
-| **新增 Skill/Agent** | 新 skill/agent 加入 `.pi/skills/` 或 `.pi/agents/` | 更新对应数据类型节 |
-| **新增 Capability Spec** | 新能力规格加入 `openspec/specs/` | 如为用户可见能力，更新对应节或新增节 |
-| **纯 bugfix/内部重构** | 无新增用户可见能力 | **不更新** README |
-
-### 更新检查清单
-
-当需要更新 README 时，依次执行以下步骤：
-
-1. **在正确的数据类型节添加条目** — 不要创建重复的节
-2. **包含三项内容**：名称、功能说明、解决的问题
-3. **添加源文件相对路径链接**
-4. **添加 OpenSpec spec 链接**（如适用）
-5. **验证所有现有链接仍然有效**
-6. **验证节顺序保持不变**
-7. **最终完整性检查**：无坏链、无占位符文本（如 TBD）
-
-
+本 README 是仓库的"活文档"，需要随仓库能力演化而持续更新。维护治理规则定义在 [AGENTS.d/readme-governance.md](.pi/agent/AGENTS.d/readme-governance.md)，能力列表以 `.pi/capabilities.yaml` 为准。
 
 ### 异常处理
 
 | 场景 | 处理方式 |
 |---|---|
-| **自指跳过** | 当本节自身（`comprehensive-readme-and-automation-governance`）归档时，显式跳过 self-governance 检查并在 verification 中记录 |
+| **自指跳过** | 当本节自身归档时，显式跳过 self-governance 检查并在 verification 中记录 |
 | **新增数据类型** | 如果新增能力没有现有数据类型节，在 README 中新增适当节，并在后续定期审计中确认结构一致性 |
 | **链接失效** | 如果源文件被移动或删除导致链接失效，verification 步骤会检测到并 block 变更通过 |
 
 ---
 
-*README 最后更新: 2026-04-30*
+*README 最后更新: 2026-05-06*
