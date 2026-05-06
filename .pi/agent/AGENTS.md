@@ -50,3 +50,15 @@
 - 需要理解某个符号的定义、引用或类型
 - 修改代码前需要检查影响范围
 - 编辑完成后需要验证无新增错误
+
+## Pi 供应商与模型配置
+
+当用户需要设置自定义供应商、添加模型或配置 `enabledModels` 时，先阅读 [AGENTS.d/pi-provider-model.md](./AGENTS.d/pi-provider-model.md)：
+- 通过 `~/.pi/agent/models.json` 添加自定义供应商/模型（Ollama、代理网关等）
+- 通过 `~/.pi/agent/settings.json` 中的 `enabledModels` 控制模型轮询范围
+
+### 初学者首次配置
+
+当用户是 pi-config 初学者或需要完整的环境配置指导时，引导其阅读 [docs/getting-started.md](../../docs/getting-started.md)：
+- 七步入门工作流：安装 Pi CLI → 配置供应商 → 配置 enabledModels → 查看能力清单 → 确认同步范围 → 执行全局同步 → 验证环境
+- 该文档涵盖内置供应商 login 和自定义供应商（企业代理/API 网关）两种配置路径

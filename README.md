@@ -4,6 +4,14 @@
 
 ---
 
+## 新手上路
+
+> 在开始之前，请确保你已经[安装并可以运行 Pi](https://pi.dev/docs/latest/installation)。
+
+如果你是第一次使用本仓库，请阅读 [docs/getting-started.md](docs/getting-started.md)，按照七个步骤完成 Pi 环境配置和全局同步：安装 Pi CLI → 配置模型供应商 → 配置 enabledModels → 查看能力清单 → 确认同步范围 → 执行全局同步 → 验证环境。
+
+---
+
 ## 架构分层概览
 
 仓库按数据类型分为五个层级，每层承担不同角色：
@@ -102,10 +110,10 @@ cat .pi/settings.json
 
 #### `subagent-dispatch`
 
-- **来源**: `./packages/subagent-dispatch`（本地包，替代 `npm:pi-subagents`）
-- **描述**: Subagent 调度引擎，支持在单次会话中并行或串行派生子 agent 执行独立任务。
-- **解决的问题**: Pi 原生不支持多 agent 协作。本包提供了 `dispatch` 工具，使主 agent 可以委派子任务给专用子 agent，实现并行开发、多视角审查等模式。
-- **引用**: `.pi/settings.json` → `packages`
+- **来源**: `.pi/extensions/subagent-dispatch`
+- **描述**: Subagent 调度扩展，支持在单次会话中并行或串行派生子 agent 执行独立任务。
+- **解决的问题**: Pi 原生不支持多 agent 协作。该扩展提供 `dispatch` 工具，使主 agent 可以委派子任务给专用子 agent，实现并行开发、多视角审查等模式。
+- **引用**: `.pi/extensions/subagent-dispatch/`
 
 #### `pi-ask-tool-extension`
 
