@@ -127,11 +127,17 @@ function createAutocompleteProvider(
           options,
         );
         if (result) {
+          // Defensive sanitization: ensure all items have string `value`
+          // before downstream editor code calls `.startsWith()` on them.
+          // Items with non-string values are dropped.
+          const sanitized = result.items.filter(
+            (item) =>
+              typeof item.value === "string" &&
+              !item.value.startsWith("skill:"),
+          );
           return {
             ...result,
-            items: result.items.filter(
-              (item) => !item.value.startsWith("skill:"),
-            ),
+            items: sanitized,
           };
         }
         return result;
