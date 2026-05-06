@@ -186,3 +186,19 @@ at the top of this file using the following format:
 - **Decision:** global (2026-05-06: 已替换移除)
 - **Reason:** 结构化交互式提问工具，支持单选/多选/tab 多问题流/内联笔记编辑；安全性极佳（0 运行时依赖，仅依赖 Pi 核心包）
 - **Notes:** 仓库 github.com/devkade/pi-ask-tool，已被 @eko24ive/pi-ask 替代，2026-05-06 执行 pi remove 移除
+
+### 2026-05-06 — pi-interactive-subagents
+
+- **Version:** latest (main branch)
+- **Research Date:** 2026-05-06
+- **Resource Types:** extensions, agents
+- **Decision:** backlog
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/HazAT/pi-interactive-subagents
+- **Install Method:** pi-install
+- **Has Dependencies:** false (peer deps only: pi-coding-agent, pi-tui, typebox)
+- **Reason:** 不可用 — 两个阻断性问题未解决
+- **Notes:**
+  1. **依赖终端多路复用器**：必须运行在 cmux/tmux/zellij/WezTerm 中，无法在普通终端直接使用
+  2. **Agent 设置不支持重载**：不读取 `settings.json` 的 `subagents.agentOverrides`，bundled agent frontmatter 硬编码 `anthropic/claude-*` 模型，导致使用自定义供应商时报 "no api key found for anthropic"
+  3. 功能丰富（异步非阻塞、实时 widget、中断/恢复、caller_ping），与内置 dispatch 互补，若上游修复上述问题可重新评估
