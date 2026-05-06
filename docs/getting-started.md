@@ -175,6 +175,55 @@ pi
 
 ---
 
+## 补充：配置 Subagent 模型重载
+
+Pi 内置的 subagent/dispatch 系统（包括 `dispatch` 扩展和 `/agents` 列表中的内置 agent）会读取 `settings.json` 中的 `subagents.agentOverrides` 来决定每个 agent 使用的模型。如果你使用自定义供应商而非 Anthropic/OpenAI 默认供应商，**必须**为每个 agent 显式指定模型，否则子 agent 会回退到默认模型（通常是 `anthropic/claude-*`），导致 "no api key found" 错误。
+
+在 `~/.pi/agent/settings.json`（或本仓库 `.pi/settings.json`，同步后生效）中添加：
+
+```json
+{
+  "subagents": {
+    "agentOverrides": {
+      "context-builder": {
+        "model": "your-provider/your-model",
+        "thinking": "high"
+      },
+      "oracle": {
+        "model": "your-provider/your-model",
+        "thinking": "medium"
+      },
+      "planner": {
+        "model": "your-provider/your-model",
+        "thinking": "high"
+      },
+      "scout": {
+        "model": "your-provider/your-model",
+        "thinking": "minimal"
+      },
+      "researcher": {
+        "model": "your-provider/your-model",
+        "thinking": "high"
+      },
+      "reviewer": {
+        "model": "your-provider/your-model",
+        "thinking": "high"
+      },
+      "worker": {
+        "model": "your-provider/your-model",
+        "thinking": "low"
+      }
+    }
+  }
+}
+```
+
+将 `your-provider/your-model` 替换为你在第一步配置的供应商和模型（如 `deepseek/deepseek-v4-flash`、`kimi-coding/k2p6`）。可用的 agent 名称可通过 `/agents` 命令查看。
+
+> **注意**：第三方 subagent 扩展（如 pi-interactive-subagents）可能不读取此配置，而是在 agent 定义文件中硬编码模型。使用前需确认该扩展是否支持 `agentOverrides`。
+
+---
+
 ## 后续扩展：可用工作流
 
 完成基础配置后，可通过以下工作流继续扩展能力：
