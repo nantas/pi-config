@@ -8,6 +8,19 @@ the decision, decision reason, source metadata, and follow-up notes.
 
 ---
 
+### 2026-05-06 — npm:@eko24ive/pi-ask
+
+- **Version:** 0.8.1
+- **Research Date:** 2026-05-06
+- **Resource Types:** extension (ask_user) + skill (ask-user)
+- **Decision:** global
+- **Source Type:** npm-package
+- **Source Repo:** https://github.com/eko24ive/pi-ask
+- **Install Method:** pi-install
+- **Has Dependencies:** false (0 runtime, 4 peers)
+- **Reason:** 替代 pi-ask-tool-extension；功能更丰富（/answer 回放、@文件引用、审阅/澄清流、Elaborate、可持久化配置、bundled skill profile），14 stars / 1,730 月下载
+- **Notes:** 工具名 ask_user（与旧 ask 不冲突），已替换 pi-ask-tool-extension（已移除）
+
 ## How to Add an Entry
 
 When recording a resource to the backlog (via the `pkg-research` skill), append a new entry
@@ -167,9 +180,9 @@ at the top of this file using the following format:
 
 ### 2026-04-29 — npm:pi-ask-tool-extension
 
-- **Version:** 0.2.4
+- **Version:** 0.2.4 (已替换 → @eko24ive/pi-ask 0.8.1)
 - **Research Date:** 2026-04-29
 - **Resource Types:** extensions (registers `ask` tool)
-- **Decision:** global
+- **Decision:** global (2026-05-06: 已替换移除)
 - **Reason:** 结构化交互式提问工具，支持单选/多选/tab 多问题流/内联笔记编辑；安全性极佳（0 运行时依赖，仅依赖 Pi 核心包）
-- **Notes:** 仓库 github.com/devkade/pi-ask-tool，已添加到 global ~/.pi/agent/settings.json，通过 sync-pi-agent.sh 同步
+- **Notes:** 仓库 github.com/devkade/pi-ask-tool，已被 @eko24ive/pi-ask 替代，2026-05-06 执行 pi remove 移除

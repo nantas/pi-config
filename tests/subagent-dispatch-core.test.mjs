@@ -15,7 +15,7 @@ import {
   normalizeSkillNames,
   serializeTaskPlan,
   summarizeDispatchResult,
-} from "../.pi/packages/subagent-dispatch/core.js";
+} from "../.pi/extensions/subagent-dispatch/core.js";
 
 test("normalizeSkillNames accepts string, array, and false", () => {
   assert.deepEqual(normalizeSkillNames("obsidian-cli"), ["obsidian-cli"]);
@@ -86,9 +86,10 @@ test("buildDispatchUserMessage keeps /dispatch natural-language", () => {
   ]);
   assert.equal(Array.isArray(message), true);
   assert.match(message[0].text, /repository-owned dispatch tool/i);
-  assert.match(message[1].text, /Available dispatch agents right now/i);
-  assert.match(message[1].text, /scout \(builtin\)/i);
-  assert.match(message[2].text, /请启动三个 subagent 搜索 harness/);
+  assert.match(message[1].text, /Available dispatch capabilities/i);
+  assert.match(message[2].text, /Available dispatch agents right now/i);
+  assert.match(message[2].text, /scout \(builtin\)/i);
+  assert.match(message[3].text, /请启动三个 subagent 搜索 harness/);
 });
 
 test("sanitizeAgentDefinition drops empty extensions placeholders", () => {
@@ -190,10 +191,10 @@ test("legacy global extension is skipped after package migration", () => {
   );
 });
 
-test("package-backed entry does not skip itself", () => {
+test("extension-backed entry does not skip itself", () => {
   assert.equal(
     shouldSkipGlobalDispatchExtensionRegistration({
-      extensionFile: "/Users/nantasmac/projects/pi-config/.pi/packages/subagent-dispatch/index.ts",
+      extensionFile: "/Users/nantasmac/projects/pi-config/.pi/extensions/subagent-dispatch/index.ts",
       cwd: "/Users/nantasmac/projects/pi-config",
     }),
     false

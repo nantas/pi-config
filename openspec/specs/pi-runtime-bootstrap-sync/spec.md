@@ -51,9 +51,9 @@ The system SHALL apply `global.settings.packages` as a whitelist and `global.set
 - **WHEN** the sync script processes settings
 - **THEN** keys listed in `global.settings.exclude_keys` (e.g., `defaultModel`, `subagents`) are omitted from the output
 
-#### Scenario: Local path package is rendered as absolute
-- **WHEN** `global.settings.packages` contains `./packages/subagent-dispatch`
-- **THEN** the sync script renders it as an absolute filesystem path in the output
+#### Scenario: Removed local package entry is not preserved
+- **WHEN** repository `.pi/settings.json` no longer contains `./packages/subagent-dispatch`
+- **THEN** the sync script does not preserve any stale runtime package entry for `subagent-dispatch`
 
 ### Requirement: Bootstrap Sync Must Publish Catalog For Cross-Repo Discovery
 The system SHALL publish the `catalog` section of `.pi/capabilities.yaml` to `~/.pi/agent/catalog/pi-config.yaml` during sync, augmented with the source repository's absolute path.

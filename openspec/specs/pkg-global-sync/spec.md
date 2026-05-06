@@ -32,12 +32,12 @@ The system SHALL deploy confirmed repository-managed Pi settings to `~/.pi/agent
 - **WHEN** a change is ready to deploy repository-managed Pi settings globally
 - **THEN** deployment does not run until the user explicitly confirms it
 
-### Requirement: Global Pi Sync Must Render Local Path Packages As Absolute
-The system SHALL continue to render local-path package sources (e.g., `./packages/subagent-dispatch`) as absolute filesystem paths when writing to `~/.pi/agent/settings.json`.
+### Requirement: Global Pi Sync Must Respect Repository Package Source Of Truth
+The system SHALL treat repository `.pi/settings.json` as the source of truth for runtime package entries when writing to `~/.pi/agent/settings.json`.
 
-#### Scenario: Local path is rendered as absolute
-- **WHEN** `./packages/subagent-dispatch` is in the whitelist
-- **THEN** the global output contains the absolute path to that package
+#### Scenario: Removed package entry is absent from global output
+- **WHEN** `./packages/subagent-dispatch` is no longer present in repository `.pi/settings.json`
+- **THEN** the global output does not retain that stale package path
 
 ### Requirement: Settings Update for Package Addition
 The system SHALL verify the package is present in `.pi/settings.json` `packages` array (normally added by `pi install -l` during Phase 2), and add it only if missing.

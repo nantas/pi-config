@@ -42,7 +42,7 @@ Phase 1 manages only the Pi-specific repository source paths listed below:
 
 ## Settings Baseline
 
-`.pi/settings.json` remains the repository-managed truth for Pi runtime activation. After the package-delivery change, it carries portable package sources such as `./packages/subagent-dispatch`, while the sync workflow renders machine-specific absolute paths only in `~/.pi/agent/settings.json`.
+`.pi/settings.json` remains the repository-managed truth for Pi runtime activation. The current `subagent-dispatch` delivery path is repository-managed extension source under `.pi/extensions/subagent-dispatch`, and the sync workflow must not preserve stale runtime package entries after that source-of-truth change.
 
 ## Closeout Governance Extension
 

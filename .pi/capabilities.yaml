@@ -41,7 +41,7 @@ global:
   settings:
     # Whitelist: only these packages appear in ~/.pi/agent/settings.json
     packages:
-      - npm:pi-ask-tool-extension
+      - npm:@eko24ive/pi-ask
       - npm:@tmustier/pi-tab-status
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals

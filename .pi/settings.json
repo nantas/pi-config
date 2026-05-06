@@ -1,12 +1,12 @@
 {
   "packages": [
     "npm:pi-mcp-adapter@2.5.1",
-    "npm:pi-ask-tool-extension",
     "npm:@tmustier/pi-tab-status",
     "npm:lsp-pi",
     "git:github.com/MasuRii/pi-tool-display",
     "git:github.com/jwu/pi-powerline",
-    "git:github.com/lucasmeijer/pi-terminal-signals"
+    "git:github.com/lucasmeijer/pi-terminal-signals",
+    "npm:@eko24ive/pi-ask"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",
