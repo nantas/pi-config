@@ -37,6 +37,12 @@
 - 需要创建或调用 Dispatch agent
 - 需要通过 MCP 操作外部工具
 
+### ask_user Tool
+
+涉及以下场景时，请先阅读 [AGENTS.d/tool-ask-user.md](./AGENTS.d/tool-ask-user.md)：
+- 调用 ask_user 让用户确认某个决策或内容选择
+- 需要将 Agent 内部生成的数据（标题、摘要、方案等）展示给用户做判断
+
 ## Markdown Output Quality
 
 输出内容包含 Markdown 表格时（尤其是 Obsidian Wiki 链接），请先阅读 [AGENTS.d/output-quality.md](./AGENTS.d/output-quality.md)。
