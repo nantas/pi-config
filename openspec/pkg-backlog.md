@@ -74,6 +74,7 @@ at the top of this file using the following format:
 - **Has Dependencies:** true
 - **Reason:** Forked from git:github.com/MasuRii/pi-tool-display for potential customization. Source switched to personal fork.
 - **Notes:** Fork of https://github.com/MasuRii/pi-tool-display. Registered in `forks/manifest.yaml` and `repo-registry` as `pi-fork-pi-tool-display`. Local clone at `/Users/nantasmac/projects/forks/pi-tool-display`.
+- **Fork Fix (2026-05-07):** `direct-tool-label-recognition` — Fixed `isMcpToolCandidate()` to check label field, enabling MCP Direct Tools to be recognized and respect `mcpOutputMode` settings. Also fixed `formatMcpCallLine()` for `MCP:` colon format. Commit: `bd352d4` on `nantas/pi-tool-display` main.
 
 ### 2026-05-04 — git:github.com/lucasmeijer/pi-terminal-signals
 

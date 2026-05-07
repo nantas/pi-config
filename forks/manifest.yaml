@@ -20,7 +20,7 @@ forks:
     upstream_source: "git:github.com/MasuRii/pi-tool-display"
     status: active
     last_upstream_sync: null
-    changes_summary: "Initial fork. No modifications yet."
+    changes_summary: "fix: isMcpToolCandidate() now checks label field for MCP Direct Tool recognition; formatMcpCallLine() handles MCP: colon format"
   - name: pi-mcp-adapter
     fork_url: "https://github.com/nantas/pi-mcp-adapter"
     upstream_url: "https://github.com/nicobailon/pi-mcp-adapter"
