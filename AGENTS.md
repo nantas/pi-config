@@ -15,6 +15,16 @@ Pi package research and management follows a structured workflow defined in the 
 - **Backlog persistence**: All decisions (A, B, optionally C) record entries in `openspec/pkg-backlog.md` with structured schema for future reference.
 - **Clone lifecycle**: Security review clones are retained through Phase 2 (test reuse) and cleaned up in Phase 3 after decision execution (not immediately after Phase 1).
 
+### Fork Development
+
+When a package already in use needs modification (bug fix, feature addition, or upstream sync), use the `pkg-fork-dev` skill:
+
+- **Scope**: `.pi/skills/pkg-fork-dev/SKILL.md` covers the complete fork lifecycle — Fork & Setup → Modification Planning → Implementation → Local Testing → Commit & Ship → Maintenance.
+- **Registry**: All forks are registered in `forks/manifest.yaml` (canonical metadata) and `repo-registry` (machine-specific clone paths via `repo://<name>`).
+- **Source switch**: Forking changes the package source in `.pi/settings.json` (npm→git or upstream→fork). The original source is preserved in `manifest.yaml` as `upstream_source`.
+- **Local testing**: Use `pi install -l file:<path>` during Phase D, then restore to `git:` URL after shipping.
+- **Boundary**: `pkg-fork-dev` complements — does not replace — `pkg-research` (new package evaluation) and `pi-extension-dev` (brand-new extension authoring).
+
 ## Agent Extension
 
 When the task requires creating a new dispatch agent or modifying an existing agent's behavior (model, thinking level, tools, system prompt):

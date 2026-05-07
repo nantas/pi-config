@@ -49,6 +49,32 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-05-07 — git:github.com/nantas/pi-mcp-adapter
+
+- **Version:** 2.5.1
+- **Research Date:** 2026-05-07
+- **Resource Types:** extension (MCP adapter)
+- **Decision:** forked
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/pi-mcp-adapter
+- **Install Method:** pi-install
+- **Has Dependencies:** true
+- **Reason:** Forked from npm:pi-mcp-adapter@2.5.1 for potential customization. Source switched from npm to git fork.
+- **Notes:** Fork of https://github.com/nicobailon/pi-mcp-adapter. Registered in `forks/manifest.yaml` and `repo-registry` as `pi-fork-pi-mcp-adapter`. Local clone at `/Users/nantasmac/projects/forks/pi-mcp-adapter`.
+
+### 2026-05-07 — git:github.com/nantas/pi-tool-display
+
+- **Version:** latest
+- **Research Date:** 2026-05-07
+- **Resource Types:** extension (tool display)
+- **Decision:** forked
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/pi-tool-display
+- **Install Method:** pi-install
+- **Has Dependencies:** true
+- **Reason:** Forked from git:github.com/MasuRii/pi-tool-display for potential customization. Source switched to personal fork.
+- **Notes:** Fork of https://github.com/MasuRii/pi-tool-display. Registered in `forks/manifest.yaml` and `repo-registry` as `pi-fork-pi-tool-display`. Local clone at `/Users/nantasmac/projects/forks/pi-tool-display`.
+
 ### 2026-05-04 — git:github.com/lucasmeijer/pi-terminal-signals
 
 - **Version:** 0.1.0

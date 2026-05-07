@@ -1,9 +1,9 @@
 {
   "packages": [
-    "npm:pi-mcp-adapter@2.5.1",
+    "git:github.com/nantas/pi-mcp-adapter",
     "npm:@tmustier/pi-tab-status",
     "npm:lsp-pi",
-    "git:github.com/MasuRii/pi-tool-display",
+    "git:github.com/nantas/pi-tool-display",
     "git:github.com/jwu/pi-powerline",
     "git:github.com/lucasmeijer/pi-terminal-signals",
     "npm:@eko24ive/pi-ask"

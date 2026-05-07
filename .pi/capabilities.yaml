@@ -14,7 +14,6 @@ global:
     - subagent-dispatch
     - tool-counter-widget
     - init-command
-    - add-provider
     - browse-session-tree
 
   # Agents synced to ~/.pi/agent/agents/
@@ -46,7 +45,7 @@ global:
       - npm:@tmustier/pi-tab-status
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
-      - git:github.com/MasuRii/pi-tool-display
+      - git:github.com/nantas/pi-tool-display
     # Keys to exclude from ~/.pi/agent/settings.json
     # (empty = sync all keys except those filtered by packages whitelist)
     exclude_keys: []
@@ -63,12 +62,18 @@ catalog:
     - name: pi-extension-dev
       source: pi-extension-dev
       description: "Guide the LLM through the complete lifecycle of developing a Pi extension"
+    - name: pkg-fork-dev
+      source: pkg-fork-dev
+      description: "Guide the LLM through forking and modifying existing third-party Pi packages"
     - name: pkg-research
       source: pkg-research
       description: "Structured workflow for researching, evaluating, and managing third-party Pi packages"
 
   # Extensions available for on-demand installation
   extensions:
+    - name: add-provider
+      source: add-provider
+      description: "Add custom model providers to Pi agent configuration"
     - name: obsidian-tools
       source: obsidian-tools
       description: "Obsidian integration tools for Pi agent"
@@ -77,7 +82,7 @@ catalog:
   # Packages available for on-demand installation (settings-entry type)
   packages:
     - name: pi-mcp-adapter
-      source: npm:pi-mcp-adapter@2.5.1
+      source: git:github.com/nantas/pi-mcp-adapter
       description: "Pi MCP adapter for external tool integration"
       type: settings-entry
     - name: lsp-pi
