@@ -369,6 +369,36 @@ git push origin main
 git push origin --tags
 ```
 
+### Step E3a — Push verification（门禁）
+
+验证推送已成功到达远程和本地 `.pi/git/` 克隆，确保修复可被 pi-config 加载：
+
+```bash
+# 1. Dev clone 确认 remote 已同步
+cd "$CLONE_PATH"
+git fetch origin
+echo "=== Dev clone: local HEAD vs origin/main ==="
+LOCAL="$(git rev-parse HEAD)"
+REMOTE="$(git rev-parse origin/main)"
+if [ "$LOCAL" != "$REMOTE" ]; then
+  echo "FAIL: origin/main ($REMOTE) does not match HEAD ($LOCAL). Push may have failed."
+  exit 1
+fi
+echo "PASS: origin/main matches HEAD."
+
+# 2. 项目 .pi/git/ 克隆确认（当前目录应是 pi-config 根目录）
+cd ".pi/git/github.com/<user>/<repo>"
+git fetch origin 2>/dev/null || true
+INSTALLED="$(git rev-parse origin/main 2>/dev/null || echo none)"
+if [ "$INSTALLED" != "$LOCAL" ]; then
+  echo "WARN: .pi/git/ clone at $INSTALLED, expected $LOCAL. Run: pi install -l"
+fi
+
+echo "PASS: push verified."
+```
+
+> **必须执行**：此步骤不可跳过。如果 `origin/main` 与 HEAD 不匹配，`git push` 失败，必须重试或中断本次 change。
+
 ### Step E4 — Restore source
 
 Update `.pi/settings.json` from `file:<path>` back to `git:github.com/<user>/<repo>`.
@@ -377,6 +407,29 @@ Update `.pi/settings.json` from `file:<path>` back to `git:github.com/<user>/<re
 
 ```bash
 pi install -l "git:github.com/<user>/<repo>"
+```
+
+### Step E5a — Install verification（门禁）
+
+验证 `.pi/git/` 和 `~/.pi/agent/git/` 两个克隆的 HEAD 是否与 dev clone 的提交一致：
+
+```bash
+EXPECTED="$(cd "$CLONE_PATH" && git rev-parse HEAD)"
+
+for CLONE in ".pi/git/github.com/<user>/<repo>" "$HOME/.pi/agent/git/github.com/<user>/<repo>"; do
+  if [ -d "$CLONE" ]; then
+    ACTUAL="$(cd "$CLONE" && git log --oneline -1)"
+    echo "=== $CLONE ==="
+    echo "  $ACTUAL"
+  fi
+done
+
+PI_INSTALLED="$(cd ".pi/git/github.com/<user>/<repo>" && git rev-parse HEAD)"
+if [ "$PI_INSTALLED" != "$EXPECTED" ]; then
+  echo "FAIL: .pi/git/ clone HEAD does not match dev clone. Manual git pull or pi install -l needed."
+  exit 1
+fi
+echo "PASS: install verified."
 ```
 
 ### Step E6 — Manifest update
@@ -535,7 +588,7 @@ When `pkg-fork-dev` is used on a different machine:
 
 ## Constraints
 
-- **Repo-registry for paths** — all dev clone paths go through `repo://<name>`
+- **Repo-registry for paths** — all dev clone paths MUST be registered in repo-registry as `repo://<name>` (仓库名，不加前缀后缀) before Phase C implementation begins. The `$CLONE_PATH` variable in Phases C-E is resolved from repo-registry, never hardcoded.
 - **Manifest as canonical source** — every fork MUST have a `forks/manifest.yaml` entry
 - **Settings.json source tracking** — original source recorded in manifest, current source in settings.json
 - **File: install for testing only** — `file:<path>` is temporary; always restore to `git:` URL for production
