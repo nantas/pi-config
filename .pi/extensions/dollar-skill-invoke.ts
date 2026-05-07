@@ -257,14 +257,20 @@ function handleInputTransform(
 export default function (pi: ExtensionAPI): void {
   // Self-dedup — prevents double registration when loaded from both
   // project-local (.pi/extensions/) and global (~/.pi/agent/extensions/).
-  // The flag is cleared on session_shutdown so that session replacements
-  // (/new, /reload, /resume) can re-register handlers.
+  // Uses session-scoped key (session_counter + ext_key) so that /new
+  // always creates a fresh dedup domain without depending on
+  // session_shutdown timing.
   const _key = "__pi_ext_dollar_skill_invoke_loaded";
-  if ((globalThis as any)[_key]) return;
-  (globalThis as any)[_key] = true;
+  const SESSION_COUNTER = "__pi_ext_session_counter";
+
+  const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
+  const sessionKey = `${_key}_session_${sessionId}`;
+
+  if ((globalThis as any)[sessionKey]) return;
+  (globalThis as any)[sessionKey] = true;
 
   pi.on("session_shutdown", () => {
-    delete (globalThis as any)[_key];
+    (globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
   });
 
   // Register input event handler ONCE at top level ($skill-name expansion).

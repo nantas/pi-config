@@ -332,10 +332,18 @@ class BrowseComponent extends Container {
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
-	const K = "__pi_ext_browse_session_tree_loaded";
-	if ((globalThis as any)[K]) return;
-	(globalThis as any)[K] = true;
-	pi.on("session_shutdown", () => { delete (globalThis as any)[K]; });
+	const _key = "__pi_ext_browse_session_tree_loaded";
+	const SESSION_COUNTER = "__pi_ext_session_counter";
+
+	const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
+	const sessionKey = `${_key}_session_${sessionId}`;
+
+	if ((globalThis as any)[sessionKey]) return;
+	(globalThis as any)[sessionKey] = true;
+
+	pi.on("session_shutdown", () => {
+		(globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
+	});
 
 	pi.registerCommand("browse", {
 		description: "Open enhanced session tree browser with detail preview",

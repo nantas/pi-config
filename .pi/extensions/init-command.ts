@@ -102,15 +102,19 @@ If no AGENTS.md exists, create a fresh one with the extracted information. Use t
 export default function (pi: ExtensionAPI): void {
   // ---- Self-dedup ----
   // Prevents duplicate registration when loaded from both project-local
-  // (.pi/extensions/) and global (~/.pi/agent/extensions/). The flag is
-  // cleared on session_shutdown so session replacements (/new, /reload, /resume)
-  // can re-register.
+  // (.pi/extensions/) and global (~/.pi/agent/extensions/). Uses
+  // session-scoped key so /new always gets a fresh dedup domain.
   const _key = "__pi_ext_init_command_loaded";
-  if ((globalThis as any)[_key]) return;
-  (globalThis as any)[_key] = true;
+  const SESSION_COUNTER = "__pi_ext_session_counter";
+
+  const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
+  const sessionKey = `${_key}_session_${sessionId}`;
+
+  if ((globalThis as any)[sessionKey]) return;
+  (globalThis as any)[sessionKey] = true;
 
   pi.on("session_shutdown", () => {
-    delete (globalThis as any)[_key];
+    (globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
   });
 
   // ---- Register /init command ----
