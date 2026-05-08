@@ -137,7 +137,17 @@ const target =
 
 ## 待办
 
-- [ ] 确认 pi-config 仓库对 npm 包的本地修改管理方式
-- [ ] 应用上述修复到 `pi-tool-display` 源码
-- [ ] 运行 `pi -e`  ephemeral 测试验证 Direct Tools 折叠生效
+- [x] 确认 pi-config 仓库对 npm 包的本地修改管理方式（已采用 fork 管理模式）
+- [x] 应用上述修复到 `pi-tool-display` 源码（通过 globalThis 桥接方案）
+- [ ] 运行 `pi -e` ephemeral 测试验证 Direct Tools 折叠生效
 - [ ] 考虑是否向上游 `pi-tool-display` 提交 PR
+
+---
+
+## 补充说明
+
+> **深入调查发现更底层问题**：`getAllTools()` 返回的 `ToolInfo` 不包含 `execute` 字段，因此即使识别逻辑修复后，`registerMcpToolOverrides()` 仍无法获取原始 `execute` 函数来完成重新注册。
+>
+> 最终修复方案采用 `globalThis.__mcpToolRegistry` 桥接模式，详见：
+> - [Pi Tool API Dependency 参考文档](../reference/pi-tool-api-dependency.md)
+> - OpenSpec change: `mcp-direct-tool-rendering-fix`

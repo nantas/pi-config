@@ -299,12 +299,95 @@ Wait for user approval before proceeding to testing.
 ### Step D1 — Temporarily switch to file source
 
 Update `.pi/settings.json`: change the package source from
-`git:github.com/<user>/<repo>` to `file:<dev-clone-path>`.
+`git:github.com/<user>/<repo>` to the local dev clone absolute path.
+
+> **Note**: Use the absolute path directly (e.g., `/Users/x/forks/pkg-name`),
+> not a `file:` prefixed string. Pi's `isLocalPath()` treats `file:` as
+> a local path but appends it to `cwd`, causing resolution errors.
+
+### Step D1a — Global dedup gate（门禁）
+
+Pi's package dedup uses identity keys based on source type. A local path
+produces `local:/path/to/pkg` while a git URL produces `git:github.com/user/pkg`.
+These are **different identities** — Pi loads both → tool name conflicts.
+
+**Detection:**
+
+```bash
+# Read global packages
+GLOBAL_PKGS=$(cat ~/.pi/agent/settings.json | python3 -c "
+import json, sys
+for p in json.load(sys.stdin).get('packages', []):
+    print(p)")
+
+# Extract package name from the local path being used in project settings
+# e.g., /Users/x/forks/pi-tool-display → basename = pi-tool-display
+LOCAL_PKG_NAME=$(basename "<dev-clone-path>")
+
+# Check if global has a git/npm entry for the same package name
+echo "$GLOBAL_PKGS" | grep -i "$LOCAL_PKG_NAME"
+```
+
+**If a match is found**, remove the conflicting entry from global settings:
+
+```bash
+python3 -c "
+import json
+with open('$HOME/.pi/agent/settings.json') as f:
+    d = json.load(f)
+removed = [p for p in d['packages'] if '$LOCAL_PKG_NAME' in p]
+d['packages'] = [p for p in d['packages'] if '$LOCAL_PKG_NAME' not in p]
+with open('$HOME/.pi/agent/settings.json', 'w') as f:
+    json.dump(d, f, indent=2)
+    f.write('\n')
+for r in removed:
+    print(f'Removed from global: {r}')
+"
+```
+
+**Persist the removal record** (see D1a-persist below).
+
+**If no match**, proceed without modification.
+
+#### D1a-persist: Override state persistence
+
+The removed entries MUST be persisted so they can be restored later.
+
+**When an OpenSpec change exists** — append to `writeback.md`:
+
+```markdown
+## Phase D Global Override State
+
+| Package | Removed from Global | Original Source |
+|---------|:---:|----------------|
+| <pkg-name> | ✅ | git:github.com/<user>/<repo> |
+
+**Recovery**: Phase E4 will restore these entries. If session is lost,
+read this section and manually add entries back to ~/.pi/agent/settings.json.
+```
+
+**When no OpenSpec change** — write to `<dev-clone>/.pi-dev-state.json`:
+
+```bash
+cat > "$CLONE_PATH/.pi-dev-state.json" << 'EOF'
+{
+  "globalOverride": {
+    "removedPackages": ["git:github.com/<user>/<repo>"],
+    "removedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  }
+}
+EOF
+```
+
+> **Why two locations?** OpenSpec changes have a structured `writeback.md` that
+> tracks all state — the override section fits naturally there. Standalone fork
+> modifications have no such file, so the dev clone directory (always locatable
+> via `repo://<name>`) serves as the persistent store.
 
 ### Step D2 — Local install
 
 ```bash
-pi install -l "file:<dev-clone-path>"
+pi install -l "<dev-clone-absolute-path>"
 ```
 
 ### Step D3 — Functional test
@@ -329,6 +412,21 @@ Once verified, confirm with the user:
 ```
 ✓ Local testing passed. Ready to commit and ship?
 ```
+
+### Step D5a — Persist record verification（门禁）
+
+Confirm the override record exists and contains the correct removed entries:
+
+```bash
+# OpenSpec change path
+grep -A5 "Phase D Global Override State" openspec/changes/<change>/writeback.md
+
+# Or standalone path
+cat "$CLONE_PATH/.pi-dev-state.json"
+```
+
+If the record is missing or incomplete, recreate it before proceeding.
+This record is the **only recovery mechanism** if the session is lost.
 
 ---
 
@@ -401,7 +499,39 @@ echo "PASS: push verified."
 
 ### Step E4 — Restore source
 
-Update `.pi/settings.json` from `file:<path>` back to `git:github.com/<user>/<repo>`.
+Update `.pi/settings.json` from the local path back to `git:github.com/<user>/<repo>`.
+
+**Restore global settings** — read the override record and re-add removed entries:
+
+```bash
+# From OpenSpec change writeback.md: read the "Original Source" column
+# From .pi-dev-state.json:
+python3 -c "
+import json
+with open('$CLONE_PATH/.pi-dev-state.json') as f:
+    state = json.load(f)
+removed = state.get('globalOverride', {}).get('removedPackages', [])
+
+with open('$HOME/.pi/agent/settings.json') as f:
+    d = json.load(f)
+for entry in removed:
+    if entry not in d['packages']:
+        d['packages'].append(entry)
+        print(f'Restored to global: {entry}')
+with open('$HOME/.pi/agent/settings.json', 'w') as f:
+    json.dump(d, f, indent=2)
+    f.write('\n')
+"
+```
+
+**Cleanup override record:**
+
+```bash
+# Standalone: remove .pi-dev-state.json
+rm "$CLONE_PATH/.pi-dev-state.json"
+
+# OpenSpec: the writeback.md section will be cleaned up during writeback execution
+```
 
 ### Step E5 — Remote reinstall
 
@@ -430,6 +560,16 @@ if [ "$PI_INSTALLED" != "$EXPECTED" ]; then
   exit 1
 fi
 echo "PASS: install verified."
+```
+
+**验证全局 settings 恢复**：
+
+```bash
+# Confirm global settings no longer has local path entries
+cat ~/.pi/agent/settings.json | grep -c "/forks/" && echo "FAIL: global settings still contains local path" || echo "PASS: no local paths in global"
+
+# Confirm override record is cleaned up
+[ -f "$CLONE_PATH/.pi-dev-state.json" ] && echo "FAIL: .pi-dev-state.json not cleaned up" || echo "PASS: override record cleaned"
 ```
 
 ### Step E6 — Manifest update
@@ -555,6 +695,7 @@ If upstream changes introduce regressions:
 | `.pi/capabilities.yaml` | Capability manifest |
 | `openspec/pkg-backlog.md` | Fork action backlog |
 | `scripts/sync-pi-agent.sh` | Global sync script |
+| `docs/reference/pi-package-loading.md` | Pi package loading, identity & dedup mechanism |
 
 ## Appendix: Skill Boundary Clarification
 
@@ -569,6 +710,65 @@ If upstream changes introduce regressions:
 - Later, if that package needs modification → switch to `pkg-fork-dev` Phase A
 - `pkg-fork-dev` Phase B for major features → optionally create OpenSpec change
 - `pi-extension-dev` for new extensions → never forks existing packages
+
+## Appendix: Session Loss Recovery
+
+If a session is lost during Phase D (global settings modified, override record exists),
+a new session can detect and recover the abnormal state via three paths:
+
+### Path 1: OpenSpec change status
+
+```bash
+openspec status --change "<change-name>"
+```
+
+If the change shows in-progress state, read `writeback.md`:
+```bash
+grep -A10 "Phase D Global Override State" openspec/changes/<change>/writeback.md
+```
+
+Restore the listed entries to `~/.pi/agent/settings.json`.
+
+### Path 2: `.pi-dev-state.json` in dev clone
+
+```bash
+CLONE_PATH=$(python3 ~/.agents/skills/repo-registry/scripts/repo-registry.py get --repo-id "<name>")
+cat "$CLONE_PATH/.pi-dev-state.json" 2>/dev/null
+```
+
+If the file exists, it contains `removedPackages` that need to be restored.
+
+### Path 3: Manual global/project comparison
+
+If neither record exists, compare the two settings files:
+
+```bash
+echo "=== Project local paths ==="
+cat .pi/settings.json | python3 -c "
+import json, sys
+for p in json.load(sys.stdin).get('packages', []):
+    if p.startswith('/') or p.startswith('./') or p.startswith('../'):
+        print(f'  {p}')
+"
+echo "=== Global entries for same packages ==="
+for name in $(cat .pi/settings.json | python3 -c "
+import json, sys, os
+for p in json.load(sys.stdin).get('packages', []):
+    if p.startswith('/'):
+        print(os.path.basename(p))
+"); do
+    cat ~/.pi/agent/settings.json | python3 -c "
+import json, sys
+for p in json.load(sys.stdin).get('packages', []):
+    if '$name' in p:
+        print(f'  GLOBAL: {p}')
+"
+done
+```
+
+If project has a local path and global has a git/npm entry for the same package,
+a conflict exists. Either remove the global entry (if continuing Phase D) or
+restore project source to git URL (if Phase E was intended).
 
 ## Appendix: Machine-Specific Path Handling
 
@@ -595,4 +795,5 @@ When `pkg-fork-dev` is used on a different machine:
 - **User confirmation gates** — fork creation, modification plan, and merge strategy all require explicit approval
 - **Backlog for all fork actions** — initial fork and every modification shipped recorded in `openspec/pkg-backlog.md`
 - **Capabilities.yaml sync** — when a package moves from npm to git or upstream to fork, update both `catalog.packages` and `global.settings.packages` if present
+- **Global dedup on local switch** — Phase D1a MUST check global settings for identity-conflicting entries before switching project source to local path. See `docs/reference/pi-package-loading.md` for the identity key mechanism.
 - **No CI/CD automation** — this skill does not create or manage fork CI/CD pipelines

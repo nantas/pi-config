@@ -75,6 +75,16 @@ at the top of this file using the following format:
 - **Reason:** Forked from git:github.com/MasuRii/pi-tool-display for potential customization. Source switched to personal fork.
 - **Notes:** Fork of https://github.com/MasuRii/pi-tool-display. Registered in `forks/manifest.yaml` and `repo-registry` as `pi-fork-pi-tool-display`. Local clone at `/Users/nantasmac/projects/forks/pi-tool-display`.
 - **Fork Fix (2026-05-07):** `direct-tool-label-recognition` — Fixed `isMcpToolCandidate()` to check label field, enabling MCP Direct Tools to be recognized and respect `mcpOutputMode` settings. Also fixed `formatMcpCallLine()` for `MCP:` colon format. Commit: `bd352d4` on `nantas/pi-tool-display` main.
+- **MCP Tool Rendering Fix (2026-05-07):** MCP tool output collapsing via `registerMcpToolOverrides()` was broken at two levels in the Pi runtime:
+  1. `getAllTools()` didn't return `label` and `execute` fields → `isMcpToolCandidate()` couldn't identify Direct Tools, and `execute` was inaccessible
+  2. `getAllRegisteredTools()` used first-write-wins → pi-tool-display's re-registration at `session_start` was silently discarded
+  
+  **Resolution**: Submitted PR `fix/mcp-tool-rendering-override` to `pi-mono/packages/coding-agent` with three changes:
+  - `types.ts`: `ToolInfo` Pick includes `"label"` and `"execute"`
+  - `agent-session.ts`: `getAllTools()` returns `label` and `execute`
+  - `runner.ts`: `getAllRegisteredTools()` uses last-write-wins
+  
+  No fork-level changes needed. The previous fork-based globalThis bridge approach was reverted because it couldn't bypass the `getAllRegisteredTools()` gate.
 
 ### 2026-05-04 — git:github.com/lucasmeijer/pi-terminal-signals
 
