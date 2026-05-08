@@ -50,6 +50,43 @@ export async function preloadKnownVaults(): Promise<void> {
   }
 }
 
+// ── Vault Detection ─────────────────────────────────────────────
+
+/**
+ * Check if the given directory is inside an Obsidian vault
+ * by walking up the directory tree looking for a `.obsidian/` directory.
+ * Uses only filesystem access — no CLI invocation.
+ */
+export function isInsideVault(cwd: string): boolean {
+  let current = resolve(cwd);
+  const root = parsePath(current).root;
+
+  while (true) {
+    try {
+      accessSync(resolve(current, ".obsidian"), constants.R_OK);
+      return true;
+    } catch {
+      // no .obsidian here
+    }
+
+    if (current === root) break;
+    current = resolve(current, "..");
+  }
+
+  return false;
+}
+
+/**
+ * Ensure vault list has been preloaded.
+ * Idempotent — skips if already loaded.
+ * Called lazily by tool handlers on first invocation.
+ */
+export async function ensurePreloaded(): Promise<void> {
+  if (!_preloaded) {
+    await preloadKnownVaults();
+  }
+}
+
 // ── Vault Resolution ────────────────────────────────────────────
 
 /**

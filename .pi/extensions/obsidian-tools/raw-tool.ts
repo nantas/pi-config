@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { runCli } from "./cli-runner";
-import { resolveVault } from "./vault-resolver";
+import { resolveVault, ensurePreloaded } from "./vault-resolver";
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -96,6 +96,9 @@ async function cliToolExecute(
   _onUpdate: any,
   _ctx: any,
 ): Promise<{ content: { type: "text"; text: string }[]; details: Record<string, unknown> }> {
+  // Lazy preload: ensure vault list is loaded before proceeding
+  await ensurePreloaded();
+
   // 5.2: Input validation
   const validationError = validateInput(params);
   if (validationError) {

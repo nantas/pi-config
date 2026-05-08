@@ -18,6 +18,7 @@ import {
   isCliAvailable,
   hasPreloaded,
   getKnownVaults,
+  ensurePreloaded,
 } from "./vault-resolver";
 
 // ── Parameter Schema ────────────────────────────────────────────
@@ -112,6 +113,9 @@ async function searchToolExecute(
   _ctx: any,
 ): Promise<ToolResult> {
   const startTime = Date.now();
+
+  // Lazy preload: ensure vault list is loaded before proceeding
+  await ensurePreloaded();
 
   // 4.2: Query sanitization
   const sanitizeResult = sanitizeQuery(params.query);

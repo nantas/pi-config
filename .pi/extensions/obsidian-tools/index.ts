@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { preloadKnownVaults } from "./vault-resolver";
+import { preloadKnownVaults, isInsideVault } from "./vault-resolver";
 import { searchToolDefinition } from "./search-tool";
 import { cliToolDefinition } from "./raw-tool";
 
@@ -21,9 +21,11 @@ export default function (pi: ExtensionAPI) {
     delete (globalThis as any)[_key];
   });
 
-  // Session start: preload known vaults
+  // Session start: preload known vaults only when inside a vault
   pi.on("session_start", async () => {
-    await preloadKnownVaults();
+    if (isInsideVault(process.cwd())) {
+      await preloadKnownVaults();
+    }
   });
 
   // Register tools
