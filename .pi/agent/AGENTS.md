@@ -15,6 +15,19 @@
 
 ### Edit Tool
 
+**Schema 结构（必填字段在顶层，与 `edits` 同级）：**
+
+```json
+{
+  "path": "relative/path/to/file",
+  "edits": [
+    { "oldText": "...", "newText": "..." },
+    { "oldText": "...", "newText": "..." }
+  ]
+}
+```
+
+- **`path` 是顶层必填字段**，不要把它放进 `edits[]` 内部，也不要遗漏。
 - **Batch limit**: 最多 3-4 个 `edits[]` 条目 per 调用。超过时拆分为多次 edit 调用。
 - **Content length**: 每条 `oldText` / `newText` 控制在 200 字符以内。长 multiline 内容优先用 bash + sed。
 - **Avoid overlap**: 多个 `edits[]` 的 `oldText` 不能在原始文件中重叠。
