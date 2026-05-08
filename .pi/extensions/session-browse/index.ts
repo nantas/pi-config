@@ -23,6 +23,8 @@ import {
   rebuildIndex,
   listRecent,
 } from "./indexer";
+import { handleSbInput } from "./browser";
+import { handleSrInput } from "./resumer";
 import { buildTurnFromEntryId, formatTurn } from "./expander";
 import { parseHtmlExport, readHtmlEntry } from "./html-parser";
 import type { JsonlEntry } from "./types";
@@ -38,6 +40,38 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     closeDb();
     delete (globalThis as any)[_key];
+  });
+
+  // ── Commands: /sb and /sr ────────────────────────────────────
+
+  pi.registerCommand("sb", {
+    description: "Search and browse historical Pi sessions.",
+    async handler(args, ctx) {
+      await handleSbInput(args, ctx);
+    },
+  });
+
+  pi.registerCommand("sr", {
+    description: "List recent sessions and resume a previous conversation.",
+    async handler(args, ctx) {
+      await handleSrInput(args, ctx);
+    },
+  });
+
+  // ── Shortcuts ──────────────────────────────────────────────
+
+  pi.registerShortcut("Cmd+Shift+F" as any, {
+    description: "Session Browse",
+    handler(ctx) {
+      ctx.ui.setEditorText("/sb ");
+    },
+  });
+
+  pi.registerShortcut("Cmd+Shift+R" as any, {
+    description: "Session Resume",
+    handler(ctx) {
+      ctx.ui.setEditorText("/sr");
+    },
   });
 
   // ── Ensure index is built on first tool use ──────────────────

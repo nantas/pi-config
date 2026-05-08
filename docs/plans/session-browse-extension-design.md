@@ -379,25 +379,25 @@ pi-session-search (https://github.com/kaiserlich-dev/pi-session-search, MIT) 用
 
 ### Change 2: session-browse-ui
 
-**范围**: UI 叠加层 + Session Resume
+**范围**: 终端交互式浏览 UI + Session Resume
 
 ```
-1. 实现 UI overlay (component.ts + screens/)
-   - 搜索屏幕: 显示搜索框 + 结果列表
-   - 预览屏幕: 显示 turn 上下文
-   - Ctrl+Shift+F 快捷键绑定
+1. 注册 /sb (session browse) 命令 — 终端内搜索/展开/读取交互
+   - /sb <query> → 搜索 → 结果列表 → 选中展开 turn → 读取原文
+   - 快捷键 Cmd+Shift+F → 输入 /sb
 
-2. 实现 Session Resume
-   - 选择 session 文件 → 恢复上次对话
+2. 注册 /sr (session resume) 命令 — 最近 session 列表 → 恢复对话
+   - /sr → 列出 session → 选择 → switchSession()
+   - 快捷键 Cmd+Shift+R → 执行 /sr
    - 仅 JSONL 格式
 
 3. 验证：
-   - Ctrl+Shift+F 调出搜索界面
-   - 搜索 → 选择结果 → 预览 turn
-   - Resume 功能正常
+   - Cmd+Shift+F → 输入查询 → 搜索结果 → 展开 turn 正确
+   - Cmd+Shift+R → 列 session → 选择 → 恢复对话成功
 ```
 
-> **设计原则**: Change 1 完成后即可在 LLM 层通过 `/session-search` 等工具完成检索工作流。
+> **设计决策**: 使用 `/sb` 和 `/sr` 替代原计划的 `/browse` 和 `/resume`（均已占用）。
+> 不实现 `setEditorComponent` overlay（Pi Editor API 为独占替换模式），改用终端内交互式 UI。
 > Change 2 是增量增强，不改变 Change 1 的后端逻辑。
 
 ## 8. 文件结构
@@ -417,18 +417,13 @@ pi-session-search (https://github.com/kaiserlich-dev/pi-session-search, MIT) 用
 └── types.ts              (类型定义)
 ```
 
-### Change 2 文件结构（UI + Resume，增量添加）
+### Change 2 文件结构（终端交互 UI + Resume，增量添加）
 
 ```
 .pi/extensions/session-browse/
 ├── ...                   (Change 1 文件保持不变)
-├── component.ts          (UI overlay: 搜索/预览屏幕)
-├── resume.ts             (Session resume)
-├── screens/
-│   ├── search.ts         (搜索屏幕)
-│   └── preview.ts        (预览屏幕)
-└── lib/
-    └── render-helpers.ts (UI 渲染辅助)
+├── browser.ts            (新增: /sb 命令处理器)
+└── resumer.ts            (新增: /sr 命令处理器)
 ```
 
 ## 9. 约束与边界
