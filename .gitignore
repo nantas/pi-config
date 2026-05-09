@@ -9,3 +9,5 @@
 Thumbs.db
 
 tmp/
+.pi/package-lock.json
+package-lock.json
