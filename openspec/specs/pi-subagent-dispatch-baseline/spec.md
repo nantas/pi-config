@@ -1,135 +1,68 @@
-# Capability: pi-subagent-dispatch-baseline
+# Specification Delta
 
-## Purpose
+## Capability 对齐（已确认）
 
-Define the repository-owned `dispatch` subagent baseline for `pi-config`, including the local orchestration extension, natural-language `/dispatch` entrypoint, and the stable bridge to `pi-subagents`.
+- Capability: `pi-subagent-dispatch-baseline`
+- 来源: `proposal.md` / 已确认 capabilities
+- 变更类型: `modified`
+- 用户确认摘要: dispatch extension 将被移除，所有 dispatch 工具/命令/接口契约不再适用
 
-## Requirements
+## 规范真源声明
+
+- 本文件是该 capability 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
+
+## REMOVED Requirements
 
 ### Requirement: The Repository Must Expose A Local Dispatch Tool
-The system SHALL provide a repository-owned `dispatch` tool through a package-backed runtime entry so that the same dispatch contract can load both inside `pi-config` and in any other repository where the global package source is enabled.
-
-#### Scenario: Contributor reviews the subagent entrypoint
-- **WHEN** a contributor inspects how multi-agent delegation is initiated in `pi-config`
-- **THEN** the contributor can identify a repository-owned `dispatch` tool as the formal repository-level entrypoint
-
-#### Scenario: Contributor inspects the subagent entrypoint after the packaging change
-- **WHEN** a contributor reviews how multi-agent delegation is initiated after the global delivery fix
-- **THEN** the contributor can still identify a repository-owned `dispatch` tool as the formal entrypoint
-- **AND** the contributor can see that the runtime entry is package-backed rather than a synced raw global extension directory
+**Reason**: The dispatch extension is removed. The native `subagent` tool (provided by pi-subagents runtime) replaces the repository-owned dispatch tool, with a `/subagent` prompt providing orchestration guidance.
+**Migration**: Use `subagent({ agent: "...", task: "..." })` directly. See `subagent-prompt-guide` spec for the new orchestration approach and `.pi/prompts/subagent.md` for quick-reference patterns.
 
 ### Requirement: The Repository Must Expose A Dispatch Command Wrapper
-The system SHALL provide a `/dispatch` command wrapper that remains bound to the repository-owned dispatch behavior regardless of whether the runtime session starts inside `pi-config` or another repository.
-
-#### Scenario: Contributor prefers a slash command
-- **WHEN** a contributor looks for a manual entrypoint in Pi
-- **THEN** the contributor can find `/dispatch` as a convenience wrapper over the same dispatch flow
-
-#### Scenario: Contributor invokes dispatch outside pi-config
-- **WHEN** a contributor starts Pi in another repository with the global package source enabled
-- **THEN** `/dispatch` is still available as the convenience wrapper over the same repository-owned dispatch flow
+**Reason**: The `/dispatch` command wrapper was part of the dispatch extension. The `/subagent` prompt serves as the new convenience entry point.
+**Migration**: Use `/subagent` prompt (`.pi/prompts/subagent.md`) for natural-language orchestration guidance. The pi-subagents bundled skill also provides comprehensive usage patterns.
 
 ### Requirement: Dispatch Command Must Accept Natural-Language Requests
-The system SHALL make `/dispatch` a natural-language user entrypoint rather than requiring callers to hand-author the structured `tasks[]` payload.
-
-#### Scenario: Contributor invokes dispatch manually
-- **WHEN** a contributor runs `/dispatch <task description>`
-- **THEN** the current main agent receives that natural-language request and decides whether to decompose it into one or more delegated tasks via the repository-owned `dispatch` tool
+**Reason**: The `/dispatch` command is removed. The `/subagent` prompt reinterprets this requirement by guiding the LLM to translate natural-language requests into structured `subagent()` calls.
+**Migration**: The LLM reads `.pi/prompts/subagent.md` to learn how to decompose natural-language delegation requests into subagent tool invocations.
 
 ### Requirement: Dispatch Must Use A Unified Task Array Contract
-The system SHALL define `dispatch` to accept a unified `tasks[]` contract so that one-task and many-task delegation share the same interface.
-
-#### Scenario: Caller dispatches one task
-- **WHEN** a caller submits a `dispatch` request with exactly one task
-- **THEN** the request uses the same `tasks[]` input shape as a multi-task request
-
-#### Scenario: Caller dispatches multiple tasks
-- **WHEN** a caller submits a `dispatch` request with multiple tasks
-- **THEN** the request remains on the same `tasks[]` contract rather than switching to a separate parallel-only interface
+**Reason**: The dispatch-specific `tasks[]` contract is removed. The native `subagent` tool accepts its own parameter shapes (`agent`+`task` for single, `tasks[]` for parallel, `chain[]` for sequential).
+**Migration**: Use native subagent parameter shapes. Single task: `{ agent, task }`. Parallel: `{ tasks: [...] }`. Chain: `{ chain: [...] }`.
 
 ### Requirement: Dispatch Must Keep The User Entry Surface Minimal In V1
-The system SHALL keep the user-facing v1 dispatch entry surface minimal while allowing the repository-owned tool contract to carry the internal planning fields required to bridge to real `pi-subagents` execution.
-
-#### Scenario: Caller evaluates dispatch parameters
-- **WHEN** a caller reviews the natural-language `/dispatch` entrypoint
-- **THEN** the caller can see that end users are not required to hand-author runtime knobs or structured task payloads
-
-#### Scenario: Main agent submits a planned dispatch request
-- **WHEN** the current main agent has already decomposed a natural-language request into delegated tasks
-- **THEN** the repository-owned `dispatch` tool may accept internal planning fields such as `context`, `skills`, `reads`, `model`, and `cwd` in addition to `agent`, `task`, and `projectContext`
-- **AND** tool limits, extension limits, and default policy remain controlled by the selected agent file rather than by broad user-authored runtime overrides
+**Reason**: The dispatch extension is removed. The pi-subagents native tool provides direct access to all subagent features, which is more explicit but requires understanding the subagent parameter interface.
+**Migration**: The `.pi/prompts/subagent.md` prompt provides the concise entry surface. For advanced usage, refer to the pi-subagents skill.
 
 ### Requirement: Dispatch Must Support Task-Level Project Context Selection
-The system SHALL support task-level `projectContext` values of `default`, `inherit`, and `strip` so that each delegated task can independently decide whether to receive current project context.
-
-#### Scenario: Multi-task dispatch mixes context policies
-- **WHEN** one task needs current project context and another task should avoid it
-- **THEN** the caller can express different `projectContext` selections for each task within the same dispatch request
+**Reason**: The `projectContext: default | inherit | strip` task-level control was unique to dispatch. pi-subagents does not support this at the task level.
+**Migration**: Use agent-level `inheritProjectContext` (boolean) in `.pi/agents/*.md` frontmatter to control per-agent context inheritance. For context-free agents, set `inheritProjectContext: false`. This is a coarser-grained control than dispatch's per-task selection.
 
 ### Requirement: Sync Must Be The Only Formal V1 Completion Mode
-The system SHALL formally support `sync` execution in v1 and SHALL reserve `async` only as a future-facing contract value that is not fully specified by this change.
-
-#### Scenario: V1 implementation scope is reviewed
-- **WHEN** a contributor checks which completion modes must be implemented in the first subagent baseline
-- **THEN** the contributor sees that `sync` is required while `async` remains an explicitly deferred extension point
+**Reason**: This constraint was specific to dispatch's v1 implementation. pi-subagents natively supports both sync and async execution modes.
+**Migration**: Async mode is now fully supported. Use `async: true` in subagent calls for background execution. See pi-subagents skill for resume, control events, and status management.
 
 ### Requirement: Dispatch Results Must Use A Stable Normalized Shape
-The system SHALL return normalized results that include a top-level `runId`, a `results[]` collection, per-task `taskId`, `agent`, `status`, `summary`, `finalOutput`, `artifactPaths`, `sessionFile`, `savedOutputPath`, `error`, and an `aggregateSummary`.
-
-#### Scenario: Single-task result is returned
-- **WHEN** a single delegated task completes
-- **THEN** the response still returns the normalized `results[]` structure with a stable `runId` and `taskId`
-- **AND** the task result carries the child output text and any real export paths that were produced
-
-#### Scenario: Multi-task result is returned
-- **WHEN** multiple delegated tasks complete
-- **THEN** the response returns each task result in the normalized shape plus an aggregate summary for the overall dispatch run
-- **AND** callers do not need a second query surface just to read the child outputs from a sync run
+**Reason**: The normalized `results[]` return shape with `runId`, `taskId`, `status`, `summary`, `finalOutput` etc. was dispatch-specific. The native `subagent` tool returns results in its own shape.
+**Migration**: Consume subagent tool results directly. The return shape is defined by the pi-subagents runtime and follows the standard Pi tool result contract.
 
 ### Requirement: Sync Dispatch Must Return Directly Consumable Child Output
-The system SHALL make `dispatch` sync results directly consumable by both the main agent and the human operator, rather than returning only task completion states.
-
-#### Scenario: Main agent reviews a sync dispatch result
-- **WHEN** a sync dispatch run completes successfully
-- **THEN** the tool-visible text output includes each child task's actual result text
-- **AND** the output includes any real artifact, saved-output, or session paths that were created
-- **AND** the main agent does not need to guess temp file locations or run a second tool just to inspect child output
-
-#### Scenario: Child output is not present in finalOutput
-- **WHEN** a child result omits `finalOutput` but a saved output or artifact output exists
-- **THEN** dispatch falls back to that persisted output for both summary generation and sync result rendering
+**Reason**: Same as above — the normalized child output contract was specific to dispatch. The native subagent tool returns child outputs as part of its result.
+**Migration**: Subagent results are directly consumable. Chain steps use `{previous}` template variable to pass outputs between steps. Individual outputs can use `output` parameter and `outputMode`.
 
 ### Requirement: Sync Run IDs Must Not Be Misrepresented As Status Handles
-The system SHALL not imply that a sync-only dispatch `runId` is compatible with async status lookup unless this change explicitly provides such a handle.
-
-#### Scenario: Contributor inspects a sync dispatch response
-- **WHEN** the response includes a top-level `runId`
-- **THEN** the contributor can understand that the identifier is the dispatch response identifier
-- **AND** the response does not imply that `subagent status` can inspect that sync run unless a dedicated status-compatible handle is also returned
+**Reason**: The sync run ID constraint was dispatch-specific. The native subagent tool has consistent run ID handling for both sync and async modes.
+**Migration**: Use `subagent({ action: "status", id: "..." })` for status inspection of both sync and async runs. The pi-subagents runtime handles run identity consistently.
 
 ### Requirement: Dispatch Must Use A Replaceable Backend Substrate
-The system SHALL hide backend-specific execution details behind the repository-owned dispatch layer and SHALL treat `pi-subagents` as the initial substrate rather than as the long-term interface contract.
-
-#### Scenario: Future orchestration backend is considered
-- **WHEN** a later change evaluates replacing or augmenting the execution substrate
-- **THEN** the dispatch contract remains stable because backend-specific invocation details are not exposed as the repository API
+**Reason**: The abstraction layer for hiding the execution substrate behind dispatch was intentional when dispatch was the repository-owned entry point. With dispatch removed, the substrate is directly exposed.
+**Migration**: The native `subagent` tool is the execution substrate. No abstraction layer is needed between the LLM and the subagent tool. The `/subagent` prompt provides usage guidance without hiding the substrate.
 
 ### Requirement: Dispatch Must Bridge To Real Pi-Subagents Execution
-The system SHALL bridge the repository-owned `dispatch` tool to real `pi-subagents` execution through package-owned dependency resolution rather than through a filesystem assumption tied to `~/.pi/agent/npm/`.
-
-#### Scenario: Contributor inspects the execution path
-- **WHEN** a contributor reviews how `dispatch` actually runs delegated tasks
-- **THEN** the contributor can identify a real bridge to `pi-subagents` execution rather than a generic spawn adapter
-
-#### Scenario: Contributor reviews the execution path after the delivery fix
-- **WHEN** a contributor inspects how `dispatch` resolves the `pi-subagents` substrate
-- **THEN** the execution path can be traced to package-managed imports
-- **AND** the bridge no longer requires a mirrored `~/.pi/agent/npm/node_modules/pi-subagents` directory to exist
+**Reason**: The bridge is no longer needed because there is no dispatch layer to bridge through. The LLM calls `subagent()` directly.
+**Migration**: Direct `subagent()` invocation replaces the bridge. No intermediate dispatch layer exists.
 
 ### Requirement: Dispatch Must Support Skill-Sensitive Task Planning
-The system SHALL allow the repository-owned dispatch plan to carry skill-sensitive execution intent without requiring end users to write raw `skill` task overrides.
-
-#### Scenario: Main agent plans a vault-search task
-- **WHEN** the main agent identifies that a delegated task must use a repository skill such as `obsidian-cli`
-- **THEN** the dispatch plan can encode that requirement through repository-owned agent policy and/or normalized internal task fields
-- **AND** successful execution does not depend on the end user hand-authoring a raw `skill: "obsidian-cli"` field
+**Reason**: The task-level skill encoding was a dispatch extension feature. pi-subagents handles skill injection through agent definitions and the `skills` parameter at the agent/task level.
+**Migration**: Use agent-level `skills` field in `.pi/agents/*.md` frontmatter, or per-task `skills` parameter in `subagent()` calls. The pi-subagents skill provides patterns for skill-sensitive delegation.

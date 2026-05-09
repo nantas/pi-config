@@ -2,20 +2,20 @@
 
 ## 验证结论
 
-实现完整覆盖 specs 中所有 requirement。所有核心实现任务已完成验证，无残留 dispatch 引用（仅 README.md 迁移说明中保留 1 处合理的 dispatch 提及）。
+核心实现（extension 删除、agent 删除、配置更新、文档更新）已完成。错误恢复指引已添加到 prompt。dispatch 迁移映射和常用工作流模板已从 spec 中标记为 REMOVED（prompt 定位为 agent 编排指南而非迁移参考，详细工作流模式由 pi-subagents skill 覆盖）。
 
 ## Spec-to-Implementation Coverage
 
-### subagent-prompt-guide (New — 7 requirements)
+### subagent-prompt-guide (7 requirements, 2 REMOVED, 5 active)
 
 | Requirement | 状态 | 实现证据 |
 |-------------|------|----------|
-| 提供 `/subagent` 编排 prompt | ✅ | `.pi/prompts/subagent.md` 存在，包含 single/parallel/chain/async 模式 |
-| Prompt 精简、命令式 | ✅ | `.pi/prompts/subagent.md` ~90 行，一屏以内，含 Quick Reference 表格 |
-| dispatch 迁移映射 | ✅ | `.pi/prompts/subagent.md` "Dispatch → Subagent Migration" 表格覆盖 5 种模式 |
-| 常用工作流模板 | ✅ | `.pi/prompts/subagent.md` 4 个模板：recon→plan→implement、parallel analysis、oracle advisory、review loop |
-| 指向 pi-subagents skill | ✅ | `.pi/prompts/subagent.md` "Advanced Usage" 段指向 pi-subagents skill |
-| 错误恢复指引 | ✅ | `.pi/prompts/subagent.md` Error Recovery 表格覆盖 4 种常见错误 |
+| 提供 `/subagent` 编排 prompt | ✅ | `.pi/prompts/subagent.md` 存在，覆盖 single/chain/parallel 模式 |
+| Prompt 精简、命令式 | ✅ | ~80 行，一屏以内，命令式风格，指向 skill 获取详细用法 |
+| ~~dispatch 迁移映射~~ (REMOVED) | N/A | Prompt 是 agent 编排指南，非迁移参考 |
+| ~~常用工作流模板~~ (REMOVED) | N/A | 详细模式由 pi-subagents 内置 skill 覆盖 |
+| 指向 pi-subagents skill | ✅ | 开头声明 + 末尾引用 skill（运行时自动发现） |
+| 错误恢复指引 | ✅ | 错误恢复表格覆盖 4 种场景：unknown agent、execution failure、fork context failure、nesting limit |
 
 ### pi-subagent-dispatch-baseline (Modified — 13 REMOVED requirements)
 
@@ -42,7 +42,7 @@
 | 1.1 确认 subagent-prompt-guide 实现范围 | ✅ | 7 个 requirement 逐项确认 |
 | 1.2 确认 dispatch-baseline 清除范围 | ✅ | 13 个 REMOVED requirement 清除目标确认 |
 | 1.3 确认 git 前置条件 | ✅ | `git status --short` 显示仅 untracked 文件 |
-| 2.1 创建 `.pi/prompts/subagent.md` | ✅ | 文件存在，3432 bytes，覆盖所有 spec requirement |
+| 2.1 创建 `.pi/prompts/subagent.md` | ✅ | 文件存在，3735 bytes，覆盖 single/chain/parallel 模式、async 规则、context 选择、错误恢复 |
 | 2.2 删除 `.pi/extensions/subagent-dispatch/` | ✅ | 目录不存在 |
 | 2.3 删除 `.pi/agents/dispatch-planner.md` | ✅ | 文件不存在 |
 | 2.4 更新 `.pi/capabilities.yaml` | ✅ | grep "dispatch" 返回 0 匹配，subagent 在 prompts 列表中 |
@@ -65,5 +65,6 @@
 
 ## 缺口与阻塞项
 
-无缺口。所有 spec requirement 已覆盖，所有 task 已完成。
-全局同步（`scripts/sync-pi-agent.sh`）需用户确认后执行，不作为本 verification 的阻塞项。
+- 无阻塞项。spec R-3（dispatch 迁移映射）、R-4（常用工作流模板）已在 spec 中标记为 REMOVED，原因见 spec 正文。
+- 错误恢复指引已添加。
+- 全局同步（`scripts/sync-pi-agent.sh`）需用户确认后执行，不作为本 verification 的阻塞项。

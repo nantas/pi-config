@@ -38,23 +38,13 @@ The prompt SHALL be a concise, command-style quick-reference that fits in a sing
 - **THEN** it consumes minimal token budget while still providing actionable patterns
 - **AND** it explicitly directs the LLM to the pi-subagents skill for advanced usage (intercom, control events, resume, agent management)
 
-### Requirement: Prompt Must Provide Dispatch Migration Mappings
-The prompt SHALL include a quick mapping table from common dispatch patterns to their equivalent subagent tool patterns, to help existing users transition.
+### ~~Requirement: Prompt Must Provide Dispatch Migration Mappings~~ (REMOVED)
 
-#### Scenario: Former dispatch user needs to find the equivalent pattern
-- **WHEN** a user or LLM was familiar with dispatch's single/parallel/chain modes
-- **THEN** the prompt shows the equivalent subagent invocation for each mode
+The prompt is an agent-facing orchestration guide, not a migration reference. The native `subagent()` tool's three modes (single/chain/parallel) are documented directly without migration context. Dispatch references in the repo are limited to `README.md` migration context mentions.
 
-### Requirement: Prompt Must Cover Common Workflows
-The prompt SHALL include ready-to-use templates for common multi-agent workflows that dispatch used to support.
+### ~~Requirement: Prompt Must Cover Common Workflows~~ (REMOVED)
 
-#### Scenario: LLM needs a recon→plan→implement flow
-- **WHEN** the LLM needs a scout→planner→worker execution pipeline
-- **THEN** the prompt provides a chain pattern that matches the dispatch equivalent
-
-#### Scenario: LLM needs a parallel review flow
-- **WHEN** the LLM needs multiple reviewers on different aspects
-- **THEN** the prompt provides a parallel tasks pattern that matches the dispatch equivalent
+Workflow patterns (recon→plan→implement, parallel review, etc.) are fully documented in the `pi-subagents` built-in skill (`SKILL.md`). The prompt references the skill for detailed patterns, avoiding duplication.
 
 ### Requirement: Prompt Must Reference Pi-Subagents Skill For Advanced Usage
 The prompt SHALL include a reference to the bundled pi-subagents skill (loaded via `skills: pi-subagents` or available in the runtime) for advanced capabilities such as intercom coordination, forked context, control events, async background runs, resume, and agent management.

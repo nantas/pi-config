@@ -1,70 +1,91 @@
-# Subagent 多 Agent 编排
+# Subagent 编排指南
 
-使用原生 `subagent` 工具委派任务给子 agent，实现多 agent 协作。
+> 本文档是对 agent 的编排行为约束，非面向用户的说明。
+> 详细 API 参考（参数 schema、调用示例、错误处理）请参考 `pi-subagents` 内置 skill。
+> 该 skill 在运行时通过 `<available_skills>` 自动发现，路径可见于其中。
 
-## 我能帮你做什么
+## 1. `subagent` 工具模式
 
-当你有以下需求时，告诉我，我会编排合适的子 agent 来完成：
+| 模式 | 参数 | 用途 |
+|------|------|------|
+| **Single** | `{ agent, task }` | 委派单个子 agent |
+| **Chain** | `{ chain: [{agent, task}, ...] }` | 多步串行流水线 |
+| **Parallel** | `{ tasks: [{agent, task}, ...] }` | 多个不冲突任务并发 |
 
-| 你想要 | 推荐方式 |
-|--------|----------|
-| 调研一个技术方案 | `researcher` 搜集外部证据 |
-| 了解代码库某个模块 | `scout` 快速侦察 |
-| 实现一个功能或修复 | `planner` → `worker` 流水线 |
-| 审查代码或 diff | `reviewer`（多角度并行审查） |
-| 挑战当前方向或决策 | `oracle` 审阅并质疑假设 |
-| 长时间后台任务 | `worker` + async 模式 |
-| 多个不冲突的任务同时进行 | `tasks[]` 并行执行 |
-| 多步流水线（侦察→规划→实现） | `chain[]` 串行执行 |
+只有这三种模式。不需要自行组合其他模式。
 
-## 工作流模式
+## 2. Async 行为规则（必须遵守）
 
-### 完整功能开发（推荐）
+```
+subagent({agent, task, async: true}) 派发后
+  │
+  ├── ❌ 禁止调用 subagent({action:"status"}) 轮询后台任务
+  │     → 不检查状态、不等待完成
+  │     → widget 会自动显示运行状态（用户可见）
+  │
+  ├── ✅ 必须立即结束当前回合
+  │     → 回复一条纯文本说明已派发
+  │     → 不得产生任何后续 tool calls
+  │     → 不得继续追加分析、建议或规划
+  │
+  └── ✅ 子 agent 完成后：
+        → 系统通过 triggerTurn 自动启动新回合
+        → 通知作为 `role:"custom"` 消息按完成时间插入上下文
+        → LLM 在新回合中处理结果，执行后续工作
+        → 如果用户在此期间发消息，系统会自动排队（FIFO 顺序）
+```
 
-澄清需求 → 规划 → 实现 → 并行审查 → 修复。这是处理非平凡任务的标准流程：
+## 3. 并发处理（系统自动完成，agent 无需干预）
 
-1. **澄清**：我先用 `scout` 收集代码上下文，有需要时加 `researcher` 搜集外部资料，然后向你提问直到需求、范围、验收标准都明确
-2. **规划**：复杂任务调用 `planner` 生成实施计划，简单任务直接确认后跳过
-3. **实现**：`worker` 按批准的计划执行实现
-4. **审查**：多个 `reviewer` 从不同角度（正确性/测试/简洁性）并行审查 diff
-5. **修复**：综合审查意见后 `worker` 应用必要的修复
+当 subagent 完成通知触发新回合时，如果用户也在发消息：
 
-### 快速实现
+| 用户操作 | 系统行为 |
+|----------|----------|
+| 正常 Enter | 消息进入 steer queue，按 FIFO 顺序与通知一起交付 |
+| Alt+Enter | 消息进入 followUp queue，当前回合完全结束后处理 |
+| 两个事件同时到达 | steer + followUp 按序 drain，保持不变 |
 
-当你需求明确时，直接委派 `worker` 实现。完成后可追加审查。
+Agent 不需要关心排队机制。只需要在收到通知后正常处理即可。
 
-### 代码审查
+## 4. `context` 选择规则
 
-对已有代码或 diff 进行多角度并行审查。审查者使用 fresh context（不看会话历史），直接检查仓库文件。
+| context 值 | 适用场景 | 说明 |
+|------------|----------|------|
+| `"fresh"` | reviewer、快速侦察 | 无历史上下文，只看当前 diff/文件 |
+| `"fork"` | oracle、worker、planner | 继承主会话上下文，适合延续性工作 |
 
-### 技术调研
+packaged 的 `planner`、`worker`、`oracle` 默认使用 `"fork"`。
+明确需要无上下文的审查时，必须指定 `context: "fresh"`。
 
-`researcher`（外部文档/生态/最佳实践）+ `scout`（本地代码/约束/集成点），合并内外证据。
+## 5. 可用子 agent
 
-### 方案挑战
+| Agent | 角色 | 默认 context |
+|-------|------|-------------|
+| `scout` | 快速代码库侦察 | fresh |
+| `planner` | 生成实施计划 | fork |
+| `worker` | 实现（单写入者） | fork |
+| `reviewer` | 代码审查 + 修复 | fresh |
+| `context-builder` | 上下文构建 + meta-prompt | fresh |
+| `researcher` | 外部资料调研 | fresh |
+| `oracle` | 方向审阅、假设挑战、风险评估 | fork |
+| `delegate` | 轻量通用委托 | fork |
 
-`oracle` 继承当前会话上下文，审查你的方向、假设和风险，提出异议。它能看到我们的讨论历史，适合做决策前的压力测试。
+## 6. 错误恢复
 
-### 后台任务
+| 错误场景 | 诊断方法 |
+|----------|----------|
+| `unknown agent` — 调用了不存在的子 agent | `subagent({ action: "list" })` 查看可用 agent 列表 |
+| 子 agent 执行失败——配置/环境问题 | `subagent({ action: "doctor" })` 获取完整诊断报告 |
+| fork context 失败——无持久化 session | 使用 `context: "fresh"` 显式指定 fresh context |
+| 子 agent 嵌套超限——recursion 过深 | 扁平化工作流，或提高 `maxSubagentDepth` |
 
-长时间运行的任务（测试套件、大规模重构）用 async 模式后台执行，你可以继续其他工作，完成后我会收到通知。
+## 7. 编排约束
 
-## 可用 Agent
-
-| Agent | 角色 | 适合场景 |
-|-------|------|----------|
-| `scout` | 快速侦察 | 代码库探索、文件定位、结构梳理 |
-| `planner` | 规划 | 生成结构化实施计划 |
-| `worker` | 实现 | 写代码、改文件、执行任务 |
-| `reviewer` | 审查 | 代码审查、diff 检查、发现问题 |
-| `context-builder` | 上下文构建 | 生成结构化的需求/代码上下文文档 |
-| `researcher` | 调研 | 搜索外部文档、API、最佳实践 |
-| `oracle` | 顾问 | 审阅方向、质疑假设、风险评估 |
-| `delegate` | 轻量委托 | 简单的通用任务委派 |
-
-## 交互提示
-
-- **审查后我会修复**：除非你明确说"只要审查"，否则实现任务会走「实现→审查→修复」完整流程
-- **我会先问再动手**：非平凡任务开始前，我会先澄清需求
-- **写操作单线程**：同一时间只有一个 agent 写文件，审查和研究可以并行
-- **决策权在我（主 agent）**：子 agent 遇到未批准的选择时会暂停请你决定，不会擅自行动
+- **写操作单线程**：同一时间只有一个 agent 写文件。review/research 可以并行。
+- **agent 不可嵌套**：子 agent 不能调用 `subagent()`。所有编排由主 agent 负责。
+- **决策权在主 agent**：子 agent 遇到未批准的 scope/product/architecture 选择时，必须暂停并请你决定，不能擅自行动。
+- **task 要具体**：给子 agent 的具体任务而非模糊指令。
+  - ✅ `"检查 auth.ts 中 null 安全检查的遗漏"`
+  - ❌ `"审查所有代码"`
+- **chain 变量**：`{task}`=原始请求, `{previous}`=上一步结果, `{chain_dir}`=共享目录。
+- **详细 API 参考**：所有参数的完整 schema、调用示例、错误处理，见 `pi-subagents` 内置 skill（运行时自动发现）。
