@@ -95,12 +95,11 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/output-scroll-viewer.ts`
 - **OpenSpec Spec**: `openspec/specs/output-scroll-viewer/spec.md`
 
-#### `subagent-dispatch`
+#### `subagent` (prompt)
 
-- **描述**: Subagent 调度扩展，支持在单次会话中并行或串行派生子 agent 执行独立任务。提供 `dispatch` 工具，支持 single / parallel / chain 三种模式。
-- **解决的问题**: Pi 原生不支持多 agent 协作。该扩展使主 agent 可以委派子任务给专用子 agent，实现并行开发、多视角审查等模式。
-- **源文件**: `.pi/extensions/subagent-dispatch/`
-- **OpenSpec Spec**: `openspec/specs/add-pi-subagent-baseline/spec.md`
+- **描述**: 多 agent 编排 prompt，提供 `/subagent` 入口，引导主 agent 使用原生 `subagent` 工具完成 single/parallel/chain/async 工作流。
+- **解决的问题**: 替代已移除的 `dispatch` 扩展，提供轻量编排指引，覆盖常用 delegation 模式和错误恢复。
+- **源文件**: `.pi/prompts/subagent.md`
 
 #### `init-command`
 
@@ -236,13 +235,7 @@ export POWERLINE_NERD_FONTS=1
 
 ### Agent 定义
 
-位于 `.pi/agents/` 下，定义仓库专用的 Agent 角色和委托合约。
-
-#### `dispatch-planner`
-
-- **角色**: 规划委托 Agent。专注于任务分解和执行规划。
-- **解决的问题**: 在 dispatch 流程中，将规划工作分离给专用 Agent，进行结构化任务分解。
-- **源文件**: `.pi/agents/dispatch-planner.md`
+当前仓库无自定义 agent 定义。使用 Pi 内置 agent（scout、planner、worker、reviewer、oracle 等）。
 
 ---
 
@@ -395,7 +388,7 @@ openspec/
 |---|---|
 | `.pi/settings.json` | 全局配置：provider、model、packages、subagent overrides |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
-| `.pi/agents/` | Agent 定义（code-writer、dispatch-planner） |
+| `.pi/agents/` | Agent 定义（当前无自定义 agent） |
 | `.pi/skills/` | 元技能（pi-extension-dev、pkg-research） |
 | `.agents/skills/` | OpenSpec 10 步工作流技能 + 全局 Superpowers |
 | `openspec/manifest.json` | 能力清单（specs 映射） |

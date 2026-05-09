@@ -11,15 +11,13 @@ global:
     - dollar-skill-invoke
     - planner-toggle
     - output-scroll-viewer
-    - subagent-dispatch
     - tool-counter-widget
     - init-command
     - browse-session-tree
     - session-browse
 
   # Agents synced to ~/.pi/agent/agents/
-  agents:
-    - dispatch-planner
+  agents: []
 
   # Skills synced to ~/.pi/agent/skills/
   skills:
@@ -37,6 +35,7 @@ global:
     - opsx-propose
     - opsx-sync
     - opsx-verify
+    - subagent
 
   # Settings filtering rules
   settings:
@@ -44,6 +43,7 @@ global:
     packages:
       - npm:@eko24ive/pi-ask
       - npm:@tmustier/pi-tab-status
+      - npm:pi-subagents@0.24.0
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display

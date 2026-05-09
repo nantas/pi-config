@@ -6,7 +6,8 @@
     "git:github.com/nantas/pi-tool-display",
     "git:github.com/jwu/pi-powerline",
     "git:github.com/lucasmeijer/pi-terminal-signals",
-    "npm:@eko24ive/pi-ask"
+    "npm:@eko24ive/pi-ask",
+    "npm:pi-subagents@0.24.0"
   ],
   "lastChangelogVersion": "0.70.6",
   "defaultThinkingLevel": "high",

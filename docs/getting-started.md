@@ -103,10 +103,10 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 7 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`subagent-dispatch`、`init-command`、`tool-counter-widget`、`add-provider` |
-| **Agent** | 1 | `dispatch-planner` |
+| **扩展** | 6 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`init-command`、`tool-counter-widget`、`add-provider` |
+| **Agent** | 0 | （使用 Pi 内置 agent） |
 | **技能** | 1 | `install-from-pi-config` |
-| **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
+| **Prompts** | 11 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify`、`subagent` |
 | **外部包** | 5 | `pi-ask`（交互提问）、`pi-tab-status`（tab 状态图标）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化） |
 
 ### 按需安装能力（Catalog）
@@ -177,7 +177,7 @@ pi
 
 ## 补充：配置 Subagent 模型重载
 
-Pi 内置的 subagent/dispatch 系统（包括 `dispatch` 扩展和 `/agents` 列表中的内置 agent）会读取 `settings.json` 中的 `subagents.agentOverrides` 来决定每个 agent 使用的模型。如果你使用自定义供应商而非 Anthropic/OpenAI 默认供应商，**必须**为每个 agent 显式指定模型，否则子 agent 会回退到默认模型（通常是 `anthropic/claude-*`），导致 "no api key found" 错误。
+Pi 内置的 subagent 系统（`/agents` 列表中的内置 agent）会读取 `settings.json` 中的 `subagents.agentOverrides` 来决定每个 agent 使用的模型。如果你使用自定义供应商而非 Anthropic/OpenAI 默认供应商，**必须**为每个 agent 显式指定模型，否则子 agent 会回退到默认模型（通常是 `anthropic/claude-*`），导致 "no api key found" 错误。
 
 在 `~/.pi/agent/settings.json`（或本仓库 `.pi/settings.json`，同步后生效）中添加：
 
