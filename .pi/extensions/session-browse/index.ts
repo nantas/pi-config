@@ -59,21 +59,21 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
     },
   });
 
-  // ── Shortcuts ──────────────────────────────────────────────
+  // ── Shortcuts (disabled — conflicts with Shift+F on some terminals) ──
 
-  pi.registerShortcut("Cmd+Shift+F" as any, {
-    description: "Session Browse",
-    handler(ctx) {
-      ctx.ui.setEditorText("/sb ");
-    },
-  });
-
-  pi.registerShortcut("Cmd+Shift+R" as any, {
-    description: "Session Resume",
-    handler(ctx) {
-      ctx.ui.setEditorText("/sr");
-    },
-  });
+  // pi.registerShortcut("Cmd+Shift+F" as any, {
+  //   description: "Session Browse",
+  //   handler(ctx) {
+  //     ctx.ui.setEditorText("/sb ");
+  //   },
+  // });
+  //
+  // pi.registerShortcut("Cmd+Shift+R" as any, {
+  //   description: "Session Resume",
+  //   handler(ctx) {
+  //     ctx.ui.setEditorText("/sr");
+  //   },
+  // });
 
   // ── Ensure index is built on first tool use ──────────────────
 
