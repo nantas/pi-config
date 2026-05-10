@@ -10,8 +10,32 @@
 
 import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
-import type { TurnData, TurnEntry, JsonlEntry } from "./types";
+import type { TurnData, TurnEntry, JsonlEntry, TurnBoundary, TurnSummary } from "./types";
 import { parseHtmlExport } from "./html-parser";
+
+const TOOL_CALL_SUMMARY_MAX_CHARS = 60;
+
+/**
+ * Format a tool call as a one-line summary.
+ * Example: session-search(query="session browse UI interface")
+ * Truncated to 60 visible characters if longer.
+ */
+export function formatToolCallSummary(
+  name: string,
+  args: Record<string, unknown>,
+): string {
+  const keys = Object.keys(args);
+  if (keys.length === 0) return `${name}()`;
+
+  const firstKey = keys[0];
+  const firstVal = String(args[firstKey]);
+  const summary = `${name}(${firstKey}="${firstVal}")`;
+
+  if (summary.length > TOOL_CALL_SUMMARY_MAX_CHARS) {
+    return summary.slice(0, TOOL_CALL_SUMMARY_MAX_CHARS - 3) + "...)";
+  }
+  return summary;
+}
 
 interface EntryRow {
   entry_id: string;
@@ -84,11 +108,13 @@ export function buildTurnFromEntryId(
 
     // Per design D6: expand output does NOT include toolResult content
     if (entry.role !== "toolResult") {
+      const toolCallArgs = extractToolCallArgs(rawEntries, entry.entry_id);
       turnItems.push({
         entry_id: entry.entry_id,
         role: entry.role,
         text,
         tool_calls: toolCalls,
+        tool_call_args: toolCallArgs,
       });
     }
   }
@@ -160,24 +186,147 @@ function getEntryText(
 }
 
 /**
- * Format a TurnData into a human-readable string.
- * Per spec: USER: <text> followed by ASST entries with tool call references.
+ * Extract tool call arguments from a raw entry.
+ * Returns an array of { name: args } objects for each tool call.
+ */
+function extractToolCallArgs(
+  rawEntries: Map<string, JsonlEntry>,
+  entryId: string,
+): Record<string, Record<string, unknown>>[] {
+  const entry = rawEntries.get(entryId);
+  if (!entry?.message) return [];
+
+  const result: Record<string, Record<string, unknown>>[] = [];
+  for (const block of entry.message.content || []) {
+    if (block.type === "toolCall" && block.name) {
+      let args: Record<string, unknown>;
+      if (typeof block.arguments === "string") {
+        try {
+          args = JSON.parse(block.arguments);
+        } catch {
+          args = {};
+        }
+      } else {
+        args = (block.arguments as Record<string, unknown>) ?? {};
+      }
+      result.push({ [block.name]: args });
+    }
+  }
+  return result;
+}
+
+/**
+ * Format a TurnData into a compact, token-efficient string for LLM consumption.
+ *
+ * Compact format (no decorative prefixes, no blank lines):
+ * ```
+ * U
+ * <full user text>
+ * A
+ * <full assistant text>
+ * → name(param="value")
+ * A
+ * <full assistant text>
+ * ```
+ *
+ * toolResult entries are skipped.
+ * Tool calls are rendered as → name(args_summary), 60 char max.
  */
 export function formatTurn(turn: TurnData): string {
   const lines: string[] = [];
 
-  lines.push(`USER: ${turn.user_text}`);
+  lines.push("U");
+  lines.push(turn.user_text);
 
   for (const entry of turn.entries) {
     if (entry.role === "assistant") {
-      if (entry.text) {
-        lines.push(`ASST: ${entry.text}`);
+      // Skip entries with no text AND no tool calls (e.g., pure toolResult wrappers)
+      const hasText = !!entry.text;
+      const hasToolCalls = entry.tool_call_args.length > 0;
+      if (!hasText && !hasToolCalls) continue;
+
+      lines.push("A");
+      if (hasText) {
+        lines.push(entry.text);
       }
-      if (entry.tool_calls.length > 0) {
-        lines.push(`  → called ${entry.tool_calls.map((t) => `${t}()`).join(", ")}`);
+      // Tool calls as one-line summaries
+      if (hasToolCalls) {
+        for (const tc of entry.tool_call_args) {
+          for (const [name, args] of Object.entries(tc)) {
+            lines.push(`→ ${formatToolCallSummary(name, args)}`);
+          }
+        }
       }
     }
+    // toolResult entries are skipped
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Build a turn boundary index for a session.
+ * Scans entries ordered by line_number, identifies each role=user entry as a turn boundary.
+ * Returns an array of TurnBoundary objects with entry_id, line_number, and user_text.
+ */
+export function buildTurnIndex(
+  db: Database.Database,
+  sessionPath: string,
+): TurnBoundary[] {
+  const entries = db.prepare(
+    "SELECT entry_id, line_number, role FROM entries WHERE session_path = ? ORDER BY line_number ASC",
+  ).all(sessionPath) as { entry_id: string; line_number: number; role: string }[];
+
+  const rawEntries = readRawEntries(sessionPath);
+  const boundaries: TurnBoundary[] = [];
+
+  for (const e of entries) {
+    if (e.role !== "user") continue;
+    const text = getEntryText(rawEntries, e.entry_id, "user");
+    boundaries.push({
+      entry_id: e.entry_id,
+      line_number: e.line_number,
+      user_text: text.slice(0, 200),
+    });
+  }
+
+  return boundaries;
+}
+
+/**
+ * Compress a TurnData into a structured TurnSummary.
+ * Used by session-iterate tool in summary mode.
+ *
+ * - user_text: truncated to 200 chars
+ * - Each assistant entry: text_summary (first 200 chars) + tool_calls list
+ * - totals: total_text_chars, total_tool_calls
+ */
+export function formatTurnSummary(turn: TurnData): TurnSummary {
+  const userText = turn.user_text.slice(0, 200);
+  let totalTextChars = turn.user_text.length;
+  let totalToolCalls = 0;
+
+  const entries: TurnSummary["entries"] = [];
+
+  for (const entry of turn.entries) {
+    totalTextChars += entry.text.length;
+    totalToolCalls += entry.tool_calls.length;
+
+    // Only include non-toolResult entries (matches formatTurn behavior)
+    if (entry.role === "toolResult") continue;
+
+    const textSummary = entry.text.slice(0, 200);
+    entries.push({
+      role: entry.role,
+      text_summary: textSummary,
+      tool_calls: entry.tool_calls,
+    });
+  }
+
+  return {
+    user_text: userText,
+    entries,
+    total_text_chars: totalTextChars,
+    total_tool_calls: totalToolCalls,
+  };
 }

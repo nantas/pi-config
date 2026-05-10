@@ -11,6 +11,8 @@ import type {
   SessionFile,
   ExtractedEntry,
   SearchResult,
+  SessionSearchGroup,
+  SessionRecord,
   JsonlEntry,
   JsonlContentBlock,
   JsonlMessage,
@@ -422,7 +424,12 @@ export function search(
         fts.role,
         fts.line_number,
         snippet(session_fts, 0, '⟨', '⟩', '...', 32) as snippet,
-        rank
+        CASE fts.role
+          WHEN 'user' THEN fts.rank * 0.5
+          WHEN 'assistant' THEN fts.rank * 0.8
+          ELSE fts.rank
+        END as rank,
+        substr(fts.content, 1, 200) as raw_content
       FROM session_fts fts
       WHERE session_fts MATCH ? AND fts.session_path = ?
       ORDER BY rank
@@ -437,7 +444,8 @@ export function search(
         fts.role,
         fts.line_number,
         snippet(session_fts, 0, '⟨', '⟩', '...', 32) as snippet,
-        rank
+        rank,
+        substr(fts.content, 1, 200) as raw_content
       FROM session_fts fts
       WHERE session_fts MATCH ?
       ORDER BY rank
@@ -449,7 +457,7 @@ export function search(
   try {
     const rows = db.prepare(sql).all(...params) as SearchResult[];
 
-    // Enrich with timestamps from entries table
+    // Enrich with timestamps from entries table and extract first line
     for (const row of rows) {
       const entry = db.prepare(
         "SELECT timestamp FROM entries WHERE session_path = ? AND entry_id = ?",
@@ -457,11 +465,121 @@ export function search(
       if (entry) {
         row.timestamp = entry.timestamp;
       }
+
+      // Extract first line from raw FTS content
+      const raw = (row as any).raw_content as string | undefined;
+      if (raw) {
+        row.first_line = raw.split("\n")[0] || "";
+      } else {
+        row.first_line = "";
+      }
+      delete (row as any).raw_content;
     }
 
     return rows;
   } catch {
     // FTS5 query syntax error — return empty
+    return [];
+  }
+}
+
+// ── Grouped Search (session-level) ─────────────────────────────
+
+/** Search grouped by session with role-weighted ranking */
+export function searchGrouped(
+  query: string,
+): SessionSearchGroup[] {
+  const db = getDb();
+  const ftsQuery = sanitizeTokens(query);
+
+  if (!ftsQuery) return [];
+
+  const sql = `
+    SELECT
+      fts.session_path,
+      s.project,
+      s.session_ts,
+      s.first_user_message,
+      COUNT(*) as raw_hit_count,
+      MIN(
+        CASE fts.role
+          WHEN 'user' THEN fts.rank * 0.5
+          WHEN 'assistant' THEN fts.rank * 0.8
+          ELSE fts.rank
+        END
+      ) as best_rank
+    FROM session_fts fts
+    JOIN sessions s ON fts.session_path = s.path
+    WHERE session_fts MATCH ?
+    GROUP BY fts.session_path
+    ORDER BY best_rank
+  `;
+
+  try {
+    const groups = db.prepare(sql).all(ftsQuery) as any[];
+    if (groups.length === 0) return [];
+
+    // Compute turn-deduped hit counts
+    const sessionPaths = groups.map((g: any) => g.session_path);
+    const placeholders = sessionPaths.map(() => "?").join(",");
+
+    // Get ALL entries for these sessions in one query
+    const allEntries = db.prepare(
+      `SELECT session_path, entry_id, role, line_number FROM entries WHERE session_path IN (${placeholders}) ORDER BY session_path, line_number ASC`,
+    ).all(...sessionPaths) as {
+      session_path: string;
+      entry_id: string;
+      role: string;
+      line_number: number;
+    }[];
+
+    // Build turn maps: entry_id -> turn-starting user entry_id
+    const turnMaps = new Map<string, Map<string, string>>();
+    for (const sp of sessionPaths) {
+      turnMaps.set(sp, new Map());
+    }
+    let curSession = "";
+    let curUser = "";
+    for (const entry of allEntries) {
+      if (entry.session_path !== curSession) {
+        curSession = entry.session_path;
+        curUser = "";
+      }
+      if (entry.role === "user") {
+        curUser = entry.entry_id;
+      }
+      turnMaps.get(curSession)!.set(entry.entry_id, curUser);
+    }
+
+    // Get all matching entry_ids across all groups (one query)
+    const allMatched = db.prepare(
+      `SELECT session_path, entry_id FROM session_fts WHERE session_fts MATCH ?`,
+    ).all(ftsQuery) as { session_path: string; entry_id: string }[];
+
+    // Count unique turns per session
+    const turnSeen = new Map<string, Set<string>>();
+    for (const sp of sessionPaths) {
+      turnSeen.set(sp, new Set());
+    }
+    for (const matched of allMatched) {
+      const turnMap = turnMaps.get(matched.session_path);
+      if (!turnMap) continue;
+      const turnKey = turnMap.get(matched.entry_id) || matched.entry_id;
+      turnSeen.get(matched.session_path)!.add(turnKey);
+    }
+
+    // Update hit_count to unique turn count
+    for (const group of groups) {
+      group.hit_count = turnSeen.get(group.session_path)?.size ?? group.raw_hit_count;
+    }
+
+    // Clean up temp field
+    for (const group of groups) {
+      delete group.raw_hit_count;
+    }
+
+    return groups as SessionSearchGroup[];
+  } catch {
     return [];
   }
 }

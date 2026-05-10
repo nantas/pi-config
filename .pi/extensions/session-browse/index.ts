@@ -7,6 +7,7 @@
  * - session-search: FTS5 keyword search across indexed session entries
  * - session-expand: Expand an entry into its full user turn context
  * - session-read: Read the raw content of a specific entry
+ * - session-iterate: Navigate session turn-by-turn with structured output
  *
  * Architecture: SQLite FTS5 per-entry index with incremental updates.
  */
@@ -25,7 +26,7 @@ import {
 } from "./indexer";
 import { handleSbInput } from "./browser";
 import { handleSrInput } from "./resumer";
-import { buildTurnFromEntryId, formatTurn } from "./expander";
+import { buildTurnFromEntryId, buildTurnIndex, formatTurn, formatTurnSummary } from "./expander";
 import { parseHtmlExport, readHtmlEntry } from "./html-parser";
 import type { JsonlEntry } from "./types";
 
@@ -129,7 +130,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
               type: "text" as const,
               text: "No matching entries found. Try different keywords or run session-search without a path filter.",
             }],
-            details: { ok: true, count: 0 },
+            details: { ok: true, count: 0, sessions: [] as string[], error: null },
           };
         }
 
@@ -156,6 +157,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             ok: true,
             count: results.length,
             sessions: sessionPaths,
+            error: null,
           },
         };
       } catch (err) {
@@ -164,7 +166,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             type: "text" as const,
             text: `Search error: ${err instanceof Error ? err.message : String(err)}`,
           }],
-          details: { ok: false, error: String(err) },
+          details: { ok: false, count: 0, sessions: [] as string[], error: String(err) },
         };
       }
     },
@@ -206,7 +208,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
               type: "text" as const,
               text: `Session file not found: ${params.session_path}`,
             }],
-            details: { ok: false, error: "file_not_found" },
+            details: { ok: false, error: "file_not_found", session_path: null, entry_count: 0 },
           };
         }
 
@@ -219,7 +221,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
               type: "text" as const,
               text: `Entry not found: ${params.entry_id} in ${params.session_path}. Try session-search first to get valid entry IDs.`,
             }],
-            details: { ok: false, error: "entry_not_found" },
+            details: { ok: false, error: "entry_not_found", session_path: null, entry_count: 0 },
           };
         }
 
@@ -232,6 +234,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             ok: true,
             session_path: params.session_path,
             entry_count: turn.entries.length,
+            error: null,
           },
         };
       } catch (err) {
@@ -240,7 +243,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             type: "text" as const,
             text: `Expand error: ${err instanceof Error ? err.message : String(err)}`,
           }],
-          details: { ok: false, error: String(err) },
+          details: { ok: false, error: String(err), session_path: null, entry_count: 0 },
         };
       }
     },
@@ -288,7 +291,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
               type: "text" as const,
               text: `Session file not found: ${params.session_path}`,
             }],
-            details: { ok: false, error: "file_not_found" },
+            details: { ok: false, error: "file_not_found", entry_id: null, truncated: null, total_chars: null },
           };
         }
 
@@ -308,7 +311,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
               type: "text" as const,
               text: `Entry not found: ${params.entry_id} in ${params.session_path}`,
             }],
-            details: { ok: false, error: "entry_not_found" },
+            details: { ok: false, error: "entry_not_found", entry_id: null, truncated: null, total_chars: null },
           };
         }
 
@@ -330,6 +333,7 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             entry_id: params.entry_id,
             truncated,
             total_chars: rawText.length,
+            error: null,
           },
         };
       } catch (err) {
@@ -338,7 +342,281 @@ export default function sessionBrowseExtension(pi: ExtensionAPI) {
             type: "text" as const,
             text: `Read error: ${err instanceof Error ? err.message : String(err)}`,
           }],
-          details: { ok: false, error: String(err) },
+          details: { ok: false, error: String(err), entry_id: null, truncated: null, total_chars: null },
+        };
+      }
+    },
+  });
+
+  // ── Tool: session-iterate ───────────────────────────────────
+
+  pi.registerTool({
+    name: "session-iterate",
+    label: "Session Iterate",
+    description:
+      "从指定 entry 开始，沿 session 时间线向前或向后步进指定的用户轮次数，" +
+      "到达新位置后返回该 turn 的完整上下文。" +
+      "每次移动一个 user entry（即一个完整 turn 的边界）。",
+    promptSnippet:
+      "Navigate session turn-by-turn: move forward/backward one or more turns, or jump to start/end.",
+    promptGuidelines: [
+      "Use session-iterate with direction='end' and mode='summary' first to get a global session overview.",
+      "Then use direction='next'|='prev' with mode='full' to deep-read specific turns.",
+      "The session_overview in every response shows all turns for context-free navigation.",
+    ],
+    parameters: Type.Object({
+      session_path: Type.String({
+        description: "session 文件路径",
+      }),
+      entry_id: Type.Optional(
+        Type.String({
+          description:
+            "起始 entry ID，首次调用由 session-browse 提供",
+        }),
+      ),
+      turn_index: Type.Optional(
+        Type.Number({
+          description:
+            "直接指定 turn 索引（0-based），替代 entry_id 定位",
+        }),
+      ),
+      direction: Type.String({
+        enum: ["next", "prev", "start", "end"],
+        description:
+          "导航方向：next=向前（时间正向）step 步进，prev=向后 step 步进，" +
+          "start=跳到第一个 turn，end=跳到最后一个 turn",
+      }),
+      steps: Type.Optional(
+        Type.Number({
+          description: "步进步数，仅 next/prev 时生效，默认 1",
+          default: 1,
+        }),
+      ),
+      mode: Type.Optional(
+        Type.String({
+          enum: ["full", "summary"],
+          description:
+            "返回模式：full=完整 turn 上下文（同 session-expand），summary=压缩摘要",
+          default: "full",
+        }),
+      ),
+      max_chars: Type.Optional(
+        Type.Number({
+          description:
+            "full 模式下文本截断长度",
+        }),
+      ),
+    }),
+    async execute(
+      _toolCallId: string,
+      params: {
+        session_path: string;
+        entry_id?: string;
+        turn_index?: number;
+        direction: "next" | "prev" | "start" | "end";
+        steps?: number;
+        mode?: "full" | "summary";
+        max_chars?: number;
+      },
+    ) {
+      try {
+        ensureIndexed();
+
+        if (!existsSync(params.session_path)) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Session file not found: ${params.session_path}`,
+            }],
+            details: { ok: false, error: "file_not_found", entry_id: null, turn_index: null, total_turns: null, is_first: null, is_last: null },
+          };
+        }
+
+        const db = getDb();
+        const boundaries = buildTurnIndex(db, params.session_path);
+
+        if (boundaries.length === 0) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `No turns found in session: ${params.session_path}`,
+            }],
+            details: { ok: false, error: "no_turns", entry_id: null, turn_index: null, total_turns: 0, is_first: null, is_last: null },
+          };
+        }
+
+        // ── Determine current turn index ────────────────
+        let currentIdx: number;
+        if (params.turn_index !== undefined) {
+          currentIdx = params.turn_index;
+        } else if (params.entry_id) {
+          currentIdx = boundaries.findIndex(
+            (b) => b.entry_id === params.entry_id,
+          );
+          if (currentIdx === -1) {
+            return {
+              content: [{
+                type: "text" as const,
+                text: `Entry ID ${params.entry_id} not found in session`,
+              }],
+              details: {
+                ok: false,
+                error: "entry_not_found",
+                entry_id: null,
+                turn_index: null,
+                total_turns: null,
+                is_first: null,
+                is_last: null,
+              },
+            };
+          }
+        } else {
+          currentIdx = 0;
+        }
+
+        // ── Navigate ───────────────────────────────────
+        const steps = params.steps ?? 1;
+        let targetIdx: number;
+        switch (params.direction) {
+          case "start":
+            targetIdx = 0;
+            break;
+          case "end":
+            targetIdx = boundaries.length - 1;
+            break;
+          case "next":
+            targetIdx = Math.min(
+              currentIdx + steps,
+              boundaries.length - 1,
+            );
+            break;
+          case "prev":
+            targetIdx = Math.max(currentIdx - steps, 0);
+            break;
+          default:
+            targetIdx = currentIdx;
+        }
+
+        // ── Build turn at target position ──────────────
+        const target = boundaries[targetIdx];
+        const turn = buildTurnFromEntryId(
+          db,
+          target.entry_id,
+          params.session_path,
+        );
+
+        if (!turn) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Failed to build turn at position ${targetIdx}`,
+            }],
+            details: { ok: false, error: "build_turn_failed", entry_id: null, turn_index: null, total_turns: null, is_first: null, is_last: null },
+          };
+        }
+
+        // ── Build session_overview ─────────────────────
+        const MAX_OVERVIEW_TURNS = 80;
+        const sessionOverview = boundaries.map((b, i) => ({
+          idx: i,
+          entry_id: b.entry_id,
+          user_text: b.user_text.slice(0, 80),
+        }));
+        const truncatedOverview =
+          sessionOverview.length > MAX_OVERVIEW_TURNS
+            ? sessionOverview.slice(0, MAX_OVERVIEW_TURNS)
+            : sessionOverview;
+
+        // ── Position info ──────────────────────────────
+        const position = {
+          entry_id: target.entry_id,
+          turn_index: targetIdx,
+          total_turns: boundaries.length,
+          is_first: targetIdx === 0,
+          is_last: targetIdx === boundaries.length - 1,
+        };
+
+        const isSummary = params.mode === "summary";
+
+        if (isSummary) {
+          const summary = formatTurnSummary(turn);
+          const summaryLines: string[] = [
+            `Position: turn ${position.turn_index + 1}/${position.total_turns}` +
+              `${position.is_first ? " (FIRST)" : ""}${position.is_last ? " (LAST)" : ""}`,
+            `User: ${summary.user_text}`,
+            `Assistant entries: ${summary.entries.length}`,
+            `Total chars: ${summary.total_text_chars} | Tool calls: ${summary.total_tool_calls}`,
+            "",
+            ...summary.entries.map(
+              (e, i) =>
+                `  [${i + 1}] ${e.role}: ${e.text_summary}` +
+                (e.tool_calls.length > 0
+                  ? ` → ${e.tool_calls.join(", ")}`
+                  : ""),
+            ),
+            "",
+            `Session overview (${truncatedOverview.length} turns):`,
+            ...truncatedOverview.map(
+              (t) =>
+                `  [${t.idx + 1}] ${t.entry_id.slice(0, 12)}... | ${t.user_text}`,
+            ),
+          ];
+
+          return {
+            content: [{
+              type: "text" as const,
+              text: summaryLines.join("\n"),
+            }],
+            details: {
+              error: null,
+              ok: true,
+              ...position,
+              summary,
+            },
+          };
+        } else {
+          // Full mode
+          const turnText = formatTurn(turn);
+          const truncated =
+            params.max_chars && turnText.length > params.max_chars;
+          const output = truncated
+            ? turnText.slice(0, params.max_chars) +
+              `\n... (truncated at ${params.max_chars} chars)`
+            : turnText;
+
+          const fullLines: string[] = [
+            `Position: turn ${position.turn_index + 1}/${position.total_turns}` +
+              `${position.is_first ? " (FIRST)" : ""}${position.is_last ? " (LAST)" : ""}`,
+            "",
+            output,
+            "",
+            `Session overview (${truncatedOverview.length} turns):`,
+            ...truncatedOverview.map(
+              (t) =>
+                `  [${t.idx + 1}] ${t.entry_id.slice(0, 12)}... | ${t.user_text}`,
+            ),
+          ];
+
+          return {
+            content: [{
+              type: "text" as const,
+              text: fullLines.join("\n"),
+            }],
+            details: {
+              error: null,
+              ok: true,
+              ...position,
+              truncated: !!truncated,
+            },
+          };
+        }
+      } catch (err) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Iterate error: ${err instanceof Error ? err.message : String(err)}`,
+          }],
+          details: { ok: false, error: String(err), entry_id: null, turn_index: null, total_turns: null, is_first: null, is_last: null },
         };
       }
     },
