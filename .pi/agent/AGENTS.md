@@ -70,6 +70,16 @@
 - 修改代码前需要检查影响范围
 - 编辑完成后需要验证无新增错误
 
+## Subagent 自动委派
+
+涉及以下场景时，请先阅读 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)：
+- 需要追踪跨文件调用链或搜索复杂代码模式
+- 需要调用 `gitnexus_query/context/impact` 等返回大量数据的工具
+- 需要并行执行多个独立探索方向
+- 实施完成后需要自动代码审查
+
+**核心原则**：当任务需要 3+ 步工具调用才能得出一个结论时，优先用 `subagent()` 委托给子 agent 执行，避免主 session context 被膨胀。
+
 ## README 维护
 
 当变更涉及仓库能力的增删（扩展、包、Agent、技能）时，必须按 [AGENTS.d/readme-governance.md](./AGENTS.d/readme-governance.md) 评估并更新 README.md 和 `docs/getting-started.md` 的能力描述，保持与 `capabilities.yaml` 一致。

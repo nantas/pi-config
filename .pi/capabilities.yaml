@@ -17,7 +17,8 @@ global:
     - session-browse
 
   # Agents synced to ~/.pi/agent/agents/
-  agents: []
+  agents:
+    - unity-worker
 
   # Skills synced to ~/.pi/agent/skills/
   skills:
@@ -35,7 +36,6 @@ global:
     - opsx-propose
     - opsx-sync
     - opsx-verify
-    - subagent
 
   # Settings filtering rules
   settings:
