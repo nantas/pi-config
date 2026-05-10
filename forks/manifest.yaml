@@ -27,4 +27,4 @@ forks:
     upstream_source: "npm:pi-mcp-adapter@2.5.1"
     status: active
     last_upstream_sync: null
-    changes_summary: "feat: Direct Tool execute functions exposed via globalThis.__mcpToolRegistry for cross-extension tool rendering bridge (mcp-direct-tool-rendering-fix)"
+    changes_summary: "Baseline fork. All modifications reverted, currently tracking origin/main."

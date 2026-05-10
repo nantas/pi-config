@@ -23,11 +23,11 @@ This skill structures fork development into six sequential phases:
 
 | Phase | Name | Exit Criteria |
 |-------|------|---------------|
-| A | Fork & Setup | Fork cloned, repo-registry registered, manifest written, settings.json updated, package reinstalled and verified |
+| A | Fork & Setup | Fork cloned, repo-registry registered, manifest written, settings.json set to **local dev path** (development mode), package verified |
 | B | Modification Planning | Modification target identified, approach designed, user confirmed |
 | C | Implementation | Code changes made in dev clone, existing tests pass, diff presented |
-| D | Local Testing | Package installed from local clone (`file:`), functionality verified in pi |
-| E | Commit & Ship | Committed, tagged, pushed; settings.json restored to git: URL; manifest and backlog updated |
+| D | Local Testing | Package in development mode (local path), functionality verified in pi via `/reload` |
+| E | Commit & Ship | Committed, tagged, pushed; settings.json **switched to git: URL** (production mode); manifest and backlog updated |
 | F | Maintenance | Upstream fetched, divergence inspected, merge executed if chosen |
 
 ---
@@ -133,17 +133,66 @@ forks:
 
 Use the `edit` tool to append this entry.
 
-### Step A6 — Settings update
+### Step A6 — Settings update (development mode)
 
-Update `.pi/settings.json` to replace the original source with the fork's git URL.
+> **Design decision**: After fork & setup, enter **development mode** — point
+> `.pi/settings.json` to the **local dev clone path**, not the git URL.
+> This ensures Phase C code changes are immediately loadable via `/reload`
+> in Pi TUI, without needing git push + reinstall.
+>
+> Phase E (Commit & Ship) transitions to **production mode** — git URL.
 
-**For npm → git:**
-Replace `"npm:<pkg>[@version]"` with `"git:github.com/<user>/<repo>"`
+Update `.pi/settings.json` to replace the original source with the
+**local absolute path to the dev clone**.
 
-**For git → git:**
-Replace `"git:github.com/<upstream-user>/<repo>"` with `"git:github.com/<fork-user>/<repo>"`
+**For all transitions (npm → fork, git-upstream → fork):**
+Replace the original source string with the absolute path to the local
+fork clone:
+```
+<original-source>  →  /Users/<username>/projects/forks/<repo-name>
+```
+
+**If the original was an npm package**, the absolute path is the local
+clone path. Pi treats any path starting with `/`, `~`, `./`, or `../`
+as a local path (`isLocalPath()`), loading files directly from the
+specified directory.
 
 Preserve the package's position in the `packages` array.
+
+> **Why not git: URL?** If we set `git:github.com/<user>/<repo>` here,
+> Pi clones to `.pi/git/` and loads from that managed copy. Changing
+> code in the dev clone does nothing to the `.pi/git/` copy. The
+> development loop would require `git push` + `pi update` for every
+> change — no good. Using the local path directly eliminates this gap.
+
+### Step A6a — Dev state verification
+
+Confirm the resulting entry in `.pi/settings.json` looks like:
+```json
+"packages": [
+  "/Users/<username>/projects/forks/<repo-name>",
+  ...
+]
+```
+
+The entry MUST be an absolute path, not a `git:` or `npm:` string.
+Verify with:
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys, os
+pkg_name = '<package-name>'
+for p in json.load(sys.stdin).get('packages', []):
+    if pkg_name in p:
+        is_local = os.path.isabs(p)
+        print(f'  {p}')
+        print(f'  → local path: {is_local}')
+        if not is_local:
+            print('  ⚠️  NOT a local path! Fix Phase A6 step.')
+"
+```
+
+> **门禁**: If the source is NOT a local path (e.g., still `git:...`),
+> the agent MUST correct it before proceeding to Phase B.
 
 ### Step A7 — Capabilities update
 
@@ -152,13 +201,18 @@ If the package appears in `.pi/capabilities.yaml`, update its `source` field:
 - Check `global.settings.packages` — update if found
 - Preserve all other fields (`name`, `description`, `type`)
 
-### Step A8 — Reinstall
+### Step A8 — Install (local path)
 
 ```bash
-pi install -l "git:github.com/<user>/<repo>"
+pi install -l "/Users/<username>/projects/forks/<repo-name>"
 ```
 
-**For npm → git transitions:** Clean up old npm dependency:
+> **Note**: For local paths, `pi install -l` only verifies the path
+> exists (a no-op in `packageManager.install()`). The actual loading
+> happens when Pi starts or reloads. This step ensures the path is
+> registered and removes stale conflicts.
+
+**For npm → local transitions:** Clean up old npm dependency:
 ```bash
 # Remove old npm package to avoid conflicts
 rm -rf ".pi/npm/<package-name>"
@@ -168,11 +222,23 @@ cd .pi/npm && npm uninstall <package-name> 2>/dev/null || true
 
 ### Step A9 — Baseline verification
 
-Start pi and confirm the package loads without errors:
-- Verify extension/skill registers
-- Check for any startup warnings related to the package
+Start pi (or use an existing session) and verify the package loads
+without errors. If errors occur, diagnose and fix, or roll back to
+original source.
 
-If errors occur: diagnose, fix, or roll back to original source.
+Since the package is now in **development mode** (local path),
+verify that Pi resolves the correct source:
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys
+s = json.load(sys.stdin)
+for p in s.get('packages', []):
+    if '<package-name>' in p:
+        import os
+        print(f'Package source: {p}')
+        print(f'Is local path: {os.path.isabs(p)}')
+"
+```
 
 ---
 
@@ -252,6 +318,38 @@ Proceed with implementation? (yes/no)
 
 **Goal:** Make the approved changes in the dev clone.
 
+### Step C0 — Verify development mode（门禁）
+
+**BEFORE making any code changes**, verify that `.pi/settings.json` is
+in **development mode** (local path). This gate ensures changes are
+immediately loadable via `/reload`.
+
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys, os
+pkg_name = '<package-name>'
+for p in json.load(sys.stdin).get('packages', []):
+    if pkg_name in p:
+        if not os.path.isabs(p):
+            print(f'FAIL: package is NOT a local path: {p}')
+            print(f'Expected absolute path like: /Users/.../forks/{pkg_name}')
+            sys.exit(1)
+        print(f'PASS: development mode — {p}')
+"
+```
+
+**If the gate fails** (source is `git:...` or `npm:...`):
+
+The package is in **production mode**. The agent MUST switch to
+development mode before proceeding:
+
+1. Read `forks/manifest.yaml` to find the fork's dev clone path
+   (registered in repo-registry as `repo://<name>`)
+2. Update `.pi/settings.json`: replace the git/npm source with the
+   absolute local path
+3. Run `pi install -l "<local-path>"`
+4. Re-verify (this step) before continuing
+
 ### Step C1 — Code changes
 
 Make modifications in the dev clone's working tree at the path registered
@@ -288,24 +386,54 @@ cd "$CLONE_PATH"
 git diff
 ```
 
-Wait for user approval before proceeding to testing.
+Wait for user approval before proceeding to Phase D.
 
 ---
 
 ## Phase D: Local Testing
 
-**Goal:** Test the modified package locally in pi before shipping.
+**Goal:** Test the modified package in a running Pi session. This is the
+**iterative test loop** — all changes are picked up via `/reload` in Pi
+TUI, no `pi install -l` or `git push` needed between iterations.
 
-### Step D1 — Temporarily switch to file source
+> **Why `/reload` works without `pi install -l`**:
+> - Settings.json already points to the local dev clone (Phase A6 set this)
+> - `/reload` calls `resourceLoader.reload()` → `packageManager.resolve()`
+>   re-reads settings.json → finds the local path → reads `package.json`
+>   → resolves `pi.extensions: ["./index.ts"]` → loads directly from
+>   `/Users/.../forks/<name>/index.ts`
+> - Each `/reload` creates a **fresh jiti instance** with
+>   `moduleCache: false` → re-transforms .ts → re-evaluates
+> - jiti v2 with `moduleCache: false` deletes `nativeRequire.cache`
+>   entries and does NOT cache new modules
+> - **The `.pi/git/` and `.pi/npm/` copies are NOT used** — the local
+>   path branch in `resolvePackageSources()` is independent
+>
+> **If `/reload` fails to pick up changes** (jiti URL caching edge case):
+> restart Pi as fallback.
 
-Update `.pi/settings.json`: change the package source from
-`git:github.com/<user>/<repo>` to the local dev clone absolute path.
+### Step D0 — Verify development mode（门禁）
 
-> **Note**: Use the absolute path directly (e.g., `/Users/x/forks/pkg-name`),
-> not a `file:` prefixed string. Pi's `isLocalPath()` treats `file:` as
-> a local path but appends it to `cwd`, causing resolution errors.
+**BEFORE testing**, confirm the package is still in development mode:
 
-### Step D1a — Global dedup gate（门禁）
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys, os
+pkg_name = '<package-name>'
+for p in json.load(sys.stdin).get('packages', []):
+    if pkg_name in p:
+        if os.path.isabs(p):
+            print(f'PASS: development mode — {p}')
+        else:
+            print(f'WARN: not local path: {p}')
+            print(f'Phase A6 should have set this to a local path.')
+"
+```
+
+**If the gate fails**: Follow the same correction procedure as Phase C0
+(read manifest, resolve repo-registry, update settings.json).
+
+### Step D1 — Global dedup gate（门禁）
 
 Pi's package dedup uses identity keys based on source type. A local path
 produces `local:/path/to/pkg` while a git URL produces `git:github.com/user/pkg`.
@@ -349,7 +477,7 @@ for r in removed:
 
 **If no match**, proceed without modification.
 
-#### D1a-persist: Override state persistence
+### Step D1a — Override state persistence
 
 The removed entries MUST be persisted so they can be restored later.
 
@@ -384,36 +512,43 @@ EOF
 > modifications have no such file, so the dev clone directory (always locatable
 > via `repo://<name>`) serves as the persistent store.
 
-### Step D2 — Local install
+### Step D2 — Functional test first pass
 
-```bash
-pi install -l "<dev-clone-absolute-path>"
+**Run `/reload`** in Pi TUI to pick up the latest code changes:
+```
+/reload
 ```
 
-### Step D3 — Functional test
-
-Start pi and verify:
-- Package loads without errors
+Then verify:
+- Package loads without errors (check for reload warnings)
 - Modified functionality works as expected
 - No regressions in existing behavior
 
-### Step D4 — Iteration
+### Step D3 — Iteration loop
 
-If issues are found:
-1. Fix in the dev clone (return to Phase C)
-2. Re-run `pi install -l file:<path>`
-3. Re-test in pi
+If issues are found in testing:
+1. Fix code in the dev clone (`$CLONE_PATH` — resolve via `repo://<name>`)
+2. In the same Pi session, run **`/reload`**
+3. Re-test
 
 Repeat until all tests pass.
 
-### Step D5 — Test complete
+> **Iteration loop**:
+> ```
+> fork source edit → /reload in Pi TUI → test → fix → /reload → test...
+> ```
+> **No `pi install -l`, no git push** between iterations.
+> The local path in settings.json ensures `/reload` loads directly from
+> the dev clone — no `.pi/git/` or `.pi/npm/` copies involved.
+
+### Step D4 — Test complete
 
 Once verified, confirm with the user:
 ```
 ✓ Local testing passed. Ready to commit and ship?
 ```
 
-### Step D5a — Persist record verification（门禁）
+### Step D4a — Persist record verification（门禁）
 
 Confirm the override record exists and contains the correct removed entries:
 
@@ -497,9 +632,13 @@ echo "PASS: push verified."
 
 > **必须执行**：此步骤不可跳过。如果 `origin/main` 与 HEAD 不匹配，`git push` 失败，必须重试或中断本次 change。
 
-### Step E4 — Restore source
+### Step E4 — Transition to production mode
 
-Update `.pi/settings.json` from the local path back to `git:github.com/<user>/<repo>`.
+> **Design**: Phase A6 entered development mode (local path). Phase E4
+> transitions to **production mode** (git URL) so Pi loads from the
+> remote fork's managed clone, isolated from future dev changes.
+
+Update `.pi/settings.json` from the local path to `git:github.com/<user>/<repo>`.
 
 **Restore global settings** — read the override record and re-add removed entries:
 
@@ -532,6 +671,24 @@ rm "$CLONE_PATH/.pi-dev-state.json"
 
 # OpenSpec: the writeback.md section will be cleaned up during writeback execution
 ```
+
+### Step E4a — Verify production mode（门禁）
+
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys, os
+pkg_name = '<package-name>'
+for p in json.load(sys.stdin).get('packages', []):
+    if pkg_name in p:
+        if p.startswith('git:'):
+            print(f'PASS: production mode — {p}')
+        else:
+            print(f'WARN: not git URL: {p}')
+            print(f'Expected: git:github.com/<user>/{pkg_name}')
+"
+```
+
+If still on local path, the agent MUST correct it before proceeding.
 
 ### Step E5 — Remote reinstall
 
@@ -577,6 +734,26 @@ cat ~/.pi/agent/settings.json | grep -c "/forks/" && echo "FAIL: global settings
 Update the corresponding entry in `forks/manifest.yaml`:
 - `changes_summary`: append or update modification description
 - `last_upstream_sync`: keep existing value (not changed by modification)
+
+### Step E6a — Dev state cleanup
+
+After transitioning to production mode, remove any stale dev-state markers:
+
+```bash
+# Remove package from pi install's stale npm copy (if original was npm)
+rm -rf ".pi/npm/node_modules/<package-name>" 2>/dev/null || true
+
+# Verify no stale local paths in settings
+cat .pi/settings.json | python3 -c "
+import json, sys
+s = json.load(sys.stdin)
+local_paths = [p for p in s.get('packages', []) if p.startswith('/') or p.startswith('~')]
+if local_paths:
+    print('INFO: remaining local paths (other fork packages):')
+    for p in local_paths:
+        print(f'  {p}')
+"
+```
 
 ### Step E7 — Backlog record
 
@@ -711,10 +888,46 @@ If upstream changes introduce regressions:
 - `pkg-fork-dev` Phase B for major features → optionally create OpenSpec change
 - `pi-extension-dev` for new extensions → never forks existing packages
 
+## Appendix: Development State Reference
+
+The skill defines two states for a forked package:
+
+| State | Settings.json Source | Use Case | Load Behavior |
+|-------|---------------------|----------|---------------|
+| **Development** | Local absolute path (e.g., `/Users/x/forks/pkg`) | Phases A–D: code, test, iterate | Pi loads directly from fork dev clone. Changes picked up via `/reload` or restart. |
+| **Production** | `git:github.com/<user>/<repo>` | Phase E onward: merged, shipped | Pi clones/manages `.pi/git/` copy. Isolated from dev changes. Updates via `pi update`. |
+
+### Agent Gate Checks
+
+The agent MUST verify the current state at these checkpoints:
+
+| Checkpoint | Expected State | Failure Action |
+|------------|---------------|----------------|
+| Phase C0 (before code changes) | Development | Switch to local path |
+| Phase D0 (before testing) | Development | Switch to local path |
+| Phase E4a (after shipping) | Production | Restore to git URL |
+
+### Quick State Check
+```bash
+cat .pi/settings.json | python3 -c "
+import json, sys, os
+pkg_name = '<package-name>'
+for p in json.load(sys.stdin).get('packages', []):
+    if pkg_name in p:
+        if os.path.isabs(p):
+            print('State: DEVELOPMENT')
+        elif p.startswith('git:'):
+            print('State: PRODUCTION')
+        else:
+            print(f'State: UNKNOWN — {p}')
+"
+```
+
 ## Appendix: Session Loss Recovery
 
-If a session is lost during Phase D (global settings modified, override record exists),
-a new session can detect and recover the abnormal state via three paths:
+If a session is lost during a development-in-progress (global settings modified,
+override record exists, package in dev mode), a new session can detect and
+recover the abnormal state via three paths:
 
 ### Path 1: OpenSpec change status
 
