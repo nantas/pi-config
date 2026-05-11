@@ -683,6 +683,20 @@ sync_prompts_and_themes() {
   fi
 }
 
+# --- Sync mcp.json ---
+sync_mcp_config() {
+  local source_path="${REPO_ROOT}/.pi/agent/mcp.json"
+  local target_path="${TARGET_ROOT}/mcp.json"
+
+  if [[ -f "${source_path}" ]]; then
+    cp "${source_path}" "${target_path}"
+    echo "  Synced mcp.json"
+  else
+    rm -f "${target_path}"
+    echo "  Removed mcp.json (source not found)"
+  fi
+}
+
 # --- Sync AGENTS.md + AGENTS.d/ ---
 sync_agents_md() {
   local source_path="${REPO_ROOT}/.pi/agent/AGENTS.md"
@@ -743,12 +757,110 @@ echo ""
 echo "--- Syncing themes ---"
 sync_prompts_and_themes
 
-# 4. Sync AGENTS.md
+# 4. Sync mcp.json
+echo ""
+echo "--- Syncing mcp.json ---"
+sync_mcp_config
+
+# 5. Sync AGENTS.md
 echo ""
 echo "--- Syncing AGENTS.md ---"
 sync_agents_md
 
-# 5. Summary
+# 6. Dedupe project-level packages that conflict with global packages
+#    Pi's dedupe only matches identical source types (npm:npm, git:git).
+#    When global uses git:... and project uses npm:... (or vice versa),
+#    both copies load → "Tool X conflicts with Y" errors on every tool.
+#    This step removes the duplicate from project-level .pi/settings.json.
+echo ""
+echo "--- Deduplicating project packages against global ---"
+
+global_settings_path="${TARGET_ROOT}/settings.json"
+repo_registry_path="${HOME}/.config/orbitos/repo_registry.json"
+
+if [[ -f "${global_settings_path}" ]] && [[ -f "${repo_registry_path}" ]]; then
+  export GLOBAL_SETTINGS_PATH="${global_settings_path}"
+  export REPO_REGISTRY_PATH="${repo_registry_path}"
+  node <<'DEDUP_NODE'
+const fs = require("fs");
+const path = require("path");
+
+const globalSettingsPath = process.env.GLOBAL_SETTINGS_PATH;
+const registryPath = process.env.REPO_REGISTRY_PATH;
+
+// Parse global packages -> extract npm package names
+function extractPkgName(spec) {
+  if (typeof spec === "string") {
+    // npm:@scope/pkg@version -> @scope/pkg
+    const m = spec.match(/^npm:(@?[^@]+?)(?:@.*)?$/);
+    if (m) return m[1];
+    // git:github.com/user/repo -> repo
+    const gm = spec.match(/^git:[^/]+\/[^/]+\/([^/]+)/);
+    if (gm) return gm[1];
+  }
+  return null;
+}
+
+const globalSettings = JSON.parse(fs.readFileSync(globalSettingsPath, "utf8"));
+const globalPkgs = Array.isArray(globalSettings.packages) ? globalSettings.packages : [];
+const globalNames = new Set(globalPkgs.map(extractPkgName).filter(Boolean));
+
+if (globalNames.size === 0) {
+  console.log("  No global packages to check against.");
+  process.exit(0);
+}
+
+// Collect project directories from repo_registry
+const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+const projectDirs = Object.values(registry.repos || {}).map(r => r.path);
+
+// Also accept extra dirs from env (colon-separated)
+const extraDirs = (process.env.EXTRA_PROJECT_DIRS || "").split(":").filter(Boolean);
+const allDirs = [...new Set([...projectDirs, ...extraDirs])];
+
+let totalCleaned = 0;
+
+for (const dir of allDirs) {
+  const settingsPath = path.join(dir, ".pi", "settings.json");
+  if (!fs.existsSync(settingsPath)) continue;
+
+  let settings;
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+  } catch { continue; }
+
+  const pkgs = Array.isArray(settings.packages) ? settings.packages : [];
+  if (pkgs.length === 0) continue;
+
+  const before = pkgs.length;
+  const filtered = pkgs.filter(spec => {
+    const name = extractPkgName(spec);
+    return !name || !globalNames.has(name);
+  });
+
+  if (filtered.length < before) {
+    const removed = pkgs.filter(spec => !filtered.includes(spec));
+    settings.packages = filtered.length > 0 ? filtered : undefined;
+    if (!filtered.length) delete settings.packages;
+
+    const tmpPath = settingsPath + ".tmp";
+    fs.writeFileSync(tmpPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
+    fs.renameSync(tmpPath, settingsPath);
+
+    console.log(`  Cleaned ${path.basename(dir)}: removed ${removed.map(s => JSON.stringify(s)).join(", ")}`);
+    totalCleaned++;
+  }
+}
+
+if (totalCleaned === 0) {
+  console.log("  No project-level package duplicates found.");
+}
+DEDUP_NODE
+else
+  echo "  Skipped (global settings or repo registry not found)"
+fi
+
+# 7. Summary
 echo ""
 cat <<EOF
 ========================================
@@ -762,8 +874,13 @@ Managed by manifest (.pi/capabilities.yaml):
   settings.json   -> ~/.pi/agent/settings.json (filtered: packages whitelist + exclude_keys)
   catalog/        -> ~/.pi/agent/catalog/pi-config.yaml
 
+Automatic maintenance:
+  project dedup   -> Scans repo_registry projects, removes packages
+                     that duplicate global-level entries (cross source-type).
+
 Unchanged (full directory copy):
   themes/         -> ~/.pi/agent/themes/
+  mcp.json        -> ~/.pi/agent/mcp.json
   AGENTS.md       -> ~/.pi/agent/AGENTS.md
   AGENTS.d/       -> ~/.pi/agent/AGENTS.d/      (on-demand detail files)
 EOF

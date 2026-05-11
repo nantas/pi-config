@@ -315,7 +315,7 @@ Pi 内置多个 subagent（如 `context-builder`、`oracle`、`planner` 等）�
 
 #### `scripts/sync-pi-agent.sh` 同步机制
 
-将仓库管理范围内的路径（`.pi/settings.json`、`.pi/extensions/`、`.pi/packages/`、`.pi/prompts/`、`.pi/themes/`、`.pi/agents/`）同步到 `~/.pi/agent/`。
+将仓库管理范围内的路径（`.pi/settings.json`、`.pi/extensions/`、`.pi/prompts/`、`.pi/themes/`、`.pi/agents/`、`.pi/agent/mcp.json`）同步到 `~/.pi/agent/`。
 
 关键约束：
 - **单向同步**: 仓库 → 运行时，运行时编辑不回写

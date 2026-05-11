@@ -6,6 +6,9 @@ global:
   # AGENTS.md is always synced to ~/.pi/agent/
   agent_md: true
 
+  # mcp.json is synced to ~/.pi/agent/mcp.json
+  mcp_config: true
+
   # Extensions synced to ~/.pi/agent/extensions/ (single-file .ts)
   extensions:
     - dollar-skill-invoke
@@ -47,6 +50,7 @@ global:
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
+      - git:github.com/nantas/pi-mcp-adapter
     # Keys to exclude from ~/.pi/agent/settings.json
     # (empty = sync all keys except those filtered by packages whitelist)
     exclude_keys: []
@@ -82,10 +86,6 @@ catalog:
 
   # Packages available for on-demand installation (settings-entry type)
   packages:
-    - name: pi-mcp-adapter
-      source: git:github.com/nantas/pi-mcp-adapter
-      description: "Pi MCP adapter for external tool integration"
-      type: settings-entry
     - name: lsp-pi
       source: npm:lsp-pi
       description: "LSP integration for Pi coding agent"

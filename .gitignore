@@ -11,3 +11,6 @@ Thumbs.db
 tmp/
 .pi/package-lock.json
 package-lock.json
+
+# Sensitive config with tokens (synced by script, not tracked)
+.pi/agent/mcp.json

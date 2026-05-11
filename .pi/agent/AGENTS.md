@@ -56,6 +56,32 @@
 - 调用 ask_user 让用户确认某个决策或内容选择
 - 需要将 Agent 内部生成的数据（标题、摘要、方案等）展示给用户做判断
 
+### Web Search Tool
+
+使用 `web_search_prime_web_search_prime` 工具进行 web 搜索，获取外部信息。
+
+**调用方式**（两种等价，优先直接调用）：
+- 直接调用：`web_search_prime_web_search_prime({ search_query: "..." })`
+- MCP gateway：`mcp({ tool: "web_search_prime_web_search_prime", args: '{"search_query":"..."}' })`
+
+**参数指南**：
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `search_query` | ✅ | 搜索词，建议 ≤70 字符，用关键词而非完整句子 |
+| `location` | - | `"cn"` 中国区域（默认），`"us"` 海外区域 |
+| `content_size` | - | `"medium"` 默认 400-600 词；`"high"` 最多 2500 词 |
+| `search_domain_filter` | - | 限制域名，如 `"github.com"` |
+| `search_recency_filter` | - | `"oneDay"` / `"oneWeek"` / `"oneMonth"` / `"oneYear"` / `"noLimit"` |
+
+**使用原则**：
+- 搜索已知技术或开源项目信息时，优先用 `grep`/`find`/`lsp`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
+- Pi 框架自身的源码和文档问题，应通过 `$cross-repo-research` 在本地仓库查找，不用 web search。
+- 构造搜索词时提取核心实体和关键词（如 `"Node.js 22 ES module flag change"`），避免自然语言长句。
+- 需要限定来源可信度时，用 `search_domain_filter` 过滤（如官方文档站点）。
+- 需要时效性时，用 `search_recency_filter` 缩小范围。
+- 返回结果为 JSON 数组，每项含 `title`、`link`、`content`，引用时注明来源 URL。
+
 ## Markdown Output Quality
 
 输出内容包含 Markdown 表格时（尤其是 Obsidian Wiki 链接），请先阅读 [AGENTS.d/output-quality.md](./AGENTS.d/output-quality.md)。
