@@ -6,7 +6,7 @@
  * Capabilities:
  * - `$` prefix triggers skill autocomplete (fuzzy filter via pi.getCommands())
  * - `/` prefix autocomplete filters out skill:xxx entries (delegate→filter)
- * - `input` event transforms `$skill-name` tokens into a consolidated `<skill>` block
+ * - `input` event transforms the first `$skill-name` token into a `<skill>` block
  * - `\$` escape supported; unknown skills / read failures left unchanged
  * - `$` autocomplete via Tab (addAutocompleteProvider chain; compatible with any editor)
  *
@@ -189,7 +189,7 @@ function toAutocompleteItem(skill: SkillInfo): AutocompleteItem {
  * - `\$`        – literal dollar sign
  * - `([a-z0-9-]+)` – skill name (capture group 1)
  */
-const DOLLAR_SKILL_REGEX = /(?<!\\)(?:\\\\)*\$([a-z0-9-]+)/g;
+const DOLLAR_SKILL_REGEX = /(?<!\\)(?:\\\\)*\$([a-z0-9-]+)/;
 
 function handleInputTransform(
   text: string,
@@ -227,25 +227,16 @@ function handleInputTransform(
     return { action: "continue" };
   }
 
-  // Build a SINGLE consolidated <skill> block that contains ALL expanded
-  // skills. This is critical for the TUI chat renderer: its parseSkillBlock()
-  // expects the user message text to START with at most one <skill> block.
-  // Without consolidation, multiple blocks would cause the 2nd+ blocks to
-  // appear as raw text in the user message area.
-  const skillNames = expanded.map((s) => s.name).join(", ");
-  const consolidatedContent = expanded
-    .map(
-      (s) =>
-        `[skill:${s.name}]` +
-        `\nLocation: ${s.filePath}` +
-        `\n\n${s.body}`,
-    )
-    .join("\n\n---\n\n");
+  // Build a single <skill> block matching the format of /skill:name
+  // (_expandSkillCommand in pi-mono).
+  const skill = expanded[0];
+  const baseDir = path.dirname(skill.filePath);
+  const skillBlock =
+    `<skill name="${skill.name}" location="${skill.filePath}">\n` +
+    `References are relative to ${baseDir}.\n\n` +
+    `${skill.body}\n</skill>`;
 
-  const finalText =
-    `<skill name="${skillNames}" location=".">\n` +
-    `${consolidatedContent}\n</skill>\n\n` +
-    transformed.trimStart();
+  const finalText = `${skillBlock}\n\n${transformed.trimStart()}`;
 
   return { action: "transform", text: finalText };
 }
