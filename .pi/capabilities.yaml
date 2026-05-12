@@ -149,6 +149,9 @@ catalog:
       source: obsidian-tools
       description: "Obsidian integration tools for Pi agent"
       has_package_json: true
+    - name: trellis-analytics
+      source: trellis-analytics
+      description: "Passive telemetry for Trellis workflow observability, context consumption tracking, and streaming JSONL persistence"
 
   # Packages available for on-demand installation (settings-entry type)
   packages:
