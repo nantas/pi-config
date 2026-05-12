@@ -40,9 +40,9 @@ global:
     - opsx-sync
     - opsx-verify
 
-  # Settings filtering rules
+  # Settings generated directly into ~/.pi/agent/settings.json
+  # Keys listed here are authoritative — keys NOT listed are preserved from target.
   settings:
-    # Whitelist: only these packages appear in ~/.pi/agent/settings.json
     packages:
       - npm:@eko24ive/pi-ask
       - npm:@tmustier/pi-tab-status
@@ -51,9 +51,75 @@ global:
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
       - git:github.com/nantas/pi-mcp-adapter
-    # Keys to exclude from ~/.pi/agent/settings.json
-    # (empty = sync all keys except those filtered by packages whitelist)
-    exclude_keys: []
+    defaultThinkingLevel: high
+    defaultProvider: deepseek
+    defaultModel: deepseek-v4-flash
+    subagents:
+      agentOverrides:
+        context-builder:
+          model: deepseek/deepseek-v4-flash
+          thinking: high
+          tools:
+            - read
+            - grep
+            - find
+            - ls
+            - bash
+            - write
+            - web_search
+            - intercom
+            - gitnexus_query
+            - gitnexus_context
+            - gitnexus_impact
+        oracle:
+          model: deepseek/deepseek-v4-flash
+          thinking: medium
+        planner:
+          model: deepseek/deepseek-v4-flash
+          thinking: high
+        researcher:
+          model: zhipuai-coding-plan/glm-5.1
+          thinking: high
+          tools:
+            - read
+            - write
+            - web_search
+            - fetch_content
+            - get_search_content
+            - intercom
+            - gitnexus_query
+        reviewer:
+          model: zhipuai-coding-plan/glm-5.1
+          thinking: high
+        scout:
+          model: zhipuai-coding-plan/glm-4.5-air
+          thinking: minimal
+          tools:
+            - read
+            - grep
+            - find
+            - ls
+            - bash
+            - write
+            - intercom
+            - gitnexus_query
+            - gitnexus_context
+            - gitnexus_impact
+            - gitnexus_list_repos
+        worker:
+          model: zhipuai-coding-plan/glm-5.1
+          thinking: low
+          tools:
+            - read
+            - grep
+            - find
+            - ls
+            - bash
+            - edit
+            - write
+            - contact_supervisor
+            - gitnexus_query
+            - gitnexus_context
 
 catalog:
   # Skills available for on-demand installation by other repositories

@@ -18,7 +18,7 @@ The system SHALL define bootstrap and sync as a one-way deployment flow from rep
 - **THEN** it reads `global` declarations from `.pi/capabilities.yaml` to determine which paths to sync
 
 ### Requirement: Bootstrap Sync Must Define Selective Path Mapping Via Manifest
-The system SHALL define the mapping from repository-managed source paths to runtime target paths through `.pi/capabilities.yaml` rather than a hardcoded MAPPINGS array. The sync script SHALL sync only resources declared in `global.extensions`, `global.agents`, `global.skills`, `global.settings.packages`, and `agent_md`. Directory targets SHALL use copy-based semantics with managed overwrite.
+The system SHALL define the mapping from repository-managed source paths to runtime target paths through `.pi/capabilities.yaml` rather than a hardcoded MAPPINGS array. The sync script SHALL sync only resources declared in `global.extensions`, `global.agents`, `global.skills`, and `agent_md`. Directory targets SHALL use copy-based semantics with managed overwrite.
 
 #### Scenario: Global extension is synced
 - **WHEN** `global.extensions` lists `planner-toggle`
@@ -36,24 +36,32 @@ The system SHALL define the mapping from repository-managed source paths to runt
 - **WHEN** a managed runtime file differs from or no longer exists in the repository source layer
 - **THEN** the next sync restores the runtime target to the repository-managed state, including deletion when applicable
 
-### Requirement: Bootstrap Sync Must Filter Settings By Manifest Rules
-The system SHALL apply `global.settings.packages` as a whitelist and `global.settings.exclude_keys` as a removal list when rendering `~/.pi/agent/settings.json` from `.pi/settings.json`.
+### Requirement: Bootstrap Sync Must Generate Settings From Manifest Directly
+The system SHALL generate `~/.pi/agent/settings.json` directly from the `global.settings` section of `.pi/capabilities.yaml`, rather than filtering `.pi/settings.json` through a whitelist. For each key present in `global.settings`, the manifest value SHALL be authoritative. For keys not present in `global.settings`, the existing value in the target `~/.pi/agent/settings.json` SHALL be preserved.
 
-#### Scenario: Whitelisted packages are retained
-- **WHEN** the sync script filters the packages array
-- **THEN** only packages listed in `global.settings.packages` appear in `~/.pi/agent/settings.json`
-
-#### Scenario: Non-whitelisted packages are excluded
-- **WHEN** `.pi/settings.json` contains `npm:lsp-pi` but it is not in `global.settings.packages`
-- **THEN** `npm:lsp-pi` does not appear in `~/.pi/agent/settings.json`
-
-#### Scenario: Excluded keys are removed
+#### Scenario: Packages are generated from manifest
 - **WHEN** the sync script processes settings
-- **THEN** keys listed in `global.settings.exclude_keys` (e.g., `defaultModel`, `subagents`) are omitted from the output
+- **THEN** the `packages` array in `~/.pi/agent/settings.json` SHALL exactly match the `global.settings.packages` list from `.pi/capabilities.yaml`
 
-#### Scenario: Removed local package entry is not preserved
-- **WHEN** repository `.pi/settings.json` no longer contains `./packages/subagent-dispatch`
-- **THEN** the sync script does not preserve any stale runtime package entry for `subagent-dispatch`
+#### Scenario: Nested subagents config is generated from manifest
+- **WHEN** the sync script processes settings
+- **THEN** the `subagents` object in `~/.pi/agent/settings.json` SHALL match the `global.settings.subagents` structure from `.pi/capabilities.yaml`
+
+#### Scenario: Simple config values are generated from manifest
+- **WHEN** the sync script processes settings
+- **THEN** `defaultThinkingLevel`, `defaultProvider`, and `defaultModel` in `~/.pi/agent/settings.json` SHALL match their counterparts in `global.settings`
+
+#### Scenario: User-managed enabledModels is preserved
+- **WHEN** the sync script processes settings
+- **THEN** `enabledModels` in `~/.pi/agent/settings.json` SHALL be preserved from the existing target file, not overwritten by the manifest
+
+#### Scenario: Keys not in manifest are preserved from target
+- **WHEN** `~/.pi/agent/settings.json` contains keys that are not declared in `global.settings` (e.g., `lastChangelogVersion`, user-added custom keys)
+- **THEN** those keys SHALL be preserved with their existing values
+
+#### Scenario: Local .pi/settings.json is not used for global generation
+- **WHEN** the sync script processes settings
+- **THEN** it SHALL NOT read `.pi/settings.json` from the pi-config repository for the purpose of generating `~/.pi/agent/settings.json`
 
 ### Requirement: Bootstrap Sync Must Publish Catalog For Cross-Repo Discovery
 The system SHALL publish the `catalog` section of `.pi/capabilities.yaml` to `~/.pi/agent/catalog/pi-config.yaml` during sync, augmented with the source repository's absolute path.

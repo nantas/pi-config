@@ -54,7 +54,8 @@ corresponding update to `.pi/capabilities.yaml`:
 - **Skills** — Directories under `.pi/skills/` containing `SKILL.md`
 - **Agents** — `.md` files under `.pi/agents/`
 - **Prompts** — `.md` files under `.pi/prompts/`
-- **Packages** — Entries in `.pi/settings.json` `packages` array
+- **Packages** — Entries in `global.settings.packages` in `.pi/capabilities.yaml`
+- **Settings** — All keys under `global.settings` in `.pi/capabilities.yaml` are authoritative for `~/.pi/agent/settings.json`; keys not listed are preserved from the target file
 
 ### Workflow Guidance
 
@@ -64,6 +65,8 @@ corresponding update to `.pi/capabilities.yaml`:
 | Add new extension (optional scope) | Append to `catalog.extensions` |
 | Remove an extension | Remove from `global.extensions` or `catalog.extensions` |
 | Add package to global config | Append to `global.settings.packages` |
+| Add settings key to global config | Add key-value to `global.settings` |
+| Remove a settings key from global | Remove key from `global.settings` |
 | Add package to backlog (pure record) | Only write to `openspec/pkg-backlog.md` (no manifest update) |
 | Remove a package | Remove from `global.settings.packages` or `catalog.packages` |
 | Add/remove an agent | Update `global.agents` |

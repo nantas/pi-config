@@ -110,30 +110,6 @@ if (parts.length === 2 && parts[1] === 'packages') {
     }
   }
   console.log(JSON.stringify(pkgs));
-} else if (parts.length === 2 && parts[1] === 'exclude_keys') {
-  const lines = content.split('\\n');
-  const keys = [];
-  let inExclude = false;
-  let excludeIndent = 0;
-
-  for (const line of lines) {
-    if (line.trim() === 'exclude_keys:' && line.includes('settings')) {
-      inExclude = true;
-      excludeIndent = line.search(/\\S/);
-      continue;
-    }
-    if (!inExclude) continue;
-
-    const ci = line.search(/\\S/);
-    if (ci <= excludeIndent && line.trim() !== '' && !line.startsWith(' '.repeat(excludeIndent + 2))) {
-      break;
-    }
-
-    if (line.trimStart().startsWith('- ')) {
-      keys.push(line.trimStart().slice(2).trim());
-    }
-  }
-  console.log(JSON.stringify(keys));
 } else {
   // Simple top-level list extraction: section is the last part
   const sectionName = parts[parts.length - 1];
@@ -183,17 +159,11 @@ remove_stale() {
   fi
 }
 
-# --- Render settings.json with manifest filtering ---
+# --- Render settings.json directly from manifest ---
 render_settings_file() {
-  local source_path="$1"
-  local target_path="$2"
+  local target_path="$1"
 
   mkdir -p "$(dirname "${target_path}")"
-
-  if [[ ! -f "${source_path}" ]]; then
-    rm -f "${target_path}"
-    return
-  fi
 
   local manifest_file="${REPO_ROOT}/.pi/capabilities.yaml"
 
@@ -202,100 +172,41 @@ render_settings_file() {
     exit 1
   fi
 
-  # Parse whitelist and exclude_keys via node
-  node <<'NODEEOF'
-const fs = require("fs");
-const path = require("path");
+  # Generate settings directly from capabilities.yaml global.settings,
+  # merging with existing target to preserve user-managed keys.
+  python3 <<'PYEOF'
+import yaml, json, os, sys
 
-const sourcePath = process.env.SOURCE_PATH;
-const targetPath = process.env.TARGET_PATH;
-const manifestPath = process.env.MANIFEST_PATH;
+manifest_path = os.environ["MANIFEST_PATH"]
+target_path = os.environ["TARGET_PATH"]
 
+# Parse capabilities.yaml
+with open(manifest_path, "r") as f:
+    manifest = yaml.safe_load(f)
 
-const content = fs.readFileSync(manifestPath, "utf8");
-const lines = content.split("\n");
+manifest_settings = (manifest.get("global") or {}).get("settings") or {}
 
-// Extract global.settings.packages (whitelist)
-const whitelist = [];
-let inPackages = false;
-let pkgIndent = 0;
-for (let i = 0; i < lines.length; i++) {
-  const line = lines[i];
-  if (/^\s+packages:/.test(line) && /\s+settings:/.test(lines.slice(Math.max(0,i-3), i).join("\n"))) {
-    inPackages = true;
-    pkgIndent = line.search(/\S/);
-    continue;
-  }
-  if (!inPackages) continue;
-  const ci = line.search(/\S/);
-  if (ci <= pkgIndent && line.trim() !== "" && !line.startsWith(" ".repeat(pkgIndent + 2))) break;
-  if (line.trimStart().startsWith("- ")) {
-    whitelist.push(line.trimStart().slice(2).trim());
-  }
-}
+# Start with manifest settings as the base
+result = dict(manifest_settings)
 
-// Extract global.settings.exclude_keys
-const excludeKeys = [];
-let inExclude = false;
-let excIndent = 0;
-for (let i = 0; i < lines.length; i++) {
-  const line = lines[i];
-  if (/^\s+exclude_keys:/.test(line)) {
-    inExclude = true;
-    excIndent = line.search(/\S/);
-    continue;
-  }
-  if (!inExclude) continue;
-  const ci = line.search(/\S/);
-  if (ci <= excIndent && line.trim() !== "" && !line.startsWith(" ".repeat(excIndent + 2))) break;
-  if (line.trimStart().startsWith("- ")) {
-    excludeKeys.push(line.trimStart().slice(2).trim());
-  }
-}
+# Read existing target and preserve keys NOT in manifest_settings
+if os.path.exists(target_path):
+    try:
+        with open(target_path, "r") as f:
+            existing = json.load(f)
+        for key, value in existing.items():
+            if key not in result:
+                result[key] = value
+    except (json.JSONDecodeError, IOError):
+        pass
 
-// Read settings
-const settings = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
-const packages = Array.isArray(settings.packages) ? settings.packages : [];
-
-// Whitelist filter
-settings.packages = packages.filter((entry) => {
-  const source = (typeof entry === "string") ? entry : (entry.source || "");
-  return whitelist.includes(source);
-});
-
-// (no local package path rendering needed — all packages are npm/git entries)
-
-// Remove excluded keys
-for (const key of excludeKeys) {
-  delete settings[key];
-}
-
-// --- Merge user-managed keys from target (pre-sync cache) ---
-const USER_MANAGED_KEYS = ["enabledModels"];
-const cache = {};
-try {
-  const targetSettings = JSON.parse(fs.readFileSync(targetPath, "utf8"));
-  for (const key of USER_MANAGED_KEYS) {
-    if (key in targetSettings) {
-      cache[key] = targetSettings[key];
-    }
-  }
-} catch {
-  // Target doesn't exist or is unreadable — cache stays empty
-}
-
-// Merge cached values back (target wins)
-for (const key of USER_MANAGED_KEYS) {
-  if (key in cache) {
-    settings[key] = cache[key];
-  }
-}
-
-// Atomic write via temp file
-const tempPath = targetPath + ".tmp";
-fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
-fs.renameSync(tempPath, targetPath);
-NODEEOF
+# Atomic write via temp file
+tmp_path = target_path + ".tmp"
+with open(tmp_path, "w") as f:
+    json.dump(result, f, indent=2)
+    f.write("\n")
+os.rename(tmp_path, target_path)
+PYEOF
 }
 
 # --- Sync managed paths from manifest ---
@@ -740,7 +651,6 @@ export SOURCE_ROOT
 export TARGET_ROOT
 export REPO_ROOT
 
-export SOURCE_PATH="${SOURCE_ROOT}/settings.json"
 export TARGET_PATH="${TARGET_ROOT}/settings.json"
 
 # 1. Sync manifest-driven resources (extensions, agents, skills, prompts)
@@ -749,8 +659,8 @@ sync_from_manifest
 # 2. Sync settings.json with manifest filtering
 echo ""
 echo "--- Syncing settings.json ---"
-render_settings_file "${SOURCE_PATH}" "${TARGET_PATH}"
-echo "  Synced settings.json (filtered by manifest)"
+render_settings_file "${TARGET_PATH}"
+echo "  Synced settings.json (generated from manifest)"
 
 # 3. Sync themes (unchanged, full copy)
 echo ""
@@ -871,7 +781,7 @@ Managed by manifest (.pi/capabilities.yaml):
   agents/         -> ~/.pi/agent/agents/      (whitelist: global.agents)
   skills/         -> ~/.pi/agent/skills/      (whitelist: global.skills)
   prompts/        -> ~/.pi/agent/prompts/     (whitelist: global.prompts)
-  settings.json   -> ~/.pi/agent/settings.json (filtered: packages whitelist + exclude_keys)
+  settings.json   -> ~/.pi/agent/settings.json (generated: global.settings from manifest + target merge)
   catalog/        -> ~/.pi/agent/catalog/pi-config.yaml
 
 Automatic maintenance:

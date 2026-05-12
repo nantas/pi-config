@@ -1,52 +1,5 @@
 {
   "packages": [
-    "git:github.com/nantas/pi-mcp-adapter",
-    "npm:@tmustier/pi-tab-status",
-    "npm:lsp-pi",
-    "git:github.com/nantas/pi-tool-display",
-    "git:github.com/jwu/pi-powerline",
-    "git:github.com/lucasmeijer/pi-terminal-signals",
-    "npm:@eko24ive/pi-ask",
-    "npm:pi-subagents@0.24.0"
-  ],
-  "lastChangelogVersion": "0.70.6",
-  "defaultThinkingLevel": "high",
-  "defaultProvider": "deepseek",
-  "defaultModel": "deepseek-v4-flash",
-  "subagents": {
-    "agentOverrides": {
-      "context-builder": {
-        "model": "deepseek/deepseek-v4-flash",
-        "thinking": "high",
-        "tools": ["read", "grep", "find", "ls", "bash", "write", "web_search", "intercom", "gitnexus_query", "gitnexus_context", "gitnexus_impact"]
-      },
-      "oracle": {
-        "model": "deepseek/deepseek-v4-flash",
-        "thinking": "medium"
-      },
-      "planner": {
-        "model": "deepseek/deepseek-v4-flash",
-        "thinking": "high"
-      },
-      "researcher": {
-        "model": "zhipuai-coding-plan/glm-5.1",
-        "thinking": "high",
-        "tools": ["read", "write", "web_search", "fetch_content", "get_search_content", "intercom", "gitnexus_query"]
-      },
-      "reviewer": {
-        "model": "zhipuai-coding-plan/glm-5.1",
-        "thinking": "high"
-      },
-      "scout": {
-        "model": "zhipuai-coding-plan/glm-4.5-air",
-        "thinking": "minimal",
-        "tools": ["read", "grep", "find", "ls", "bash", "write", "intercom", "gitnexus_query", "gitnexus_context", "gitnexus_impact", "gitnexus_list_repos"]
-      },
-      "worker": {
-        "model": "zhipuai-coding-plan/glm-5.1",
-        "thinking": "low",
-        "tools": ["read", "grep", "find", "ls", "bash", "edit", "write", "contact_supervisor", "gitnexus_query", "gitnexus_context"]
-      }
-    }
-  }
+    "npm:lsp-pi"
+  ]
 }
