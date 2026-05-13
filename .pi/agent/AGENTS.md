@@ -98,13 +98,46 @@
 
 ## Subagent 自动委派
 
-涉及以下场景时，请先阅读 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)：
-- 需要追踪跨文件调用链或搜索复杂代码模式
-- 需要调用 `gitnexus_query/context/impact` 等返回大量数据的工具
-- 需要并行执行多个独立探索方向
-- 实施完成后需要自动代码审查
+**核心原则**：当工具调用会产生大量返回数据（高 token 消耗），或需要 3+ 步工具调用才能得出结论时，**必须 delegate**。subagent 的主要价值是充当 token 屏障——将巨大 toolresult 压缩成精炼结论，避免主 session context 膨胀。
 
-**核心原则**：当任务需要 3+ 步工具调用才能得出一个结论时，优先用 `subagent()` 委托给子 agent 执行，避免主 session context 被膨胀。
+### 委派 vs 不委派
+
+| 场景 | 委派？ | Agent |
+|------|--------|-------|
+| `gitnexus_query` 查询（模糊探索或定向） | ✅ | `scout` |
+| `gitnexus_context` 360° 视图 | ✅ | `scout` |
+| `gitnexus_impact` blast radius 分析 | ✅ | `scout` |
+| 追踪 3+ 步跨文件调用链 | ✅ | `scout` |
+| 跨 3+ 文件分析代码模式 | ✅ | `scout` |
+| Git 多步溯源（log + blame + diff 组合） | ✅ | `scout` |
+| 多个独立方向同时探索 | ✅ 并行 | `scout` × N |
+| Unity MCP 场景树/prefab 查询 | ✅ | `unity-worker` |
+| 实施完成后代码审查 | ✅ 并行 | `reviewer` × 3 |
+| 单次 `lsp definition` / `references` | ❌ 直接做 | — |
+| 单次 `grep` 简单模式搜索 | ❌ 直接做 | — |
+| `gitnexus_list_repos` / `gitnexus_cypher`（小返回） | ❌ 直接做 | — |
+| 主 agent 需要完整原始数据做后续推理 | ❌ 不委派 | — |
+
+### Subagent 选择
+
+| 任务类型 | Agent | Context |
+|---------|-------|---------|
+| 代码侦察 / gitnexus 重操作 / Git 溯源 | `scout` | fresh |
+| 外部资料调研 | `researcher` | fresh |
+| 编辑后审查 | `reviewer` | fresh |
+| 实施执行 | `worker` | fork |
+| 实施计划制定 | `planner` | fork |
+| 上下文构建 | `context-builder` | fresh |
+| 方向审阅 | `oracle` | fork |
+
+### 执行规范
+
+1. **Task 描述要具体**：明确查什么、输出什么格式（例：`"用 gitnexus_query 查询 XxxManager 执行流，输出关键调用链 + 文件路径"`）
+2. **主 agent 只保留摘要**：subagent 返回后提取结构化结论，不保留完整源码
+3. **按符号/文件拆分并行**：多个不相关查询用 `tasks: [...]` 并行执行
+4. **不要嵌套 subagent**：所有编排在主 agent 完成
+
+> 编排模式（chain、parallel 组合）、完整工作流和 task prompt 编写指南见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
 
 ## README 维护
 
