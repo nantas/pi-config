@@ -26,7 +26,7 @@ into the current repository's `.pi/` directory.
 | 3 | Resolve Dependencies | Transitive `requires` resolved, combined plan presented |
 | 4 | Install (File-Based) | Skill/extension directories copied to target `.pi/` |
 | 4b | Install (Settings-Entry) | Package source added to target `.pi/settings.json` |
-| 5 | npm Dependencies | `npm install` executed if `has_package_json: true` |
+| 5 | npm Dependencies | `npm install` executed if `has_package_json: true` or single-file extension imports detected |
 | 6 | Verify Installation | Files exist or settings entry confirmed |
 
 ---
@@ -192,24 +192,56 @@ cp -R "$SOURCE" "$TARGET"
 echo "Installed: $name → $TARGET"
 ```
 
-For **extensions**:
+For **extensions** — auto-detect single-file (`.ts`) vs directory:
 ```bash
-SOURCE="{{source_repo_path}}/.pi/extensions/{{name}}/"
-TARGET="{{target_repo}}/.pi/extensions/{{name}}/"
+SOURCE_REPO="{{source_repo_path}}"
+TARGET_REPO="{{target_repo}}"
+NAME="{{name}}"
 
-if [[ -d "$TARGET" ]]; then
-  echo "Target path already exists: $TARGET"
-  echo "Overwrite? (yes/no)"
-  read -r overwrite
-  if [[ "$overwrite" != "yes" ]]; then
-    echo "Skipping: $name"
-    return
+# Detect source type: single-file (.ts) or directory
+if [[ -f "$SOURCE_REPO/.pi/extensions/$NAME.ts" ]]; then
+  # Single-file extension
+  SOURCE="$SOURCE_REPO/.pi/extensions/$NAME.ts"
+  TARGET="$TARGET_REPO/.pi/extensions/$NAME.ts"
+
+  if [[ -f "$TARGET" ]]; then
+    echo "Target file already exists: $TARGET"
+    echo "Overwrite? (yes/no)"
+    read -r overwrite
+    if [[ "$overwrite" != "yes" ]]; then
+      echo "Skipping: $NAME"
+      return
+    fi
   fi
-fi
 
-mkdir -p "$(dirname "$TARGET")"
-cp -R "$SOURCE" "$TARGET"
-echo "Installed: $name → $TARGET"
+  mkdir -p "$(dirname "$TARGET")"
+  cp "$SOURCE" "$TARGET"
+  echo "Installed (single-file): $NAME → $TARGET"
+elif [[ -d "$SOURCE_REPO/.pi/extensions/$NAME" ]]; then
+  # Directory extension
+  SOURCE="$SOURCE_REPO/.pi/extensions/$NAME/"
+  TARGET="$TARGET_REPO/.pi/extensions/$NAME/"
+
+  if [[ -d "$TARGET" ]]; then
+    echo "Target path already exists: $TARGET"
+    echo "Overwrite? (yes/no)"
+    read -r overwrite
+    if [[ "$overwrite" != "yes" ]]; then
+      echo "Skipping: $NAME"
+      return
+    fi
+  fi
+
+  mkdir -p "$(dirname "$TARGET")"
+  cp -R "$SOURCE" "$TARGET"
+  echo "Installed (directory): $NAME → $TARGET"
+else
+  echo "Error: Extension source not found: $NAME"
+  echo "Checked:"
+  echo "  - $SOURCE_REPO/.pi/extensions/$NAME.ts (single-file)"
+  echo "  - $SOURCE_REPO/.pi/extensions/$NAME/ (directory)"
+  return 1
+fi
 ```
 
 ---
@@ -256,9 +288,9 @@ This triggers Pi's package loader to install the package.
 
 ## Phase 5: npm Dependencies
 
-**Goal:** Run `npm install` for extensions that have `package.json`.
+**Goal:** Install npm dependencies for extensions.
 
-### Step 1 — Check has_package_json
+### Step 1 — Directory extension dependencies
 
 If the catalog entry has `has_package_json: true`:
 
@@ -273,9 +305,56 @@ if [[ -f "$TARGET_DIR/package.json" ]]; then
 fi
 ```
 
-### Step 2 — No package.json
+### Step 2 — Single-file extension dependencies
 
-If `has_package_json` is not set or is `false`, skip this phase.
+For single-file extensions (`.ts`), scan the file for npm `import` statements
+and install detected packages into the target repository's `.pi/npm/`:
+
+```bash
+TARGET_REPO="{{target_repo}}"
+NAME="{{name}}"
+EXT_FILE="$TARGET_REPO/.pi/extensions/$NAME.ts"
+
+if [[ -f "$EXT_FILE" ]]; then
+  echo "Scanning $NAME.ts for npm dependencies..."
+
+  # Extract import package names, excluding:
+  #   - node: built-in modules (node:fs, node:path, etc.)
+  #   - relative imports (./ or ../)
+  #   - bare file imports
+  PACKAGES=$(grep -oP 'from\s+["\'](@?[^"\'./]+[^"\']*)["\'\)]' "$EXT_FILE" \
+    | grep -oP '(?<=from\s+["\'])@?[^"\'']+' \
+    | grep -v '^node:' \
+    | grep -v '^\.' \
+    | sort -u)
+
+  if [[ -n "$PACKAGES" ]]; then
+    PKG_LIST=($PACKAGES)
+    echo "Detected npm packages: ${PKG_LIST[*]}"
+
+    NPM_DIR="$TARGET_REPO/.pi/npm"
+    mkdir -p "$NPM_DIR"
+
+    # Initialize package.json if missing
+    if [[ ! -f "$NPM_DIR/package.json" ]]; then
+      cd "$NPM_DIR"
+      npm init -y > /dev/null 2>&1
+    fi
+
+    cd "$NPM_DIR"
+    echo "Installing npm packages for single-file extension $NAME..."
+    npm install "${PKG_LIST[@]}"
+    echo "npm dependencies installed for $NAME."
+  else
+    echo "No external npm dependencies found for $NAME."
+  fi
+fi
+```
+
+### Step 3 — No dependencies
+
+If neither `has_package_json` is set nor the extension is a single-file,
+skip this phase.
 
 ---
 
@@ -288,9 +367,11 @@ If `has_package_json` is not set or is `false`, skip this phase.
 ```bash
 # Verify skill
 [[ -f ".pi/skills/{{name}}/SKILL.md" ]] && echo "✓ Skill installed: $name"
-# Verify extension
+# Verify extension (directory or single-file)
 [[ -f ".pi/extensions/{{name}}/index.ts" ]] || [[ -f ".pi/extensions/{{name}}/index.js" ]] \
-  || [[ -f ".pi/extensions/{{name}}.ts" ]] && echo "✓ Extension installed: $name"
+  && echo "✓ Extension installed (directory): $name"
+[[ -f ".pi/extensions/{{name}}.ts" ]] \
+  && echo "✓ Extension installed (single-file): $name"
 ```
 
 ### For settings-entry installs
