@@ -25,8 +25,8 @@
  * Spec: openspec/changes/prompt-based-plan-mode/specs/planner-toggle/spec.md
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Key } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Key } from "@earendil-works/pi-tui";
 
 // ---------------------------------------------------------------------------
 // Constants

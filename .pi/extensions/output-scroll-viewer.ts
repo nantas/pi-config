@@ -10,15 +10,15 @@
  * Spec: openspec/changes/output-scroll-viewer/specs/output-scroll-viewer/spec.md
  */
 
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import type { Component, MarkdownTheme, TUI } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import type { Component, MarkdownTheme, TUI } from "@earendil-works/pi-tui";
 import {
 	Key,
 	Markdown,
 	matchesKey,
 	truncateToWidth,
 	visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 // ---------------------------------------------------------------------------
 // Helpers

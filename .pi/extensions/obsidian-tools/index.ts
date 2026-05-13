@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { preloadKnownVaults, isInsideVault } from "./vault-resolver";
 import { searchToolDefinition } from "./search-tool";
 import { cliToolDefinition } from "./raw-tool";

@@ -12,7 +12,7 @@
  * Architecture: SQLite FTS5 per-entry index with incremental updates.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { existsSync, readFileSync } from "node:fs";
 import { extname } from "node:path";

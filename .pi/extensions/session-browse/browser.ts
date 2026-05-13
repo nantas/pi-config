@@ -11,9 +11,9 @@
  * Uses ctx.ui.custom() + SelectList for both levels.
  */
 
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import type { Component, SelectListTheme, SelectItem } from "@mariozechner/pi-tui";
-import { SelectList, Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { Component, SelectListTheme, SelectItem } from "@earendil-works/pi-tui";
+import { SelectList, Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 import { getDb, updateIndex, search, searchGrouped } from "./indexer";
 import { buildTurnFromEntryId, formatTurn } from "./expander";
 import type { SearchResult, SessionSearchGroup } from "./types";

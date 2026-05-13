@@ -6,7 +6,7 @@
  * JSONL only — HTML exports are rejected with a friendly message.
  */
 
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { updateIndex, listRecent } from "./indexer";
 import type { SessionRecord } from "./types";
 import { existsSync } from "node:fs";

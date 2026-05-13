@@ -60,7 +60,7 @@ Ask the user (or infer from their description) the following:
 - **What** does the extension do? (core functionality)
 - **When** should it activate? (event-driven, tool-callable, command, ephemeral)
 - **Which** ExtensionAPI surfaces are needed? (events, tools, commands, shortcuts, flags)
-- **Any** npm dependencies required beyond `@mariozechner/pi-coding-agent` and `@sinclair/typebox`?
+- **Any** npm dependencies required beyond `@earendil-works/pi-coding-agent` and `@sinclair/typebox`?
 
 If the user has already provided clear requirements, proceed directly to Phase B.
 
@@ -177,7 +177,7 @@ Based on the file organization decision from Phase B:
 
 **Single-file pattern** (`.pi/extensions/<name>.ts`):
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 export default function (pi: ExtensionAPI) {

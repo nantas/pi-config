@@ -16,13 +16,13 @@
  *   - slash-skill-filter/spec.md
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   type AutocompleteItem,
   type AutocompleteProvider,
   type AutocompleteSuggestions,
   fuzzyFilter,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 
