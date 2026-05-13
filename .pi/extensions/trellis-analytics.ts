@@ -316,6 +316,10 @@ class JsonlWriter {
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI) {
+  // Sentinel: only activate in Trellis-managed repositories
+  const sentinelPath = path.join(process.cwd(), ".trellis", "config.yaml");
+  if (!fs.existsSync(sentinelPath)) return;
+
   // Dedup guard
   const _key = "__pi_ext_trellis_analytics_loaded";
   if ((globalThis as any)[_key]) return;
