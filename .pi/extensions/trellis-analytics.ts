@@ -1,10 +1,13 @@
 /**
  * trellis-analytics — Passive telemetry extension for the Trellis framework.
  *
- * Tracks skill loads, phase context injection, invoke resolution, and
- * reference consumption across Pi sessions. Writes streaming JSONL to
- * `.trellis/.analytics/` and registers a `trellis_analytics` tool for
- * querying the collected data.
+ * Tracks skill loads, phase context injection, and reference consumption
+ * across Pi sessions. Uses stateless append-only writes to
+ * `.trellis/.analytics/<YYYY-MM>/<sessionId>.jsonl` and registers a
+ * `trellis_analytics` tool for querying the collected data.
+ *
+ * Design: open → write → fsync → close per event. No fd state, no lifecycle
+ * dependency, no cross-turn state machines (except reference tracking).
  *
  * Capabilities: workflow-observability, context-consumption-tracking,
  * streaming-persistence, analysis-tool.
@@ -22,7 +25,6 @@ import * as path from "node:path";
 interface AnalyticsEvent {
   ts: string;
   session: string;
-  turn: number;
   event: string;
   data: Record<string, unknown>;
 }
@@ -30,13 +32,6 @@ interface AnalyticsEvent {
 interface PendingCommand {
   command: string;
   phase: string;
-}
-
-// Invoke target tracking with turn-of-origin for 10-turn timeout
-interface TrackedInvoke {
-  skill: string;
-  source: string;
-  originTurn: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +74,6 @@ function extractInjectedFiles(output: string): string[] {
   const regex = /^=== (.+?) ===$/gm;
   let m;
   while ((m = regex.exec(output)) !== null) {
-    // Skip non-file headers like "=== prd.md ===" — actually include all
     files.push(m[1].trim());
   }
   return [...new Set(files)];
@@ -127,8 +121,6 @@ function extractBoundChange(output: string): {
     bridge_workflow: match[5],
   };
 }
-
-const INVOKE_TIMEOUT_TURNS = 10;
 
 /** Extract references from inline content (file paths and known skill names). */
 function extractReferences(
@@ -185,129 +177,40 @@ function extractInvokeTargets(output: string): string[] {
   return targets;
 }
 
-/** Match a file read path against a reference with suffix/precision logic. */
-function matchReference(filePath: string, ref: string): boolean {
-  const nPath = filePath.replace(/\\/g, "/");
-  const nRef = ref.replace(/\\/g, "/");
+// ---------------------------------------------------------------------------
+// Stateless Analytics Writer
+// ---------------------------------------------------------------------------
 
-  // Exact match
-  if (nPath === nRef) return true;
-
-  // Suffix match with path-boundary guard.
-  // "contest.md" should NOT match ref "test.md" even though it ends with it.
-  // The character right before the suffix must be "/" or undefined (full string).
-  const suffixCheck = (longer: string, shorter: string): boolean => {
-    if (!longer.endsWith(shorter)) return false;
-    const boundaryIdx = longer.length - shorter.length - 1;
-    const boundary = longer[boundaryIdx];
-    return boundary === undefined || boundary === "/";
-  };
-  if (suffixCheck(nPath, nRef) || suffixCheck(nRef, nPath)) return true;
-
-  // Basename match (when paths differ but file is the same)
-  const basePath = path.basename(nPath);
-  const baseRef = path.basename(nRef);
-  if (basePath === baseRef) return true;
-
-  // Path segment containment (e.g., ref="shell/scenes/main.md" matches read ending "scenes/main.md")
-  if (nPath.includes("/" + nRef) || nRef.includes("/" + nPath)) return true;
-
-  return false;
+/** Resolve the analytics file path for a session: `.trellis/.analytics/<YYYY-MM>/<sessionId>.jsonl` */
+function resolveAnalyticsPath(cwd: string, sessionId: string): string {
+  const now = new Date();
+  const monthDir = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return path.join(cwd, ".trellis", ".analytics", monthDir, `${sessionId}.jsonl`);
 }
 
-// ---------------------------------------------------------------------------
-// Streaming JSONL Writer
-// ---------------------------------------------------------------------------
-
-class JsonlWriter {
-  private fd: number | null = null;
-  private filePath: string = "";
-  private taskSlug: string | null = null;
-  private sessionId: string = "";
-  private turnCounter: number = 0;
-
-  constructor(private cwd: string) {}
-
-  init(sessionId: string): void {
-    this.sessionId = sessionId;
-
-    // Read .trellis/.current-task
-    const pointerPath = path.join(this.cwd, ".trellis", ".current-task");
-    let taskSlug: string | null = null;
-    try {
-      const ref = fs.readFileSync(pointerPath, "utf-8").trim();
-      if (ref) {
-        // Extract slug from path like .trellis/tasks/05-12-my-task or absolute
-        taskSlug = path.basename(ref);
-      }
-    } catch {
-      // No current task → orphan mode
-    }
-
-    if (taskSlug) {
-      this.taskSlug = taskSlug;
-      const dir = path.join(
-        this.cwd, ".trellis", ".analytics", "tasks", taskSlug
-      );
-      this.filePath = path.join(dir, "events.jsonl");
-      fs.mkdirSync(dir, { recursive: true });
-      this.fd = fs.openSync(this.filePath, "a");
-    } else {
-      this.taskSlug = null;
-      const orphanDir = path.join(this.cwd, ".trellis", ".analytics", "orphans");
-      fs.mkdirSync(orphanDir, { recursive: true });
-      this.filePath = path.join(orphanDir, `${sessionId}.jsonl`);
-      this.fd = fs.openSync(this.filePath, "a");
-    }
-  }
-
-  getTaskSlug(): string | null {
-    return this.taskSlug;
-  }
-
-  getSessionId(): string {
-    return this.sessionId;
-  }
-
-  incrementTurn(): number {
-    return ++this.turnCounter;
-  }
-
-  getTurn(): number {
-    return this.turnCounter;
-  }
-
-  write(eventType: string, data: Record<string, unknown>): void {
-    if (this.fd === null) return;
-    const record: AnalyticsEvent = {
-      ts: isoNow(),
-      session: this.sessionId,
-      turn: this.turnCounter,
-      event: eventType,
-      data,
-    };
-    try {
-      const line = JSON.stringify(record) + "\n";
-      fs.writeSync(this.fd, line);
-      fs.fsyncSync(this.fd);
-    } catch (err) {
-      console.error("[trellis-analytics] write error:", err);
-    }
-  }
-
-  close(): void {
-    if (this.fd !== null) {
-      try {
-        fs.closeSync(this.fd);
-      } catch {
-        // ignore
-      }
-      this.fd = null;
-    }
-  }
-
-  getFilePath(): string {
-    return this.filePath;
+/** Write a single analytics event. Stateless: open → write → fsync → close. */
+function writeAnalytics(
+  cwd: string,
+  sessionId: string,
+  eventType: string,
+  data: Record<string, unknown>
+): void {
+  const filePath = resolveAnalyticsPath(cwd, sessionId);
+  const record: AnalyticsEvent = {
+    ts: isoNow(),
+    session: sessionId,
+    event: eventType,
+    data,
+  };
+  try {
+    const dir = path.dirname(filePath);
+    fs.mkdirSync(dir, { recursive: true });
+    const fd = fs.openSync(filePath, "a");
+    fs.writeSync(fd, JSON.stringify(record) + "\n");
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+  } catch (err) {
+    console.error("[trellis-analytics] write error:", err);
   }
 }
 
@@ -325,42 +228,30 @@ export default function (pi: ExtensionAPI) {
   if ((globalThis as any)[_key]) return;
   (globalThis as any)[_key] = true;
 
-  pi.on("session_shutdown", () => {
-    delete (globalThis as any)[_key];
-  });
-
   // State
   const cwd = process.cwd();
-  const writer = new JsonlWriter(cwd);
+  let sessionId: string | null = null;
   const pendingCommands = new Map<string, PendingCommand>();
-  const knownInvokeTargets = new Map<string, TrackedInvoke>();
   const knownReferences = new Map<string, { ref: string; type: string }>();
   const loadedSkills = new Set<string>();
   // Dynamic set of known skill names for reference extraction
   const knownSkillNames = new Set<string>();
 
-  // ---------------------------------------------------------------------------
-  // Events: session_start — init writer
-  // ---------------------------------------------------------------------------
-  pi.on("session_start", async (event, ctx) => {
-    // Generate session ID from session file or timestamp
+  /** Lazily resolve session ID from session manager. */
+  function ensureSessionId(ctx: any): string {
+    if (sessionId) return sessionId;
     const sessionFile = ctx.sessionManager.getSessionFile();
-    const sessionId = sessionFile
+    sessionId = sessionFile
       ? path.basename(sessionFile, ".jsonl")
       : `session-${Date.now()}`;
-
-    writer.init(sessionId);
-    writer.write("session_start", {
-      reason: event.reason,
-      sessionFile: sessionFile ?? "ephemeral",
-    });
-  });
+    return sessionId;
+  }
 
   // ---------------------------------------------------------------------------
   // Events: tool_call — skill tracking + command detection
   // ---------------------------------------------------------------------------
-  pi.on("tool_call", async (event, _ctx) => {
-    writer.incrementTurn();
+  pi.on("tool_call", async (event, ctx) => {
+    const sid = ensureSessionId(ctx);
 
     // --- Skill load tracking (read tool, SKILL.md path) ---
     if (event.toolName === "read") {
@@ -368,51 +259,39 @@ export default function (pi: ExtensionAPI) {
       if (filePath.endsWith("SKILL.md") || filePath.includes("/SKILL.md")) {
         const skillInfo = extractSkillFromPath(filePath);
         if (skillInfo) {
-          // Determine source
-          let source = "autonomous";
-          if (knownInvokeTargets.has(skillInfo.skill)) {
-            source = "phase_context_invoke";
-          } else if (loadedSkills.size === 0) {
-            // First skill in session likely from user prompt or startup
-            source = "user_prompt";
-          }
+          // Dedup: only write skill_load on first load
+          if (!loadedSkills.has(skillInfo.skill)) {
+            loadedSkills.add(skillInfo.skill);
+            knownSkillNames.add(skillInfo.skill);
+            const shortName = skillInfo.skill.split("/").pop()!;
+            if (shortName !== skillInfo.skill) knownSkillNames.add(shortName);
 
-          loadedSkills.add(skillInfo.skill);
-          knownSkillNames.add(skillInfo.skill);
-          // Also add the short name (last segment) for reference matching
-          const shortName = skillInfo.skill.split("/").pop()!;
-          if (shortName !== skillInfo.skill) knownSkillNames.add(shortName);
-
-          writer.write("skill_load", {
-            skill: skillInfo.skill,
-            namespace: skillInfo.namespace,
-            path: filePath,
-            source,
-          });
-
-          // Check if this resolves an invoke target
-          if (knownInvokeTargets.has(skillInfo.skill)) {
-            writer.write("invoke_resolved", {
+            writeAnalytics(cwd, sid, "skill_load", {
               skill: skillInfo.skill,
-              loaded: true,
+              namespace: skillInfo.namespace,
+              path: filePath,
+              source: "autonomous",
             });
-            knownInvokeTargets.delete(skillInfo.skill);
           }
         }
       }
 
-      // Check if this read matches a known reference
+      // Check if this read matches a known reference (precise suffix match)
       for (const [key, refData] of knownReferences.entries()) {
-        if (
-          refData.type === "file" &&
-          matchReference(filePath, refData.ref)
-        ) {
-          writer.write("reference_followed", {
-            ref: refData.ref,
-            type: refData.type,
-            read: true,
-          });
-          knownReferences.delete(key);
+        if (refData.type === "file") {
+          const nPath = filePath.replace(/\\/g, "/");
+          const nRef = refData.ref.replace(/\\/g, "/");
+          if (
+            nPath === nRef ||
+            (nPath.endsWith(nRef) && nPath[nPath.length - nRef.length - 1] === "/")
+          ) {
+            writeAnalytics(cwd, sid, "reference_followed", {
+              ref: refData.ref,
+              type: refData.type,
+              read: true,
+            });
+            knownReferences.delete(key);
+          }
         }
       }
     }
@@ -427,11 +306,6 @@ export default function (pi: ExtensionAPI) {
             command,
             phase,
           });
-
-          writer.write("context_injection_begin", {
-            phase,
-            command,
-          });
         }
       }
     }
@@ -441,9 +315,10 @@ export default function (pi: ExtensionAPI) {
   // Events: tool_result — parse phase context output
   // ---------------------------------------------------------------------------
   pi.on("tool_result", async (event, _ctx) => {
+    if (!sessionId) return;
+
     const pending = pendingCommands.get(event.toolCallId);
     if (!pending) return;
-
     pendingCommands.delete(event.toolCallId);
 
     // Extract text content from the result
@@ -469,23 +344,12 @@ export default function (pi: ExtensionAPI) {
     const injectedFileSet = new Set(injectedFiles);
     const references = extractReferences(outputText, injectedFileSet, knownSkillNames);
 
-    // Record invoke targets for cross-reference
-    for (const target of invokeTargets) {
-      const skillInfo = extractSkillFromPath(target);
-      const skillName = skillInfo ? skillInfo.skill : target;
-      knownInvokeTargets.set(skillName, {
-        skill: skillName,
-        source: "phase_context_invoke",
-        originTurn: writer.getTurn(),
-      });
-    }
-
     // Record references for tracking
     for (const ref of references) {
       knownReferences.set(ref.ref, ref);
     }
 
-    writer.write("context_injection_parsed", {
+    writeAnalytics(cwd, sessionId, "context_injection_parsed", {
       phase: pending.phase,
       injectedFiles,
       modeMap,
@@ -493,46 +357,6 @@ export default function (pi: ExtensionAPI) {
       boundChange,
       referenceCount: references.length,
     });
-
-    writer.write("context_injection_references", {
-      phase: pending.phase,
-      references,
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Events: turn_end — check unresolved invokes
-  // ---------------------------------------------------------------------------
-  pi.on("turn_end", async (_event, _ctx) => {
-    // Check for invoke targets that have exceeded the 10-turn timeout
-    const currentTurn = writer.getTurn();
-    for (const [skillName, data] of knownInvokeTargets.entries()) {
-      if (currentTurn - data.originTurn >= INVOKE_TIMEOUT_TURNS) {
-        writer.write("invoke_resolved", {
-          skill: skillName,
-          loaded: false,
-          note: `unresolved_after_${INVOKE_TIMEOUT_TURNS}_turns`,
-        });
-        knownInvokeTargets.delete(skillName);
-      }
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // Events: session_shutdown — cleanup
-  // ---------------------------------------------------------------------------
-  pi.on("session_shutdown", async (_event, _ctx) => {
-    // Log any unresolved invoke targets
-    for (const [skillName, data] of knownInvokeTargets.entries()) {
-      writer.write("invoke_resolved", {
-        skill: skillName,
-        loaded: false,
-        note: "unresolved_at_shutdown",
-      });
-    }
-
-    writer.write("session_shutdown", {});
-    writer.close();
   });
 
   // ---------------------------------------------------------------------------
@@ -542,18 +366,14 @@ export default function (pi: ExtensionAPI) {
     name: "trellis_analytics",
     label: "Trellis Analytics",
     description:
-      "Query Trellis analytics data. Actions: summary, context-consumption, timeline, list-sessions, task-detail.",
+      "Query Trellis analytics data. Actions: summary, context-consumption, timeline, list-sessions.",
     parameters: Type.Object({
       action: StringEnum([
         "summary",
         "context-consumption",
         "timeline",
         "list-sessions",
-        "task-detail",
       ] as const),
-      task_slug: Type.Optional(
-        Type.String({ description: "Filter by task slug" })
-      ),
       session_id: Type.Optional(
         Type.String({ description: "Filter by Pi session ID" })
       ),
@@ -565,7 +385,6 @@ export default function (pi: ExtensionAPI) {
       _toolCallId: string,
       params: {
         action: string;
-        task_slug?: string;
         session_id?: string;
         limit?: number;
       },
@@ -586,14 +405,12 @@ export default function (pi: ExtensionAPI) {
             return handleTimeline(analyticsDir, params, limit);
           case "list-sessions":
             return handleListSessions(analyticsDir);
-          case "task-detail":
-            return handleTaskDetail(analyticsDir, params, limit);
           default:
             return {
               content: [
                 {
                   type: "text",
-                  text: `Unknown action: ${params.action}. Use: summary, context-consumption, timeline, list-sessions, task-detail`,
+                  text: `Unknown action: ${params.action}. Use: summary, context-consumption, timeline, list-sessions`,
                 },
               ],
             };
@@ -637,12 +454,49 @@ export default function (pi: ExtensionAPI) {
     return events;
   }
 
+  /** Scan analytics directory for JSONL files in both new and legacy formats. */
   function findAllJsonlFiles(
     analyticsDir: string
-  ): { filePath: string; taskSlug: string | null; sessionId: string | null }[] {
-    const results: { filePath: string; taskSlug: string | null; sessionId: string | null }[] = [];
+  ): { filePath: string; sessionId: string }[] {
+    const results: { filePath: string; sessionId: string }[] = [];
 
-    // Task-based files
+    if (!fs.existsSync(analyticsDir)) return results;
+
+    // New format: <YYYY-MM>/<sessionId>.jsonl
+    for (const entry of fs.readdirSync(analyticsDir)) {
+      const fullPath = path.join(analyticsDir, entry);
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(fullPath);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory() && /^\d{4}-\d{2}$/.test(entry)) {
+        for (const file of fs.readdirSync(fullPath)) {
+          if (file.endsWith(".jsonl")) {
+            results.push({
+              filePath: path.join(fullPath, file),
+              sessionId: file.replace(".jsonl", ""),
+            });
+          }
+        }
+      }
+    }
+
+    // Legacy format: orphans/<sessionId>.jsonl
+    const orphanDir = path.join(analyticsDir, "orphans");
+    if (fs.existsSync(orphanDir)) {
+      for (const file of fs.readdirSync(orphanDir)) {
+        if (file.endsWith(".jsonl")) {
+          results.push({
+            filePath: path.join(orphanDir, file),
+            sessionId: file.replace(".jsonl", ""),
+          });
+        }
+      }
+    }
+
+    // Legacy format: tasks/<taskSlug>/events.jsonl
     const tasksDir = path.join(analyticsDir, "tasks");
     if (fs.existsSync(tasksDir)) {
       for (const taskDir of fs.readdirSync(tasksDir)) {
@@ -650,22 +504,7 @@ export default function (pi: ExtensionAPI) {
         if (fs.existsSync(eventsFile)) {
           results.push({
             filePath: eventsFile,
-            taskSlug: taskDir,
-            sessionId: null,
-          });
-        }
-      }
-    }
-
-    // Orphan files
-    const orphanDir = path.join(analyticsDir, "orphans");
-    if (fs.existsSync(orphanDir)) {
-      for (const file of fs.readdirSync(orphanDir)) {
-        if (file.endsWith(".jsonl")) {
-          results.push({
-            filePath: path.join(orphanDir, file),
-            taskSlug: null,
-            sessionId: file.replace(".jsonl", ""),
+            sessionId: taskDir,
           });
         }
       }
@@ -676,26 +515,25 @@ export default function (pi: ExtensionAPI) {
 
   function handleSummary(
     analyticsDir: string,
-    params: { task_slug?: string },
+    params: { session_id?: string },
     _limit: number
   ) {
     const files = findAllJsonlFiles(analyticsDir);
 
-    if (params.task_slug) {
-      const file = files.find((f) => f.taskSlug === params.task_slug);
+    if (params.session_id) {
+      const file = files.find((f) => f.sessionId === params.session_id);
       if (!file) {
         return {
           content: [
             {
               type: "text",
-              text: `No analytics data found for task: ${params.task_slug}`,
+              text: `No analytics data found for session: ${params.session_id}`,
             },
           ],
         };
       }
 
       const events = readJsonlLines(file.filePath);
-      const sessions = new Set(events.map((e) => e.session));
       const skillLoads = events.filter((e) => e.event === "skill_load");
       const injections = events.filter(
         (e) => e.event === "context_injection_parsed"
@@ -710,36 +548,20 @@ export default function (pi: ExtensionAPI) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5);
 
-      let text = `## Task Summary: ${params.task_slug}\n\n`;
-      text += `- **Task slug:** ${params.task_slug}\n`;
-      text += `- **Sessions:** ${sessions.size}\n`;
+      let text = `## Session Summary: ${params.session_id}\n\n`;
+      text += `- **Session:** ${params.session_id}\n`;
       text += `- **Total events:** ${events.length}\n`;
 
       // Workflows detected (phases with context injection)
       const phases = [...new Set(injections.map((e) => e.data.phase as string))];
       text += `- **Workflows detected:** ${phases.length > 0 ? phases.join(", ") : "none"}\n`;
 
-      // Inject files count
+      // Injected files count
       const totalInjectedFiles = injections.reduce(
         (acc, e) => acc + ((e.data.injectedFiles as string[]) ?? []).length,
         0
       );
       text += `- **Injected files:** ${totalInjectedFiles}\n`;
-
-      // Invoke resolution rate
-      const invokeResolved = events.filter(
-        (e) => e.event === "invoke_resolved" && e.data.loaded === true
-      );
-      const totalInvokeTargets = injections.reduce(
-        (acc, e) => acc + ((e.data.invokeTargets as string[]) ?? []).length,
-        0
-      );
-      const invokeRate =
-        totalInvokeTargets > 0
-          ? `${invokeResolved.length}/${totalInvokeTargets} (${Math.round((invokeResolved.length / totalInvokeTargets) * 100)}%)`
-          : "N/A";
-      text += `- **Invoke resolution rate:** ${invokeRate}\n`;
-
       text += `- **Skill loads:** ${skillLoads.length}\n`;
       text += `\n### Top Skills\n`;
       for (const [name, count] of sortedSkills) {
@@ -764,7 +586,7 @@ export default function (pi: ExtensionAPI) {
           const name = (e.data.skill as string) ?? "unknown";
           allSkills.set(name, (allSkills.get(name) ?? 0) + 1);
         }
-        if (e.event === "context_injection_begin") {
+        if (e.event === "context_injection_parsed") {
           const phase = (e.data.phase as string) ?? "unknown";
           workflowEvents.set(phase, (workflowEvents.get(phase) ?? 0) + 1);
         }
@@ -796,47 +618,43 @@ export default function (pi: ExtensionAPI) {
 
   function handleContextConsumption(
     analyticsDir: string,
-    params: { task_slug?: string },
+    params: { session_id?: string },
     _limit: number
   ) {
-    if (!params.task_slug) {
+    if (!params.session_id) {
       return {
         content: [
           {
             type: "text",
-            text: "task_slug is required for context-consumption action.",
+            text: "session_id is required for context-consumption action.",
           },
         ],
       };
     }
 
-    const filePath = path.join(
-      analyticsDir, "tasks", params.task_slug, "events.jsonl"
-    );
-    const events = readJsonlLines(filePath);
+    const files = findAllJsonlFiles(analyticsDir);
+    const file = files.find((f) => f.sessionId === params.session_id);
+    if (!file) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `No analytics data found for session: ${params.session_id}`,
+          },
+        ],
+      };
+    }
+
+    const events = readJsonlLines(file.filePath);
 
     const injections = events.filter(
       (e) => e.event === "context_injection_parsed"
     );
-    const resolved = events.filter(
-      (e) => e.event === "invoke_resolved" && e.data.loaded === true
-    );
-    const allInvokes = events.filter(
-      (e) => e.event === "invoke_resolved"
-    );
     const followedRefs = events.filter(
       (e) => e.event === "reference_followed" && e.data.read === true
     );
-    const allRefs = events.filter(
-      (e) => e.event === "context_injection_references"
-    );
 
-    let totalInvokes = 0;
-    for (const inj of injections) {
-      totalInvokes += ((inj.data.invokeTargets as string[]) ?? []).length;
-    }
-
-    let text = `## Context Consumption: ${params.task_slug}\n\n`;
+    let text = `## Context Consumption: ${params.session_id}\n\n`;
 
     for (const inj of injections) {
       const phase = (inj.data.phase as string) ?? "unknown";
@@ -852,36 +670,24 @@ export default function (pi: ExtensionAPI) {
       }
 
       text += `- **Invoke targets:** ${invokes.length}\n`;
-      for (const inv of invokes) {
-        const wasLoaded = resolved.some(
-          (r) => r.data.skill === extractSkillFromPath(inv)?.skill
-        );
-        text += `  - ${inv}: ${wasLoaded ? "✅ loaded" : "❌ not loaded"}\n`;
-      }
       text += `\n`;
     }
 
-    const rate =
-      totalInvokes > 0
-        ? `${resolved.length}/${totalInvokes} (${Math.round(
-            (resolved.length / totalInvokes) * 100
-          )}%)`
-        : "N/A";
+    let totalRefs = 0;
+    for (const inj of injections) {
+      totalRefs += (inj.data.referenceCount as number) ?? 0;
+    }
 
     text += `### Consumption Rate\n`;
-    text += `- **Invoke resolution:** ${rate}\n`;
     text += `- **References followed:** ${followedRefs.length}\n`;
-    text += `- **Total references extracted:** ${allRefs.reduce(
-      (acc, r) => acc + ((r.data.referenceCount as number) ?? 0),
-      0
-    )}\n`;
+    text += `- **Total references extracted:** ${totalRefs}\n`;
 
     return { content: [{ type: "text", text }] };
   }
 
   function handleTimeline(
     analyticsDir: string,
-    params: { session_id?: string; task_slug?: string; limit?: number },
+    params: { session_id?: string; limit?: number },
     limit: number
   ) {
     const files = findAllJsonlFiles(analyticsDir);
@@ -891,60 +697,41 @@ export default function (pi: ExtensionAPI) {
       targetFile =
         files.find((f) => f.sessionId === params.session_id)?.filePath ??
         null;
-      if (!targetFile) {
-        // Check task-based files for session_id match
-        for (const file of files) {
-          const events = readJsonlLines(file.filePath);
-          if (events.some((e) => e.session === params.session_id)) {
-            targetFile = file.filePath;
-            break;
-          }
-        }
-      }
-    } else if (params.task_slug) {
-      targetFile =
-        files.find((f) => f.taskSlug === params.task_slug)?.filePath ?? null;
     }
 
     if (!targetFile) {
-      // Default to the writer's current file
-      targetFile = writer.getFilePath();
+      return {
+        content: [
+          {
+            type: "text",
+            text: "session_id is required for timeline action.",
+          },
+        ],
+      };
     }
 
     const events = readJsonlLines(targetFile, limit);
 
     let text = `## Timeline\n\n`;
-    text += `Source: ${path.basename(targetFile)}\n\n`;
+    text += `Source: ${path.basename(path.dirname(targetFile))}/${path.basename(targetFile)}\n\n`;
 
     for (const e of events) {
       const time = new Date(e.ts).toLocaleTimeString();
       let summary = "";
       switch (e.event) {
-        case "session_start":
-          summary = `Session started (${e.data.reason ?? ""})`;
-          break;
         case "skill_load":
-          summary = `Skill loaded: ${e.data.skill} (${e.data.source ?? ""})`;
-          break;
-        case "context_injection_begin":
-          summary = `Phase context injection started: ${e.data.phase}`;
+          summary = `Skill loaded: ${e.data.skill}`;
           break;
         case "context_injection_parsed":
           summary = `Phase context parsed: ${e.data.phase} (${(e.data.injectedFiles as string[])?.length ?? 0} files)`;
           break;
-        case "invoke_resolved":
-          summary = `Invoke ${e.data.loaded ? "resolved" : "unresolved"}: ${e.data.skill}`;
-          break;
         case "reference_followed":
           summary = `Reference followed: ${e.data.ref}`;
-          break;
-        case "session_shutdown":
-          summary = "Session ended";
           break;
         default:
           summary = `${e.event}`;
       }
-      text += `- **${time}** (turn ${e.turn}): ${summary}\n`;
+      text += `- **${time}**: ${summary}\n`;
     }
 
     return { content: [{ type: "text", text }] };
@@ -954,69 +741,13 @@ export default function (pi: ExtensionAPI) {
     const files = findAllJsonlFiles(analyticsDir);
 
     let text = `## Tracked Sessions\n\n`;
-    text += `| # | Type | Slug/ID | Sessions | Events |\n`;
-    text += `|---|------|---------|----------|--------|\n`;
+    text += `| # | Session ID | Events |\n`;
+    text += `|---|------------|--------|\n`;
 
     files.forEach((file, idx) => {
       const events = readJsonlLines(file.filePath);
-      const sessions = new Set(events.map((e) => e.session));
-      const type = file.taskSlug ? "task" : "orphan";
-      const id = file.taskSlug ?? file.sessionId ?? "unknown";
-      text += `| ${idx + 1} | ${type} | ${id} | ${sessions.size} | ${events.length} |\n`;
+      text += `| ${idx + 1} | ${file.sessionId} | ${events.length} |\n`;
     });
-
-    return { content: [{ type: "text", text }] };
-  }
-
-  function handleTaskDetail(
-    analyticsDir: string,
-    params: { task_slug?: string },
-    _limit: number
-  ) {
-    if (!params.task_slug) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "task_slug is required for task-detail action.",
-          },
-        ],
-      };
-    }
-
-    const filePath = path.join(
-      analyticsDir, "tasks", params.task_slug, "events.jsonl"
-    );
-    const events = readJsonlLines(filePath);
-
-    const sessions = new Map<
-      string,
-      { start: string; end: string; events: number }
-    >();
-    for (const e of events) {
-      if (!sessions.has(e.session)) {
-        sessions.set(e.session, {
-          start: e.ts,
-          end: e.ts,
-          events: 0,
-        });
-      }
-      const s = sessions.get(e.session)!;
-      s.end = e.ts;
-      s.events++;
-    }
-
-    let text = `## Task Detail: ${params.task_slug}\n\n`;
-    text += `- **Total events:** ${events.length}\n`;
-    text += `- **Sessions:** ${sessions.size}\n\n`;
-
-    text += `### Sessions\n`;
-    for (const [sid, info] of sessions.entries()) {
-      text += `- **${sid.substring(0, 16)}...**\n`;
-      text += `  - Start: ${new Date(info.start).toLocaleString()}\n`;
-      text += `  - End: ${new Date(info.end).toLocaleString()}\n`;
-      text += `  - Events: ${info.events}\n`;
-    }
 
     return { content: [{ type: "text", text }] };
   }
