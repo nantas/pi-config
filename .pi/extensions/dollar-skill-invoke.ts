@@ -1,19 +1,22 @@
 /**
  * dollar-skill-invoke
  *
- * Pi extension that adds `$skill-name` autocomplete and input transformation.
+ * Pi extension that adds `$skill-name` autocomplete and context-level skill injection.
  *
  * Capabilities:
  * - `$` prefix triggers skill autocomplete (fuzzy filter via pi.getCommands())
  * - `/` prefix autocomplete filters out skill:xxx entries (delegate→filter)
- * - `input` event transforms the first `$skill-name` token into a `<skill>` block
+ * - `context` event injects matched `$skill-name` tokens as separate `<skill>` messages
+ *   appended to the user message, preserving original prompt text intact
  * - `\$` escape supported; unknown skills / read failures left unchanged
  * - `$` autocomplete via Tab (addAutocompleteProvider chain; compatible with any editor)
+ * - Multi-skill support: all `$skill-name` tokens are expanded independently
+ *   and injected as individual CustomMessage entries
+ * - Repeat injection prevention: dedup checks if user message is already followed
+ *   by skill custom messages
  *
- * Spec: openspec/changes/dollar-skill-invoke/specs/
- *   - dollar-skill-autocomplete/spec.md
- *   - dollar-skill-invoke/spec.md
- *   - slash-skill-filter/spec.md
+ * Spec: openspec/changes/dollar-skill-invoke-context/specs/dollar-skill-invoke/spec.md
+ * Design: openspec/changes/dollar-skill-invoke-context/design.md
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -34,12 +37,6 @@ interface SkillInfo {
   name: string;
   description?: string;
   filePath: string;
-}
-
-interface ExpandedSkill {
-  name: string;
-  filePath: string;
-  body: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +176,7 @@ function toAutocompleteItem(skill: SkillInfo): AutocompleteItem {
 }
 
 // ---------------------------------------------------------------------------
-// Input event transform
+// Context event injection
 // ---------------------------------------------------------------------------
 
 /**
@@ -188,57 +185,112 @@ function toAutocompleteItem(skill: SkillInfo): AutocompleteItem {
  * - `(?:\\\\)*` – zero or more escaped-backslash pairs (consumed as literal `\`)
  * - `\$`        – literal dollar sign
  * - `([a-z0-9-]+)` – skill name (capture group 1)
+ *
+ * Non-global variant (single-match) kept as canonical pattern source.
  */
 const DOLLAR_SKILL_REGEX = /(?<!\\)(?:\\\\)*\$([a-z0-9-]+)/;
 
-function handleInputTransform(
-  text: string,
-  pi: ExtensionAPI,
-): { action: "continue" } | { action: "transform"; text: string } {
-  if (!text || !text.includes("$")) {
-    return { action: "continue" };
+/**
+ * Read a custom message's text content as a flat string, regardless of whether
+ * the message stores content as a string or as (TextContent | ImageContent)[].
+ */
+function getMessageText(msg: { content: unknown }): string {
+  if (typeof msg.content === "string") return msg.content;
+  if (Array.isArray(msg.content)) {
+    return msg.content
+      .filter((c: any) => c.type === "text")
+      .map((c: any) => c.text)
+      .join("");
   }
+  return "";
+}
+
+/**
+ * Handle `context` event: parse `$skill-name` tokens from the last user
+ * message and inject skill content as individual `CustomMessage` entries.
+ *
+ * Dedup: if the user message is already followed by a custom message with
+ * `customType === "skill"`, skip injection (prevents re‑injection on
+ * tool‑call continuations within the same turn).
+ */
+function handleContextInjection(
+  messages: unknown[],
+  pi: ExtensionAPI,
+): { messages: unknown[] } | undefined {
+  // 1. Find last user message from tail
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i] as Record<string, unknown>;
+    if (msg.role === "user") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+  if (lastUserIdx === -1) return undefined;
+
+  // 2. Dedup: check if the next message is already a skill injection
+  const nextMsg = messages[lastUserIdx + 1] as Record<string, unknown> | undefined;
+  if (nextMsg && nextMsg.role === "custom" && nextMsg.customType === "skill") {
+    return undefined;
+  }
+
+  // 3. Parse $skill tokens from user message text
+  const userMsg = messages[lastUserIdx] as { content: unknown };
+  const userText = getMessageText(userMsg);
+  if (!userText.includes("$")) return undefined;
 
   const allSkills = getSkills(pi);
-  const expanded: ExpandedSkill[] = [];
-  let hasExpansion = false;
 
-  const transformed = text.replace(
-    DOLLAR_SKILL_REGEX,
-    (fullMatch: string, skillName: string) => {
-      const skill = allSkills.find((s) => s.name === skillName);
-      if (!skill) return fullMatch; // unknown skill → leave unchanged
+  // Build a global regex from the canonical pattern for multi-match
+  const re = new RegExp(DOLLAR_SKILL_REGEX.source, "g");
+  const skillMessages: Array<{
+    role: "custom";
+    customType: string;
+    content: string;
+    display: false;
+    timestamp: number;
+  }> = [];
 
-      let content: string;
-      try {
-        content = readFileSync(skill.filePath, "utf-8");
-      } catch {
-        return fullMatch; // file read failure → leave unchanged
-      }
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(userText)) !== null) {
+    const skillName = match[1];
+    const skill = allSkills.find((s) => s.name === skillName);
+    if (!skill) continue; // unknown skill → skip
 
-      const body = stripFrontmatter(content).trim();
-      expanded.push({ name: skill.name, filePath: skill.filePath, body });
-      hasExpansion = true;
-      return ""; // remove the token from the text
-    },
-  );
+    let content: string;
+    try {
+      content = readFileSync(skill.filePath, "utf-8");
+    } catch {
+      continue; // file read failure → skip
+    }
 
-  if (!hasExpansion) {
-    return { action: "continue" };
+    const body = stripFrontmatter(content).trim();
+    const baseDir = path.dirname(skill.filePath);
+    const skillBlock =
+      `<skill name="${skill.name}" location="${skill.filePath}">\n` +
+      `References are relative to ${baseDir}.\n\n` +
+      `${body}\n</skill>`;
+
+    skillMessages.push({
+      role: "custom",
+      customType: "skill",
+      content: skillBlock,
+      display: false,
+      timestamp: Date.now(),
+    });
   }
 
-  // Build a single <skill> block matching the format of /skill:name
-  // (_expandSkillCommand in pi-mono).
-  const skill = expanded[0];
-  const baseDir = path.dirname(skill.filePath);
-  const skillBlock =
-    `<skill name="${skill.name}" location="${skill.filePath}">\n` +
-    `References are relative to ${baseDir}.\n\n` +
-    `${skill.body}\n</skill>`;
+  if (skillMessages.length === 0) return undefined;
 
-  const finalText = `${skillBlock}\n\n${transformed.trimStart()}`;
+  // 4. Insert skill messages immediately after the user message,
+  //    before any pending nextTurn / before_agent_start messages.
+  const newMessages = [
+    ...messages.slice(0, lastUserIdx + 1),
+    ...skillMessages,
+    ...messages.slice(lastUserIdx + 1),
+  ];
 
-  return { action: "transform", text: finalText };
+  return { messages: newMessages };
 }
 
 // ---------------------------------------------------------------------------
@@ -264,11 +316,13 @@ export default function (pi: ExtensionAPI): void {
     (globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
   });
 
-  // Register input event handler ONCE at top level ($skill-name expansion).
+  // Register context event handler ONCE at top level.
   // This MUST be outside session_start to prevent handler accumulation
   // across /new and /reload.
-  pi.on("input", async (event) => {
-    return handleInputTransform(event.text, pi);
+  // Parses $skill-name tokens from the last user message and injects skill
+  // content as separate CustomMessage entries (runs on each LLM call).
+  pi.on("context", async (event) => {
+    return handleContextInjection(event.messages, pi);
   });
 
   pi.on("session_start", async (_event, ctx) => {
