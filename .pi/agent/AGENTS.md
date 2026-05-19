@@ -108,33 +108,33 @@
 
 ### 委派 vs 不委派
 
-| 场景 | 委派？ | Agent |
-|------|--------|-------|
-| `gitnexus_query` 查询（模糊探索或定向） | ✅ | `scout` |
-| `gitnexus_context` 360° 视图 | ✅ | `scout` |
-| `gitnexus_impact` blast radius 分析 | ✅ | `scout` |
-| 追踪 3+ 步跨文件调用链 | ✅ | `scout` |
-| 跨 3+ 文件分析代码模式 | ✅ | `scout` |
-| Git 多步溯源（log + blame + diff 组合） | ✅ | `scout` |
-| 多个独立方向同时探索 | ✅ 并行 | `scout` × N |
-| Unity MCP 场景树/prefab 查询 | ✅ | `unity-worker` |
-| 实施完成后代码审查 | ✅ 并行 | `reviewer` × 3 |
-| 单次 `lsp definition` / `references` | ❌ 直接做 | — |
-| 单次 `grep` 简单模式搜索 | ❌ 直接做 | — |
-| `gitnexus_list_repos` / `gitnexus_cypher`（小返回） | ❌ 直接做 | — |
-| 主 agent 需要完整原始数据做后续推理 | ❌ 不委派 | — |
+| 场景 | 委派？ | Agent | Skill |
+|------|--------|-------|-------|
+| `gitnexus_query` 查询（模糊探索或定向） | ✅ | `scout` | `gitnexus-exploring` |
+| `gitnexus_context` 360° 视图 | ✅ | `scout` | `gitnexus-exploring` |
+| `gitnexus_impact` blast radius 分析 | ✅ | `scout` | `gitnexus-impact-analysis` |
+| 追踪 3+ 步跨文件调用链 | ✅ | `scout` | `gitnexus-exploring` |
+| 跨 3+ 文件分析代码模式 | ✅ | `scout` | `gitnexus-exploring` |
+| Git 多步溯源（log + blame + diff 组合） | ✅ | `scout` | `gitnexus-debugging` |
+| 多个独立方向同时探索 | ✅ 并行 | `scout` × N | `gitnexus-exploring` |
+| Unity MCP 场景树/prefab 查询 | ✅ | `unity-worker` | `unity-mcp-workflow` |
+| 实施完成后代码审查 | ✅ 并行 | `reviewer` × 3 | — |
+| 单次 `lsp definition` / `references` | ❌ 直接做 | — | — |
+| 单次 `grep` 简单模式搜索 | ❌ 直接做 | — | — |
+| `gitnexus_list_repos` / `gitnexus_cypher`（小返回） | ❌ 直接做 | — | — |
+| 主 agent 需要完整原始数据做后续推理 | ❌ 不委派 | — | — |
 
 ### Subagent 选择
 
-| 任务类型 | Agent | Context |
-|---------|-------|---------|
-| 代码侦察 / gitnexus 重操作 / Git 溯源 | `scout` | fresh |
-| 外部资料调研 | `researcher` | fresh |
-| 编辑后审查 | `reviewer` | fresh |
-| 实施执行 | `worker` | fork |
-| 实施计划制定 | `planner` | fork |
-| 上下文构建 | `context-builder` | fresh |
-| 方向审阅 | `oracle` | fork |
+| 任务类型 | Agent | Context | Skill |
+|---------|-------|---------|-------|
+| 代码侦察 / gitnexus 重操作 / Git 溯源 | `scout` | fresh | `gitnexus-exploring` / `gitnexus-debugging` / `gitnexus-impact-analysis` |
+| 外部资料调研 | `researcher` | fresh | — |
+| 编辑后审查 | `reviewer` | fresh | — |
+| 实施执行 | `worker` | fork | — |
+| 实施计划制定 | `planner` | fork | — |
+| 上下文构建 | `context-builder` | fresh | — |
+| 方向审阅 | `oracle` | fork | — |
 
 ### 执行规范
 

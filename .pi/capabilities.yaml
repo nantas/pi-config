@@ -92,7 +92,7 @@ global:
           model: zhipuai-coding-plan/glm-5.1
           thinking: high
         scout:
-          model: zhipuai-coding-plan/glm-4.5-air
+          model: zhipuai-coding-plan/glm-5-turbo
           thinking: minimal
           tools:
             - read
