@@ -50,7 +50,7 @@ global:
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
-      - git:github.com/nantas/pi-mcp-adapter
+      - npm:pi-mcp-adapter
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
