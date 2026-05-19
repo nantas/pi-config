@@ -94,13 +94,21 @@
 
 ## LSP 代码智能
 
-涉及复杂仓库的代码理解、检索或诊断时，优先用 `lsp` 工具而非 `grep` + `read`。完整指南参见 [AGENTS.d/lsp-guide.md](./AGENTS.d/lsp-guide.md)。
+当 `lsp` 工具可用时，**必须优先使用**而非 `grep` + `read` 组合。
 
-以下场景**必须**阅读：
-- 第一次在当前项目中使用 `lsp` 工具
-- 需要理解某个符号的定义、引用或类型
-- 修改代码前需要检查影响范围
-- 编辑完成后需要验证无新增错误
+### 决策表
+
+| 场景 | 用 `lsp` action | 禁止的替代方案 |
+|------|-----------------|----------------|
+| 找函数/类的定义 | `definition` | ❌ grep + read + 人眼扫描 |
+| 查谁调用了某函数 | `references` | ❌ grep 搜名 + 人工筛 import/注释 |
+| 列出文件中的符号 | `symbols` | ❌ read 全文 + 人眼扫描 |
+| 查变量类型签名 | `hover` | ❌ 人眼追踪类型链 |
+| 修改前检查影响 | `references` + `diagnostics` | ❌ 凭记忆 grep |
+| 跨文件重命名 | `rename` | ❌ 逐文件 sed |
+| 编辑后验证 | `diagnostics` | ❌ 等 lint |
+
+用法示例和 hook 配置见 [AGENTS.d/lsp-guide.md](./AGENTS.d/lsp-guide.md)。
 
 ## Subagent 自动委派
 
