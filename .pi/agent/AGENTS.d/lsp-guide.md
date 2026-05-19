@@ -1,52 +1,53 @@
-# LSP 代码智能工具
+# LSP 参考指南
 
-项目已安装 `lsp-pi` 扩展（`npm:lsp-pi`），为 Python（`pyright-langserver`）和 TypeScript（`typescript-language-server`）提供代码智能。
+> **工作流指南**：代码探索、修改验证流程见 `lsp-code-intelligence` skill（自动注入）。
+> 本文档提供 hook 配置、环境初始化和进阶用法参考。
 
-## 代码检索操作指南（Agent 必读）
+---
 
-**核心原则：涉及代码理解时，优先用 `lsp` 工具而非 `grep` + `read`。**
+## Hook 配置
 
-| 当需要… | 用 `lsp` action | 而非 |
-|---|---|---|
-| 找到函数/类/接口的定义位置 | `definition`（一键跳转到定义行）| `grep` + `read` + 人眼扫描 |
-| 查看某个函数被哪些地方调用 | `references`（精确返回所有调用点）| `grep` 搜函数名然后人工筛除 import 和注释 |
-| 了解一个文件里有哪些函数/类型 | `symbols`（结构化列表，含行号）| `read` 全文然后人眼扫描 |
-| 查看变量/函数的类型签名 | `hover`（即时返回类型信息）| 人眼追踪类型声明链 |
-| 修改前检查是否影响其他文件 | `references` + `diagnostics` | 凭记忆或手动 grep |
-| 跨文件重命名符号 | `rename`（自动更新所有引用）| 逐个文件 `sed` |
-| 检查刚编辑的代码是否有错误 | `diagnostics`（单文件）或 `workspace-diagnostics`（批量）| 等 `npm run lint` 或 `ruff check` |
+自动诊断默认在 Agent 响应结束后对编辑过的文件运行。
 
-### 典型用法模式
+通过 `/lsp` 命令切换模式：
 
-```
-# 模式 1：探索陌生代码
-lsp symbols(file="web/app/api/search/route.ts")
-↓ 发现感兴趣的函数 searchAll
-lsp definition(file="web/app/api/search/route.ts", query="searchAll")
-↓ 跳转到定义
-lsp references(file="web/lib/db.ts", query="searchAll")
-↓ 查看所有调用点
+| 模式 | 行为 | 适用场景 |
+|------|------|---------|
+| `agent_end`（默认）| 每次 agent 响应后诊断 | 通用开发 |
+| `edit_write` | 每次 `edit`/`write` 调用后诊断 | 激进的即时反馈 |
+| `disabled` | 不自动运行 | 需要手动控制诊断时机 |
 
-# 模式 2：修改前的安全检查
-lsp references(file="web/lib/db.ts", query="getVideos")
-↓ 确认修改影响范围
-# 改代码...
-lsp diagnostics(file="web/lib/db.ts")
-↓ 验证无新错误
-```
+## 环境初始化
 
-## 自动诊断（Hook）
-
-- 默认在每次 Agent 响应结束后，自动对编辑过的文件运行诊断
-- 可通过 `/lsp` 命令切换模式：`agent_end`（默认）| `edit_write` | `disabled`
-
-## 新成员环境初始化
-
-除 Python 依赖外，还需确保 LSP 服务端可用：
+确保 LSP 服务端可用：
 
 ```bash
 which pyright-langserver && echo "Python LSP OK"
 which typescript-language-server && echo "TypeScript LSP OK"
 ```
+
+### 安装
+
+```bash
+# Python
+npm install -g pyright
+
+# TypeScript / JavaScript
+npm install -g typescript typescript-language-server
+```
+
+## 工具参数参考
+
+| Action | 必填参数 | 可选参数 | 说明 |
+|--------|---------|---------|------|
+| `symbols` | `file` | `query` | 列出文件中的符号（函数、类、接口等）|
+| `definition` | `file` | `query`, `line`, `column` | 跳转到符号定义位置 |
+| `references` | `file` | `query`, `line`, `column` | 查找所有引用/调用点 |
+| `hover` | `file` | `query`, `line`, `column` | 获取类型签名和文档 |
+| `rename` | `file` | `query`, `line`, `column`, `newName` | 跨文件重命名符号 |
+| `diagnostics` | `file` | `severity` | 单文件诊断 |
+| `workspace-diagnostics` | — | `files`, `severity` | 批量文件诊断 |
+| `signature` | `file` | `query`, `line`, `column` | 函数签名信息 |
+| `codeAction` | `file` | `line`, `column`, `endLine`, `endColumn` | 代码操作（修复建议）|
 
 > 注意：`lsp-pi` 是 Pi 环境的扩展，不适用于 VS Code 等其他编辑器。
