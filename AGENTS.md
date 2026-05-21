@@ -41,6 +41,8 @@ When the task requires creating a new dispatch agent or modifying an existing ag
 - Use OpenSpec files in `openspec/` as the primary project context when relevant.
 - When `pi-config` work needs confirmation from Pi source code or official Pi docs, use `$cross-repo-research` against `repo://pi-mono` in-session and read local repository evidence; do not use web search for that Pi source/doc confirmation path.
 - Feature and configuration change closeout follows the workflow defined in `docs/pi-change-closeout-governance.md`. When a change reaches verification phase, read that document and follow its required closeout sequence.
+- When configuring custom providers, adding models, or setting `enabledModels`, refer to `docs/reference/pi-provider-model.md`.
+- When capability changes require README updates, follow `docs/reference/readme-governance.md`.
 - OpenSpec writeback targets are resolved via `repo://` virtual paths through the global repo registry at `~/.config/orbitos/repo_registry.json`. Before executing writeback, resolve the target path via `repo-registry` skill (`resolve --repo-ref repo://<id>`), then edit the target file directly. Writeback content must be a concise summary (conclusion, status, deliverables, verification result), not a copy of full artifacts.
 
 ## Capability Manifest Governance
