@@ -3,6 +3,19 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-05-21 — git:github.com/rwese/pi-question
+
+- **Version:** 2.3.0
+- **Research Date:** 2026-05-21
+- **Resource Types:** extension (question)
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/rwese/pi-question
+- **Install Method:** pi-install
+- **Has Dependencies:** true (1 runtime: @mariozechner/pi-tui)
+- **Reason:** 替代 @eko24ive/pi-ask（已降级 backlog）；参数结构更简洁（questions[] 数组），有提交前审查、运行时启用/禁用、非交互模式自动降级，解决了 pi-ask "生成问题前额外模型交互、参数复杂易出错"的问题
+- **Notes:** 工具名 question，支持单选/多选/多问题序列/自定义输入/推荐选项/附加备注，提供 pi-question:disabled|enabled 命令和 pi-question-disabled flag
+
 Each entry tracks the resource name/version, research date, resource types,
 the decision, decision reason, source metadata, and follow-up notes.
 
@@ -13,13 +26,13 @@ the decision, decision reason, source metadata, and follow-up notes.
 - **Version:** 0.8.1
 - **Research Date:** 2026-05-06
 - **Resource Types:** extension (ask_user) + skill (ask-user)
-- **Decision:** global
+- **Decision:** backlog（原 global，2026-05-21 降级）
 - **Source Type:** npm-package
 - **Source Repo:** https://github.com/eko24ive/pi-ask
 - **Install Method:** pi-install
 - **Has Dependencies:** false (0 runtime, 4 peers)
 - **Reason:** 替代 pi-ask-tool-extension；功能更丰富（/answer 回放、@文件引用、审阅/澄清流、Elaborate、可持久化配置、bundled skill profile），14 stars / 1,730 月下载
-- **Notes:** 工具名 ask_user（与旧 ask 不冲突），已替换 pi-ask-tool-extension（已移除）
+- **Notes:** 工具名 ask_user（与旧 ask 不冲突），已替换 pi-ask-tool-extension（已移除）。2026-05-21 降级为 backlog：生成问题前还需要额外的模型和交互的额外时间，参数复杂容易出错
 
 ## How to Add an Entry
 
@@ -153,9 +166,9 @@ at the top of this file using the following format:
 - **Version:** 1.0.4
 - **Research Date:** 2026-04-30
 - **Resource Types:** extensions (LSP Tool + Hook auto-diagnostics)
-- **Decision:** global
+- **Decision:** backlog（原 global，2026-05-21 降级）
 - **Reason:** LSP 集成扩展，agent 可主动调用 definition/references/hover/symbols/diagnostics 等 9 种语义操作替代文本搜索，显著提升编码和代码分析效率。Hook 提供自动诊断反馈。支持 TS/JS/Vue/Svelte/Dart/Python/Go/Kotlin/Swift/Rust。
-- **Notes:** 前置条件：需安装对应语言的 LSP 服务（如 typescript-language-server）。安全审查通过：所有 spawn/fetch 均为合法 LSP 行为。
+- **Notes:** 前置条件：需安装对应语言的 LSP 服务（如 typescript-language-server）。安全审查通过：所有 spawn/fetch 均为合法 LSP 行为。2026-05-21 降级为 backlog：agent 不会自动发现和使用这个工具
 
 ### 2026-04-30 — npm:@tmustier/pi-tab-status
 
@@ -239,3 +252,16 @@ at the top of this file using the following format:
   1. **依赖终端多路复用器**：必须运行在 cmux/tmux/zellij/WezTerm 中，无法在普通终端直接使用
   2. **Agent 设置不支持重载**：不读取 `settings.json` 的 `subagents.agentOverrides`，bundled agent frontmatter 硬编码 `anthropic/claude-*` 模型，导致使用自定义供应商时报 "no api key found for anthropic"
   3. 功能丰富（异步非阻塞、实时 widget、中断/恢复、caller_ping），与内置 dispatch 互补，若上游修复上述问题可重新评估
+
+## @johnnywu/pi-webfetch — 2025-05-21
+
+- **Source**: `git:github.com/jwu/pi-webfetch`
+- **Version**: 1.1.0
+- **License**: MIT
+- **Decision**: A1 (Global)
+- **Summary**: Pi extension providing `webfetch` tool. Routes GitHub URLs through `gh` CLI, other URLs through Scrapling (3-tier: fetcher → dynamic → stealthy) with optional Defuddle HTML→Markdown conversion and LLM quality judge.
+- **Resources**: 1 extension (`webfetch` tool)
+- **Dependencies**: `defuddle ^0.18.1` (runtime), 4 Pi core peer deps
+- **Security**: CLEAN — all spawn/fetch calls are functional, no injection risks
+- **External requirements**: `scrapling` (Python CLI), `gh` (GitHub CLI, authenticated)
+- **Capabilities sync**: Added to `global.settings.packages` in capabilities.yaml
