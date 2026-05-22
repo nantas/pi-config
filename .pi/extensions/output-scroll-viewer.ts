@@ -296,21 +296,8 @@ class ScrollableOutputViewer implements Component {
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
-	// GlobalThis self-dedup — prevents duplicate registration when loaded
-	// from both project-local (.pi/extensions/) and global
-	// (~/.pi/agent/extensions/) paths. Uses session-scoped key.
-	const _key = "__pi_ext_output_scroll_viewer_loaded";
-	const SESSION_COUNTER = "__pi_ext_session_counter";
-
-	const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
-	const sessionKey = `${_key}_session_${sessionId}`;
-
-	if ((globalThis as any)[sessionKey]) return;
-	(globalThis as any)[sessionKey] = true;
-
-	pi.on("session_shutdown", () => {
-		(globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
-	});
+	// Dedup: Pi's resolveExtensionPaths deduplicates by resolved file path,
+	// so the same file is never loaded twice. No globalThis guard needed.
 
 	// session_start: hook point for capturing session-level context.
 	// The TUI instance (needed for terminal.rows/columns) is only available

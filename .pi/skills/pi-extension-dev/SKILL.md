@@ -191,33 +191,11 @@ export default function (pi: ExtensionAPI) {
 - Run `npm install` inside the extension directory
 - Write `index.ts` with the default export function
 
-> **Dedup Requirement:** If this extension will be deployed globally (via `scripts/sync-pi-agent.sh`),
-> it MUST include a `globalThis` self-dedup marker AND a `session_shutdown` handler
-> at the entry of its `export default function`.
->
-> The dedup prevents duplicate registration when the same extension is loaded from both
-> project-local (`.pi/extensions/`) and global (`~/.pi/agent/extensions/`) paths.
-> The `session_shutdown` handler is REQUIRED to clear the flag when the session ends,
-> so that session replacements (`/new`, `/reload`, `/resume`) can re-register handlers.
-> Without the `session_shutdown` handler, the `globalThis` flag persists across sessions
-> and the extension silently stops working after any session replacement.
->
-> For detailed explanation, see [docs/reference/pi-extension-session-shutdown-dedup.md](../../docs/reference/pi-extension-session-shutdown-dedup.md).
->
-> ```typescript
-> export default function (pi: ExtensionAPI) {
->   const _key = "__pi_ext_<name>_loaded";  // unique per extension
->   if ((globalThis as any)[_key]) return;
->   (globalThis as any)[_key] = true;
->
->   // REQUIRED: clear flag on session end so session replacements work
->   pi.on("session_shutdown", () => {
->     delete (globalThis as any)[_key];
->   });
->
->   // ... rest of extension
-> }
-> ```
+> **Dedup:** Pi's `resolveExtensionPaths` deduplicates by resolved file path,
+> so the same extension file is never loaded twice. **Do NOT add `globalThis` dedup guards** —
+> they can silently disable extensions when the factory is re-invoked without a prior
+> `session_shutdown` (e.g., reload, settings change). Handler-level dedup (checking existing
+> state before acting) is sufficient where needed.
 >
 > Violating this requirement causes the extension to silently stop working after
 > `/new`, `/reload`, or `/resume`.

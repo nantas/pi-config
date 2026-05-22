@@ -13,7 +13,7 @@
  * - `/init` — full repository analysis and AGENTS.md creation/update
  * - `/init focus on <topic>` — scoped analysis via $ARGUMENTS injection
  * - Structural comparison with existing AGENTS.md (similar vs different)
- * - globalThis dedup + session_shutdown cleanup
+ * - Dedup via Pi's resolveExtensionPaths (no globalThis needed)
  *
  * Spec: openspec/changes/init-command/specs/init-command/spec.md
  */
@@ -100,22 +100,8 @@ If no AGENTS.md exists, create a fresh one with the extracted information. Use t
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
-  // ---- Self-dedup ----
-  // Prevents duplicate registration when loaded from both project-local
-  // (.pi/extensions/) and global (~/.pi/agent/extensions/). Uses
-  // session-scoped key so /new always gets a fresh dedup domain.
-  const _key = "__pi_ext_init_command_loaded";
-  const SESSION_COUNTER = "__pi_ext_session_counter";
-
-  const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
-  const sessionKey = `${_key}_session_${sessionId}`;
-
-  if ((globalThis as any)[sessionKey]) return;
-  (globalThis as any)[sessionKey] = true;
-
-  pi.on("session_shutdown", () => {
-    (globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
-  });
+  // Dedup: Pi's resolveExtensionPaths deduplicates by resolved file path,
+  // so the same file is never loaded twice. No globalThis guard needed.
 
   // ---- Register /init command ----
   pi.registerCommand("init", {
