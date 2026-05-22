@@ -1,6 +1,1 @@
-{
-  "packages": [
-    "git:github.com/rwese/pi-question",
-    "git:github.com/jwu/pi-webfetch"
-  ]
-}
+{}

@@ -35,6 +35,16 @@
 - 先读错误信息确认根因：missing field / type mismatch / content overlap。
 - 根据根因选择：拆分参数、换方案、或修复参数后再试。
 
+### Grep / Find Tool
+
+使用 `grep` / `find` 搜索代码时，**必须缩小搜索范围**，避免对大仓库全量扫描导致输出截断和 token 浪费。
+
+**使用原则**：
+- **通过 `glob` 指定扩展名**：如 `glob: '*.ts'`、`glob: '**/*.yaml'`，避免命中无关文件（lock 文件、构建产物、vendor 目录等）。
+- **通过 `path` 限定目录范围**：已知目标在 `src/` 下就不要搜整个仓库根目录。
+- **组合使用**：`path: 'src/components'` + `glob: '*.tsx'` 是最优实践。
+- **find 同理**：使用 `pattern: '*.spec.ts'` 而非 `pattern: '*.ts'` 全量扫描后再过滤。
+
 ### Web Search Tool
 
 使用 `web_search_prime_web_search_prime` 工具进行 web 搜索，获取外部信息。
