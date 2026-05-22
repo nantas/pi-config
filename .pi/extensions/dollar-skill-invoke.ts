@@ -298,29 +298,13 @@ function handleContextInjection(
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
-  // Self-dedup — prevents double registration when loaded from both
-  // project-local (.pi/extensions/) and global (~/.pi/agent/extensions/).
-  // Uses session-scoped key (session_counter + ext_key) so that /new
-  // always creates a fresh dedup domain without depending on
-  // session_shutdown timing.
-  const _key = "__pi_ext_dollar_skill_invoke_loaded";
-  const SESSION_COUNTER = "__pi_ext_session_counter";
+  // Dedup: Pi's resolveExtensionPaths deduplicates by resolved file path,
+  // so the same file is never loaded twice. No globalThis guard needed.
+  //
+  // Context handler dedup is handled inside handleContextInjection()
+  // (checks if a skill custom message already follows the user message).
+  // Autocomplete double-registration is harmless.
 
-  const sessionId = (globalThis as any)[SESSION_COUNTER] ?? 0;
-  const sessionKey = `${_key}_session_${sessionId}`;
-
-  if ((globalThis as any)[sessionKey]) return;
-  (globalThis as any)[sessionKey] = true;
-
-  pi.on("session_shutdown", () => {
-    (globalThis as any)[SESSION_COUNTER] = ((globalThis as any)[SESSION_COUNTER] ?? 0) + 1;
-  });
-
-  // Register context event handler ONCE at top level.
-  // This MUST be outside session_start to prevent handler accumulation
-  // across /new and /reload.
-  // Parses $skill-name tokens from the last user message and injects skill
-  // content as separate CustomMessage entries (runs on each LLM call).
   pi.on("context", async (event) => {
     return handleContextInjection(event.messages, pi);
   });
