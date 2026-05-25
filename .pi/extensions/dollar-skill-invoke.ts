@@ -26,7 +26,8 @@ import {
   type AutocompleteSuggestions,
   fuzzyFilter,
 } from "@earendil-works/pi-tui";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import * as path from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -46,7 +47,7 @@ interface SkillInfo {
 /**
  * Get the current list of skills from pi.getCommands() filtered by source.
  */
-function getSkills(pi: ExtensionAPI): SkillInfo[] {
+function getSkillsFromCommands(pi: ExtensionAPI): SkillInfo[] {
   return pi
     .getCommands()
     .filter((c) => c.source === "skill")
@@ -55,6 +56,63 @@ function getSkills(pi: ExtensionAPI): SkillInfo[] {
       description: c.description,
       filePath: c.sourceInfo.path,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Independent skill index — does NOT depend on pi.getCommands() timing
+// ---------------------------------------------------------------------------
+
+let _fileSystemSkillIndex: SkillInfo[] | null = null;
+
+/** Recursively scan a directory for SKILL.md files */
+function scanSkillDir(dir: string, skills: SkillInfo[]): void {
+  if (!existsSync(dir)) return;
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === "SKILL.md" && (entry.isFile() || entry.isSymbolicLink())) {
+        const filePath = path.join(dir, entry.name);
+        if (!skills.some((s) => s.filePath === filePath)) {
+          const skillDir = path.dirname(filePath);
+          const parentName = path.basename(skillDir);
+          let name = parentName;
+          try {
+            const raw = readFileSync(filePath, "utf-8");
+            const fmMatch = raw.match(/^---\nname:\s*(.+)$/m);
+            if (fmMatch) name = fmMatch[1].trim();
+          } catch {}
+          skills.push({ name, filePath });
+        }
+        return;
+      }
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+      if (entry.isDirectory() || entry.isSymbolicLink()) {
+        const fullPath = path.join(dir, entry.name);
+        try {
+          if (statSync(fullPath).isDirectory()) scanSkillDir(fullPath, skills);
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
+function buildFileSystemSkillIndex(cwd: string): SkillInfo[] {
+  const skills: SkillInfo[] = [];
+  const home = homedir();
+  scanSkillDir(path.join(cwd, ".agents", "skills"), skills);
+  scanSkillDir(path.join(cwd, ".pi", "skills"), skills);
+  scanSkillDir(path.join(home, ".agents", "skills"), skills);
+  scanSkillDir(path.join(home, ".pi", "agent", "skills"), skills);
+  return skills;
+}
+
+function getSkills(pi: ExtensionAPI): SkillInfo[] {
+  const fromCommands = getSkillsFromCommands(pi);
+  if (fromCommands.length > 0) return fromCommands;
+  if (_fileSystemSkillIndex && _fileSystemSkillIndex.length > 0) return _fileSystemSkillIndex;
+  return fromCommands;
 }
 
 /**
@@ -228,10 +286,16 @@ function handleContextInjection(
   }
   if (lastUserIdx === -1) return undefined;
 
-  // 2. Dedup: check if the next message is already a skill injection
+  // 2. Dedup: scan up to 5 messages after user message for existing skill injection.
+  //    This handles cases where before_agent_start or other extensions shift messages.
   const nextMsg = messages[lastUserIdx + 1] as Record<string, unknown> | undefined;
-  if (nextMsg && nextMsg.role === "custom" && nextMsg.customType === "skill") {
-    return undefined;
+  if (nextMsg) {
+    if (nextMsg.role === "custom" && nextMsg.customType === "skill") return undefined;
+    for (let j = lastUserIdx + 1; j < Math.min(lastUserIdx + 5, messages.length); j++) {
+      const m = messages[j] as Record<string, unknown>;
+      if (m.role === "custom" && m.customType === "skill") return undefined;
+      if (m.role === "assistant" || m.role === "toolResult") break;
+    }
   }
 
   // 3. Parse $skill tokens from user message text
@@ -240,6 +304,11 @@ function handleContextInjection(
   if (!userText.includes("$")) return undefined;
 
   const allSkills = getSkills(pi);
+
+  let effectiveSkills = allSkills;
+  if (effectiveSkills.length === 0 && _fileSystemSkillIndex) {
+    effectiveSkills = _fileSystemSkillIndex;
+  }
 
   // Build a global regex from the canonical pattern for multi-match
   const re = new RegExp(DOLLAR_SKILL_REGEX.source, "g");
@@ -254,7 +323,10 @@ function handleContextInjection(
   let match: RegExpExecArray | null;
   while ((match = re.exec(userText)) !== null) {
     const skillName = match[1];
-    const skill = allSkills.find((s) => s.name === skillName);
+    const skill = effectiveSkills.find((s) => s.name === skillName);
+    if (!skill && _fileSystemSkillIndex && effectiveSkills !== _fileSystemSkillIndex) {
+      skill = _fileSystemSkillIndex.find((s) => s.name === skillName);
+    }
     if (!skill) continue; // unknown skill → skip
 
     let content: string;
@@ -298,23 +370,23 @@ function handleContextInjection(
 // ---------------------------------------------------------------------------
 
 export default function (pi: ExtensionAPI): void {
-  // Dedup: Pi's resolveExtensionPaths deduplicates by resolved file path,
-  // so the same file is never loaded twice. No globalThis guard needed.
-  //
-  // Context handler dedup is handled inside handleContextInjection()
-  // (checks if a skill custom message already follows the user message).
-  // Autocomplete double-registration is harmless.
+  // Dedup: Pi's resolveExtensionPaths deduplicates by resolved file path.
+  // Context handler dedup is handled inside handleContextInjection().
+
+  pi.on("session_start", async (_event, ctx) => {
+    try {
+      _fileSystemSkillIndex = buildFileSystemSkillIndex((ctx as any).cwd);
+    } catch {}
+
+    ctx.ui.addAutocompleteProvider((current) =>
+      createAutocompleteProvider(current, () => {
+        const skills = getSkills(pi);
+        return skills.length > 0 ? skills : (_fileSystemSkillIndex ?? []);
+      }),
+    );
+  });
 
   pi.on("context", async (event) => {
     return handleContextInjection(event.messages, pi);
-  });
-
-  pi.on("session_start", async (_event, ctx) => {
-    // Register autocomplete provider for the new session context.
-    // The provider chain detects `$` prefix (Tab to trigger) and filters
-    // `skill:` entries from `/` autocomplete.
-    ctx.ui.addAutocompleteProvider((current) =>
-      createAutocompleteProvider(current, () => getSkills(pi)),
-    );
   });
 }
