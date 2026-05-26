@@ -544,6 +544,9 @@ function rankResults(
       reasons.push("filename_partial");
     }
 
+    // Resolve file path once for reuse in downstream scoring
+    const filePath = resolve(vaultPath, entry.file);
+
     // match_position_bonus — best among all matches
     const fmEndLine = getFrontmatterEndLine(filePath);
     let bestPositionBonus = config.ranking.match_position.body;
@@ -559,7 +562,6 @@ function rankResults(
     }
 
     // content_density_bonus
-    const filePath = resolve(vaultPath, entry.file);
     const totalLines = getFileLineCount(filePath);
     const densityBonus =
       totalLines > 0

@@ -80,7 +80,7 @@ global:
           model: deepseek/deepseek-v4-flash
           thinking: high
         researcher:
-          model: zhipuai-coding-plan/glm-5.1
+          model: kimi-coding/kimi-for-coding
           thinking: high
           tools:
             - read
@@ -91,10 +91,10 @@ global:
             - intercom
             - gitnexus_query
         reviewer:
-          model: zhipuai-coding-plan/glm-5.1
+          model: kimi-coding/kimi-for-coding
           thinking: high
         scout:
-          model: zhipuai-coding-plan/glm-5-turbo
+          model: minimax-cn/minimax-m2.7
           thinking: minimal
           tools:
             - read
@@ -109,7 +109,7 @@ global:
             - gitnexus_impact
             - gitnexus_list_repos
         worker:
-          model: zhipuai-coding-plan/glm-5.1
+          model: minimax-cn/minimax-m2.7
           thinking: low
           tools:
             - read
