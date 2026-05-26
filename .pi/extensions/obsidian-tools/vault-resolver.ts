@@ -1,6 +1,6 @@
 import { accessSync, constants, realpathSync } from "node:fs";
 import { resolve, sep, parse as parsePath } from "node:path";
-import { runCli, parseSearchJson } from "./cli-runner";
+import { runCli } from "./cli-runner";
 
 // ── Shared state ────────────────────────────────────────────────
 let knownVaults: Map<string, string> = new Map(); // name → root path
@@ -116,6 +116,17 @@ export function resolveVault(
 
   // Step 2-3: CWD walk-up detection
   return resolveVaultFromCwd(workDir);
+}
+
+/**
+ * Resolve a vault name to its filesystem root path.
+ * Looks up in known vaults first, then treats as direct path.
+ */
+export function resolveVaultPath(vault: string): string {
+  const known = getKnownVaults();
+  const path = known.get(vault);
+  if (path) return resolve(path);
+  return resolve(vault);
 }
 
 /**

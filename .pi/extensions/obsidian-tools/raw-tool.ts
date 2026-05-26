@@ -1,6 +1,7 @@
 import { Type } from "typebox";
 import { runCli } from "./cli-runner";
-import { resolveVault, ensurePreloaded } from "./vault-resolver";
+import { resolveVault, ensurePreloaded, resolveVaultPath } from "./vault-resolver";
+import { handleSearchInit } from "./search-config";
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ async function cliToolExecute(
     };
   }
 
-  // 5.3: Dangerous command blocking
+  // 5.3: Dangerous command blocking (before vault resolution for safety)
   const command = params.command.toLowerCase();
   if (DANGEROUS_COMMANDS.has(command) && !params.allowDangerous) {
     const blockMessage = `Blocked dangerous command '${params.command}'. Re-run with allowDangerous=true if intentional.`;
@@ -125,6 +126,23 @@ async function cliToolExecute(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { content: [{ type: "text", text: msg }], details: { ok: false, error: msg } };
+  }
+
+  // Intercept search:init command (local handler, not Obsidian CLI)
+  if (params.command === "search:init") {
+    try {
+      const vaultPath = resolveVaultPath(vault);
+      const overwrite = params.flags?.includes("--overwrite") ?? false;
+      const configPath = handleSearchInit(vaultPath, overwrite);
+      const msg = `Created default search config: ${configPath}`;
+      return {
+        content: [{ type: "text", text: msg }],
+        details: { ok: true, command: "search:init", config_path: configPath },
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: msg }], details: { ok: false, error: msg } };
+    }
   }
 
   // 5.4: Command construction and execution

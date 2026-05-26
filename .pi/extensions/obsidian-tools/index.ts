@@ -1,9 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { preloadKnownVaults, isInsideVault } from "./vault-resolver";
-import { searchToolDefinition } from "./search-tool";
+import { searchToolDefinition, resetSessionState } from "./search-tool";
 import { cliToolDefinition } from "./raw-tool";
-
-const _key = "__pi_ext_obsidian_tools_loaded";
 
 /**
  * Obsidian Tools Extension
@@ -13,22 +11,19 @@ const _key = "__pi_ext_obsidian_tools_loaded";
  * known vaults on session start.
  */
 export default function (pi: ExtensionAPI) {
-  // Global dedup marker — prevent double registration on hot reload
-  if ((globalThis as any)[_key]) return;
-  (globalThis as any)[_key] = true;
+  // Register tools immediately so they're available
+  pi.registerTool(searchToolDefinition);
+  pi.registerTool(cliToolDefinition);
 
-  pi.on("session_shutdown", () => {
-    delete (globalThis as any)[_key];
-  });
-
-  // Session start: preload known vaults only when inside a vault
+  // Session start: preload known vaults when inside a vault
   pi.on("session_start", async () => {
     if (isInsideVault(process.cwd())) {
       await preloadKnownVaults();
     }
   });
 
-  // Register tools
-  pi.registerTool(searchToolDefinition);
-  pi.registerTool(cliToolDefinition);
+  // Session shutdown: clean up session-scoped state
+  pi.on("session_shutdown", () => {
+    resetSessionState();
+  });
 }
