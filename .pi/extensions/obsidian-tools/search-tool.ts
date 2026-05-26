@@ -2,7 +2,7 @@ import { Type } from "typebox";
 import { spawnSync } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
 import { readFileSync, statSync } from "node:fs";
-import { runCli } from "./cli-runner";
+
 import {
   resolveVault,
   ensurePreloaded,
@@ -10,6 +10,7 @@ import {
 } from "./vault-resolver";
 import {
   loadSearchConfig,
+  handleSearchInit,
   type SearchConfig,
   type ScopeConfig,
 } from "./search-config";
@@ -57,6 +58,13 @@ const searchParams = Type.Object({
         "Optional subdirectory path to limit search scope (e.g., '20-synthesis/digest/游戏分析').",
     }),
   ),
+  init: Type.Optional(
+    Type.Boolean({
+      default: false,
+      description:
+        "Set to true to generate a default search-config.yaml at vault root.",
+    }),
+  ),
 });
 
 interface SearchParams {
@@ -65,6 +73,7 @@ interface SearchParams {
   mode?: "fast" | "deep";
   limit?: number;
   scope?: string;
+  init?: boolean;
 }
 
 // ── Prompt Helpers ──────────────────────────────────────────────
@@ -73,7 +82,7 @@ const promptSnippet =
   "Search Obsidian vault content with intelligent ranking and automatic context expansion.";
 
 const promptGuidelines = [
-  "Prefer obsidian_search over direct obsidian_cli for retrieval — it handles ranking and expansion automatically.",
+
   "Fast mode (~3s) for targeted lookups like project pages or known document titles.",
   "Deep mode (~5-8s) when decision context, backlinks, or related documents matter.",
   "Set scope to a subdirectory when the query is specific to a project area.",
@@ -87,13 +96,9 @@ const promptGuidelines = [
 // ── Session State ───────────────────────────────────────────────
 
 let _sessionConfigCache: Map<string, SearchConfig> = new Map();
-let _preflightDone = false;
-let _preflightMode: "rg-primary" = "rg-primary";
 
 export function resetSessionState(): void {
   _sessionConfigCache.clear();
-  _preflightDone = false;
-  _preflightMode = "rg-primary";
 }
 
 // ── Tool Definition ─────────────────────────────────────────────
@@ -171,8 +176,22 @@ async function searchToolExecute(
   }
   const vaultPath = resolveVaultPath(vaultName);
 
-  // Preflight
-  const preflightMode = await ensurePreflight(vaultName, signal);
+  // Init mode: generate default config and return
+  if (params.init) {
+    try {
+      const configPath = handleSearchInit(vaultPath, false);
+      const elapsed = Date.now() - startTime;
+      return {
+        content: [{ type: "text", text: `Created default search config: ${configPath}` }],
+        details: { ok: true, init: true, config_path: configPath, stats: { time_ms: elapsed } },
+      };
+    } catch (err) {
+      return errorResult(
+        err instanceof Error ? err.message : String(err),
+        startTime,
+      );
+    }
+  }
 
   // Load config
   let config: SearchConfig;
@@ -248,7 +267,7 @@ async function searchToolExecute(
   const elapsed = Date.now() - startTime;
   return buildOutput({
     ok: true,
-    mode: preflightMode,
+    mode: "rg",
     vault: vaultName,
     effectiveQuery,
     stats: {
@@ -286,19 +305,6 @@ function sanitizeQuery(
   }
 
   return { ok: true, query: sanitized };
-}
-
-// ── Preflight ───────────────────────────────────────────────────
-
-async function ensurePreflight(
-  _vault: string,
-  _signal?: AbortSignal,
-): Promise<"rg-primary"> {
-  // Since D1: rg is the sole search backend — no CLI search probe needed.
-  // The preflight gate is retained for session-lifecycle consistency
-  // but always resolves to rg-primary.
-  _preflightDone = true;
-  return "rg-primary";
 }
 
 // ── Tokenization ────────────────────────────────────────────────
@@ -753,7 +759,7 @@ function generateSnippet(
 
 interface OutputData {
   ok: boolean;
-  mode: "rg-primary";
+  mode: "rg";
   vault: string;
   effectiveQuery: string;
   stats: { total_hits: number; returned: number; time_ms: number };
