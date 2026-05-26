@@ -343,6 +343,9 @@ export function generateDefaultConfig(): string {
 
 search:
   scopes:
+    - path: .
+      weight: 2.5
+      default: true
     - path: 10-wiki
       weight: 3.0
       default: true

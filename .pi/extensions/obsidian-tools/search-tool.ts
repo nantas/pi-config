@@ -62,7 +62,14 @@ const searchParams = Type.Object({
     Type.Boolean({
       default: false,
       description:
-        "Set to true to generate a default search-config.yaml at vault root.",
+        "Set to true to generate a default search-config.yaml at vault root. Use overwrite=true to replace existing config.",
+    }),
+  ),
+  overwrite: Type.Optional(
+    Type.Boolean({
+      default: false,
+      description:
+        "Used with init=true to overwrite an existing search-config.yaml.",
     }),
   ),
 });
@@ -74,6 +81,7 @@ interface SearchParams {
   limit?: number;
   scope?: string;
   init?: boolean;
+  overwrite?: boolean;
 }
 
 // ── Prompt Helpers ──────────────────────────────────────────────
@@ -179,7 +187,7 @@ async function searchToolExecute(
   // Init mode: generate default config and return
   if (params.init) {
     try {
-      const configPath = handleSearchInit(vaultPath, false);
+      const configPath = handleSearchInit(vaultPath, params.overwrite ?? false);
       const elapsed = Date.now() - startTime;
       return {
         content: [{ type: "text", text: `Created default search config: ${configPath}` }],
@@ -408,11 +416,13 @@ function runRgSearch(
   }
 
   try {
-    const result = spawnSync(
-      rgPath,
-      ["-n", pattern, dir, "--max-count", "40"],
-      { timeout: timeoutMs },
-    );
+    const args = ["-n", pattern, dir, "--max-count", "40"];
+    // When searching the vault root, limit to root-level files only
+    // to avoid duplicating scope-based subdirectory searches.
+    if (resolve(dir) === resolve(vaultPath)) {
+      args.push("--max-depth", "1");
+    }
+    const result = spawnSync(rgPath, args, { timeout: timeoutMs });
 
     if (result.error) {
       return { matches: [], error: `rg error: ${result.error.message}` };
