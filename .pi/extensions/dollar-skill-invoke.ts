@@ -109,7 +109,16 @@ function buildFileSystemSkillIndex(cwd: string): SkillInfo[] {
 }
 
 function getSkills(pi: ExtensionAPI): SkillInfo[] {
-  const fromCommands = getSkillsFromCommands(pi);
+  let fromCommands: SkillInfo[];
+  try {
+    fromCommands = getSkillsFromCommands(pi);
+  } catch {
+    // pi.getCommands() may throw when the shared ExtensionRuntime is stale
+    // after session replacement (/new, /fork, /switchSession).
+    // Fall back to filesystem index built during session_start.
+    if (_fileSystemSkillIndex && _fileSystemSkillIndex.length > 0) return _fileSystemSkillIndex;
+    return [];
+  }
   if (fromCommands.length > 0) return fromCommands;
   if (_fileSystemSkillIndex && _fileSystemSkillIndex.length > 0) return _fileSystemSkillIndex;
   return fromCommands;
