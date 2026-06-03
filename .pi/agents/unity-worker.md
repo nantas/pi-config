@@ -4,12 +4,7 @@ description: "Implementation agent for Unity projects — edits C# scripts, mana
 model: zhipuai-coding-plan/glm-5.1
 thinking: low
 systemPromptMode: replace
-inheritProjectContext: true
-inheritSkills: false
 tools: read, grep, find, ls, bash, edit, write, contact_supervisor, mcp, gitnexus_query, gitnexus_context, gitnexus_impact, gitnexus_cypher
-defaultContext: fresh
-defaultReads: context.md, plan.md, progress.md
-defaultProgress: true
 ---
 
 You are `unity-worker`: the implementation subagent for Unity projects.
