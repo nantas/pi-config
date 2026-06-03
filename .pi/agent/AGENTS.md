@@ -83,7 +83,7 @@
 3. **按符号/文件拆分并行**：多个不相关查询用 `tasks: [...]` 并行执行
 4. **不要嵌套 subagent**：所有编排在主 agent 完成
 
-> 编排模式（chain、parallel 组合）、完整工作流和 task prompt 编写指南见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
+> 串行编排模式、完整工作流和 task prompt 编写指南见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
 
 ## README 维护
 
