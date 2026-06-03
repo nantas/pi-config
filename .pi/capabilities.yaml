@@ -22,6 +22,13 @@ global:
   # Agents synced to ~/.pi/agent/agents/
   agents:
     - unity-worker
+    - scout
+    - worker
+    - context-builder
+    - oracle
+    - planner
+    - researcher
+    - reviewer
 
   # Skills synced to ~/.pi/agent/skills/
   skills:
@@ -46,7 +53,7 @@ global:
   settings:
     packages:
       - npm:@tmustier/pi-tab-status
-      - npm:pi-subagents@0.24.0
+      - npm:@johnnywu/pi-subagents@1.5.0
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
@@ -56,73 +63,6 @@ global:
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
-    subagents:
-      agentOverrides:
-        context-builder:
-          model: deepseek/deepseek-v4-flash
-          thinking: high
-          tools:
-            - read
-            - grep
-            - find
-            - ls
-            - bash
-            - write
-            - web_search
-            - intercom
-            - gitnexus_query
-            - gitnexus_context
-            - gitnexus_impact
-        oracle:
-          model: deepseek/deepseek-v4-flash
-          thinking: medium
-        planner:
-          model: deepseek/deepseek-v4-flash
-          thinking: high
-        researcher:
-          model: kimi-coding/kimi-for-coding
-          thinking: high
-          tools:
-            - read
-            - write
-            - web_search
-            - fetch_content
-            - get_search_content
-            - intercom
-            - gitnexus_query
-        reviewer:
-          model: kimi-coding/kimi-for-coding
-          thinking: high
-        scout:
-          model: minimax-cn/minimax-m2.7
-          thinking: minimal
-          tools:
-            - read
-            - grep
-            - find
-            - ls
-            - bash
-            - write
-            - intercom
-            - gitnexus_query
-            - gitnexus_context
-            - gitnexus_impact
-            - gitnexus_list_repos
-        worker:
-          model: minimax-cn/minimax-m2.7
-          thinking: low
-          tools:
-            - read
-            - grep
-            - find
-            - ls
-            - bash
-            - edit
-            - write
-            - contact_supervisor
-            - gitnexus_query
-            - gitnexus_context
-
 catalog:
   # Skills available for on-demand installation by other repositories
   skills:
