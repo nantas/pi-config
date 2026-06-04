@@ -1,13 +1,9 @@
 import { Type } from "typebox";
 import { spawnSync } from "node:child_process";
-import { relative, resolve, sep } from "node:path";
+import { basename, relative, resolve, sep } from "node:path";
 import { readFileSync, statSync } from "node:fs";
 
-import {
-  resolveVault,
-  ensurePreloaded,
-  resolveVaultPath,
-} from "./vault-resolver";
+import { resolveVault, clearVaultCache } from "./vault-resolver";
 import {
   loadSearchConfig,
   handleSearchInit,
@@ -107,6 +103,7 @@ let _sessionConfigCache: Map<string, SearchConfig> = new Map();
 
 export function resetSessionState(): void {
   _sessionConfigCache.clear();
+  clearVaultCache();
 }
 
 // ── Tool Definition ─────────────────────────────────────────────
@@ -161,9 +158,6 @@ async function searchToolExecute(
 ): Promise<ToolResult> {
   const startTime = Date.now();
 
-  // Lazy preload
-  await ensurePreloaded();
-
   // Query sanitization
   const sanitizeResult = sanitizeQuery(params.query);
   if (!sanitizeResult.ok) {
@@ -173,16 +167,15 @@ async function searchToolExecute(
   const mode = (params.mode ?? "fast") as "fast" | "deep";
 
   // Vault resolution
-  let vaultName: string;
+  let vaultPath: string;
   try {
-    vaultName = resolveVault(params.vault);
+    vaultPath = resolveVault(params.vault);
   } catch (err) {
     return errorResult(
       err instanceof Error ? err.message : String(err),
       startTime,
     );
   }
-  const vaultPath = resolveVaultPath(vaultName);
 
   // Init mode: generate default config and return
   if (params.init) {
@@ -276,7 +269,7 @@ async function searchToolExecute(
   return buildOutput({
     ok: true,
     mode: "rg",
-    vault: vaultName,
+    vault: basename(vaultPath),
     effectiveQuery,
     stats: {
       total_hits: merged.length,
