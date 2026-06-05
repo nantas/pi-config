@@ -332,7 +332,7 @@ function handleContextInjection(
   let match: RegExpExecArray | null;
   while ((match = re.exec(userText)) !== null) {
     const skillName = match[1];
-    const skill = effectiveSkills.find((s) => s.name === skillName);
+    let skill = effectiveSkills.find((s) => s.name === skillName);
     if (!skill && _fileSystemSkillIndex && effectiveSkills !== _fileSystemSkillIndex) {
       skill = _fileSystemSkillIndex.find((s) => s.name === skillName);
     }
