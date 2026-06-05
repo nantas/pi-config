@@ -28,10 +28,11 @@
 README 中的能力列表必须与 `.pi/capabilities.yaml` 保持同步：
 
 | README 节 | 对应 capabilities.yaml 节 |
-|-----------|--------------------------|
+|-----------|------------------------------------------|
 | 自定义扩展 | `global.extensions` |
 | 外部 Pi 包 | `global.settings.packages` |
 | Agent 定义 | `global.agents` |
 | 工作流技能 | `global.skills` + `catalog.skills` |
+| 环境变量 | `global.env`（按能力 ID 分组）+ `catalog.env`（预留） |
 
 **校验方法**：对比 README 中列出的条目数量和名称与 `capabilities.yaml` 中对应 section 的条目是否一致。不一致时以 `capabilities.yaml` 为准修正 README。

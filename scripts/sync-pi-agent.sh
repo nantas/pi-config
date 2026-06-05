@@ -770,6 +770,134 @@ else
   echo "  Skipped (global settings or repo registry not found)"
 fi
 
+# 6.5. Check environment variables declared in global.env
+#    Parses capabilities.yaml global.env and verifies each declared variable
+#    is present and (if value specified) matches in the current shell.
+echo ""
+echo "--- Checking environment variables ---"
+
+MANIFEST_PATH="${REPO_ROOT}/.pi/capabilities.yaml"
+
+if [[ -f "${MANIFEST_PATH}" ]]; then
+  python3 <<'ENV_CHECK_PY'
+import os, sys, yaml
+
+manifest_path = os.environ.get("MANIFEST_PATH", "")
+try:
+    with open(manifest_path) as f:
+        manifest = yaml.safe_load(f)
+except Exception as e:
+    print(f"  ERROR: Failed to parse manifest: {e}")
+    sys.exit(0)  # non-fatal
+
+global_section = manifest.get("global", {})
+env_section = global_section.get("env")
+if not env_section:
+    print("  No global.env section found. Skipping.")
+    sys.exit(0)
+
+# --- Extract active capability IDs ---
+active_ids = set()
+import re
+
+def extract_cap_id(spec):
+    if not isinstance(spec, str):
+        return None
+    m = re.match(r"^npm:(?:@[^/]+/)?([^@]+)", spec)
+    if m:
+        return m.group(1)
+    m = re.match(r"^git:[^/]+/[^/]+/([^/]+)", spec)
+    if m:
+        return m.group(1)
+    return None
+
+settings = global_section.get("settings", {})
+for pkg in (settings.get("packages") or []):
+    cid = extract_cap_id(pkg)
+    if cid:
+        active_ids.add(cid)
+
+for ext in (global_section.get("extensions") or []):
+    active_ids.add(ext)
+for skill in (global_section.get("skills") or []):
+    active_ids.add(skill)
+for agent in (global_section.get("agents") or []):
+    active_ids.add(agent)
+
+# --- Check each env capability ---
+errors = 0
+warnings = 0
+oks = []
+
+for cap_id, cap_conf in env_section.items():
+    if cap_id not in active_ids:
+        print(f"  ⚠  WARNING: Orphaned env block '{cap_id}' — no matching active capability")
+        warnings += 1
+        continue
+
+    variables = cap_conf.get("variables", {})
+    desc = cap_conf.get("description", "")
+    cap_ok = True
+
+    for var_name, var_conf in variables.items():
+        expected_value = var_conf.get("value")
+        required = var_conf.get("required", False)
+        var_desc = var_conf.get("description", "")
+        actual = os.environ.get(var_name)
+
+        # Auto-create parent directory for path-type variables
+        if expected_value and expected_value.startswith("$HOME/"):
+            expanded_path = expected_value.replace("$HOME", os.path.expanduser("~"))
+            parent = os.path.dirname(expanded_path)
+            if not os.path.exists(parent):
+                try:
+                    os.makedirs(parent, exist_ok=True)
+                    print(f"  📁 Created directory: {parent}")
+                except OSError as e:
+                    print(f"  ⚠  WARNING: Could not create {parent}: {e}")
+
+        if actual is None:
+            level = "ERROR" if required else "WARNING"
+            icon = "✗" if required else "⚠"
+            expand_hint = expected_value.replace("$HOME", "$HOME") if expected_value else ""
+            print(f"  {icon}  {level}: {cap_id} — {var_name} is not set")
+            if expand_hint:
+                print(f"       Fix: export {var_name}=\"{expand_hint}\"")
+            if required:
+                errors += 1
+            else:
+                warnings += 1
+            cap_ok = False
+        elif expected_value:
+            expanded_expected = expected_value.replace("$HOME", os.path.expanduser("~"))
+            if actual != expanded_expected:
+                print(f"  ⚠  WARNING: {cap_id} — {var_name} mismatch")
+                print(f"       Current:  {actual}")
+                print(f"       Expected: {expected_value}")
+                warnings += 1
+                cap_ok = False
+
+    if cap_ok:
+        var_names = ", ".join(variables.keys())
+        oks.append(f"{cap_id} ({var_names})")
+
+if oks:
+    print(f"  ✓  OK: {', '.join(oks)}")
+
+if errors > 0:
+    print(f"\n  ⚠  {errors} error(s), {warnings} warning(s) — some required env variables are missing.")
+    print("     Add the recommended export commands to your shell config (e.g. ~/.zshenv).")
+elif warnings > 0:
+    print(f"\n  ⚠  {warnings} warning(s) — env check passed with warnings.")
+else:
+    if env_section:
+        print("  All environment variables OK.")
+
+ENV_CHECK_PY
+else
+  echo "  Skipped (manifest not found)"
+fi
+
 # 7. Summary
 echo ""
 cat <<EOF

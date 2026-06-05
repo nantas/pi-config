@@ -60,9 +60,26 @@ global:
       - npm:pi-mcp-adapter
       - git:github.com/rwese/pi-question
       - git:github.com/jwu/pi-webfetch
+      - npm:@ff-labs/pi-fff
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
+
+  # Environment variables declared per-capability (global scope)
+  # Each key is a capability ID matching an entry in packages/extensions/skills/agents
+  env:
+    pi-fff:
+      description: "fff fuzzy file finder — frecency & history database paths"
+      variables:
+        FFF_FRECENCY_DB:
+          value: "$HOME/.cache/pi/fff_frecency"
+          description: "Path to LMDB frecency database for persistent ranking"
+          required: true
+        FFF_HISTORY_DB:
+          value: "$HOME/.cache/pi/fff_history"
+          description: "Path to LMDB history database for query persistence"
+          required: true
+
 catalog:
   # Skills available for on-demand installation by other repositories
   skills:
@@ -97,3 +114,14 @@ catalog:
 
   # Packages available for on-demand installation (settings-entry type)
   packages: []
+
+  # Environment variables for catalog capabilities (reserved)
+  # Checked by install-from-pi-config during installation, not by global sync.
+  # env:
+  #   example-capability:
+  #     description: "..."
+  #     variables:
+  #       EXAMPLE_VAR:
+  #         value: "..."
+  #         description: "..."
+  #         required: false

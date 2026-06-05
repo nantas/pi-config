@@ -231,9 +231,49 @@ export POWERLINE_NERD_FONTS=1
 }
 ```
 
----
+#### `pi-fff`
 
-### Agent 定义
+- **来源**: `npm:@ff-labs/pi-fff`
+- **描述**: 高性能模糊文件搜索 Pi 扩展（基于 fff-core），支持跨会话 frecency 学习和查询历史持久化。通过 `FFF_FRECENCY_DB` 和 `FFF_HISTORY_DB` 环境变量配置 LMDB 数据库路径。
+- **解决的问题**: Pi 内置文件搜索无使用频次记忆，高频访问文件的搜索排名无法随使用优化。pi-fff 通过 frecency 算法自动学习用户偏好，提升搜索精度。
+- **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.env.pi-fff`
+- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
+
+#### 环境变量配置（`global.env` / `catalog.env`）
+
+部分能力需要环境变量才能启用全部功能（如数据库路径、API key 等）。`capabilities.yaml` 通过 `global.env` 和 `catalog.env` 字段声明这些变量，**按能力 ID 分组**，与 `global.settings.packages`、`global.extensions`、`global.skills`、`global.agents` 中的能力条目对应。
+
+```yaml
+# global.env 示例：声明全局能力 pi-fff 需要的环境变量
+global:
+  env:
+    pi-fff:                         # ← capability ID
+      description: "fff fuzzy file finder — frecency & history databases"
+      variables:
+        FFF_FRECENCY_DB:
+          value: "$HOME/.cache/pi/fff_frecency"
+          description: "Path to LMDB frecency database for persistent ranking"
+          required: true
+        FFF_HISTORY_DB:
+          value: "$HOME/.cache/pi/fff_history"
+          description: "Path to LMDB history database for query persistence"
+          required: true
+```
+
+```yaml
+# catalog.env 预留：为 catalog 中的能力声明环境变量
+# 由 install-from-pi-config 技能在安装时检查
+catalog:
+  env: {}  # 预留，暂无条目
+```
+
+**字段结构**：
+- **Key**：能力 ID（与 packages/extensions/skills/agents 列表中的条目对应）
+- **`variables`**：环境变量映射，每个变量支持 `value`（期望值）、`description`（用途说明）、`required`（是否必需）
+- **`global.env`**：由 `sync-pi-agent.sh` 在全局同步时检查
+- **`catalog.env`**：由 `install-from-pi-config` 技能在 catalog 安装时检查
+
+**校验行为**：sync 脚本会检测孤立 env 块（能力 ID 无匹配），并在缺失/不匹配时给出修复命令。不自动修改 shell 配置文件。
 
 当前仓库无自定义 agent 定义。使用 Pi 内置 agent（scout、planner、worker、reviewer、oracle 等）。
 

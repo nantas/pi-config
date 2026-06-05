@@ -58,6 +58,7 @@ corresponding update to `.pi/capabilities.yaml`:
 - **Prompts** — `.md` files under `.pi/prompts/`
 - **Packages** — Entries in `global.settings.packages` in `.pi/capabilities.yaml`
 - **Settings** — All keys under `global.settings` in `.pi/capabilities.yaml` are authoritative for `~/.pi/agent/settings.json`; keys not listed are preserved from the target file
+- **Env** — Entries in `global.env` and `catalog.env` declare environment variables required by capabilities, keyed by capability ID. `sync-pi-agent.sh` validates `global.env` during sync; `catalog.env` is checked by `install-from-pi-config` during catalog installation.
 
 ### Workflow Guidance
 
@@ -74,6 +75,9 @@ corresponding update to `.pi/capabilities.yaml`:
 | Add/remove an agent | Update `global.agents` |
 | Add/remove a skill | Update `global.skills` or `catalog.skills` |
 | Add/remove a prompt | Append to / Remove from `global.prompts` |
+| Add env vars for a global capability | Add capability ID key to `global.env` with `variables` map |
+| Add env vars for a catalog capability | Add capability ID key to `catalog.env` with `variables` map |
+| Remove env vars | Remove capability ID key from `global.env` or `catalog.env` |
 
 ### Precedence Rule
 
