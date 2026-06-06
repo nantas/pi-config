@@ -34,6 +34,16 @@ When the task requires creating a new dispatch agent or modifying an existing ag
 - **Convention**: Project agents go in `.pi/agents/{name}.md`. Overrides go in `.pi/settings.json` under `subagents.agentOverrides`.
 - **Validation**: After creating, verify via `/agents` list and `/run {name}` before marking the task done.
 
+## Agent skills
+
+### Issue tracker
+
+This repo uses OpenSpec for change and task tracking. **All openspec artifact operations must go through the official workflow** — use the `/opsx-*` prompt-driven skills or the `openspec` CLI. Never manually create or modify files under `openspec/changes/`. See `docs/agents/issue-tracker.md` for the full reference.
+
+### Domain docs
+
+Single-context layout — one `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+
 ## Working Rules
 
 - Default language: Chinese for discussion, English for code and filenames unless the repo already uses Chinese.
@@ -43,6 +53,7 @@ When the task requires creating a new dispatch agent or modifying an existing ag
 - Feature and configuration change closeout follows the workflow defined in `docs/pi-change-closeout-governance.md`. When a change reaches verification phase, read that document and follow its required closeout sequence.
 - When configuring custom providers, adding models, or setting `enabledModels`, refer to `docs/reference/pi-provider-model.md`.
 - When capability changes require README updates, follow `docs/reference/readme-governance.md`.
+- 执行 `/opsx-archive` 或 `/opsx-sync` 后，如果产生了新的主 spec（`openspec/specs/` 下新增或变更），必须在归档摘要之后追加一步：更新 `CONTEXT.md` 的 OpenSpec 索引，在对应能力域组追加新 slug。若无现有分组匹配则新增分组。
 - OpenSpec writeback targets are resolved via `repo://` virtual paths through the global repo registry at `~/.config/orbitos/repo_registry.json`. Before executing writeback, resolve the target path via `repo-registry` skill (`resolve --repo-ref repo://<id>`), then edit the target file directly. Writeback content must be a concise summary (conclusion, status, deliverables, verification result), not a copy of full artifacts.
 
 ## Capability Manifest Governance
