@@ -1,1 +1,30 @@
-{}
+{
+  "packages": [
+    "npm:@tmustier/pi-tab-status",
+    "npm:@johnnywu/pi-subagents@1.5.0",
+    "git:github.com/jwu/pi-powerline",
+    "git:github.com/lucasmeijer/pi-terminal-signals",
+    "git:github.com/nantas/pi-tool-display",
+    "npm:pi-mcp-adapter",
+    "git:github.com/rwese/pi-question",
+    "git:github.com/jwu/pi-webfetch",
+    "npm:@ff-labs/pi-fff"
+  ],
+  "defaultThinkingLevel": "high",
+  "defaultProvider": "zhipuai-coding-plan",
+  "defaultModel": "glm-5.1",
+  "quietStartup": true,
+  "lastChangelogVersion": "0.78.0",
+  "enabledModels": [
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "kimi-coding/kimi-for-coding",
+    "zhipuai-coding-plan/glm-5-turbo",
+    "zhipuai-coding-plan/glm-5.1",
+    "minimax-cn/minimax-m2.7",
+    "minimax-cn/minimax-m3"
+  ],
+  "hideThinkingBlock": false,
+  "powerline": true,
+  "breadcrumb": "inner"
+}

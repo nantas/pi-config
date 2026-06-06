@@ -68,7 +68,7 @@ global:
   # Each key is a capability ID matching an entry in packages/extensions/skills/agents
   env:
     pi-fff:
-      description: "fff fuzzy file finder — frecency & history database paths"
+      description: "fff fuzzy file finder — frecency & history database paths; editor mode override"
       variables:
         FFF_FRECENCY_DB:
           value: "$HOME/.cache/pi/fff_frecency"
@@ -77,6 +77,10 @@ global:
         FFF_HISTORY_DB:
           value: "$HOME/.cache/pi/fff_history"
           description: "Path to LMDB history database for query persistence"
+          required: true
+        PI_FFF_MODE:
+          value: tools-only
+          description: "Disable FffEditor (@-mention autocomplete) to avoid setEditorComponent conflict with pi-powerline"
           required: true
 
 catalog:
