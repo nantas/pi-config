@@ -56,6 +56,100 @@ Pi 启动 → 创建 CustomEditor（默认）
    - 只启用 Extension B → 是否正常？
    - 同时启用 → 哪个功能失效？
 
+## 3.5 实战排查方法：setEditorComponent 覆盖诊断
+
+当怀疑存在 `setEditorComponent` 覆盖冲突时，按以下步骤系统排查。
+
+### 第一步：确认扩展是否被加载
+
+在目标扩展的入口文件顶部添加文件日志（不能用 `console.log`，TUI 模式下 stderr 不可见）：
+
+```typescript
+import { appendFileSync } from "fs";
+// 在 factory 函数入口处：
+appendFileSync("/tmp/ext-debug.log", `[${new Date().toISOString()}] factory called\n`);
+```
+
+重启 pi 后检查 `/tmp/ext-debug.log`。如果没有日志，说明扩展未被加载——可能是包路径问题（见下方第三步）。
+
+### 第二步：在 pi 框架侧追踪 setEditorComponent 调用链
+
+在 pi 框架的 `dist/modes/interactive/interactive-mode.js` 的 `setCustomEditorComponent` 方法开头注入追踪：
+
+```javascript
+import { appendFileSync as _afs } from "fs";
+// 在 setCustomEditorComponent(factory) { 之后：
+_afs("/tmp/editor-trace.log", `[${new Date().toISOString()}] setCustomComponent(${typeof factory})\n` +
+  new Error().stack.split("\n").slice(1,5).join("\n") + "\n");
+```
+
+重启后 `/tmp/editor-trace.log` 会列出**所有**调用者及其调用栈。如果出现两次 `setCustomEditorComponent(function)`，后一个调用者就是覆盖者。
+
+### 第三步：注意项目级 vs 全局包路径
+
+Git 包会根据 scope 安装到不同位置：
+
+| scope | 路径 |
+|-------|------|
+| project | `<cwd>/.pi/git/<host>/<owner>/<repo>/` |
+| user (global) | `~/.pi/agent/git/<host>/<owner>/<repo>/` |
+
+当 `.pi/settings.json`（项目级）和 `~/.pi/agent/settings.json`（全局）都声明了同一个包时，**项目级优先**。调试时必须修改项目级副本（`.pi/git/` 下），修改全局副本不会生效。
+
+验证方法：
+
+```bash
+# 找到所有同名扩展的物理副本
+find ~ -path "*/pi-powerline/extensions/index.ts" -not -path "*/node_modules/*"
+```
+
+### 第四步：清除 jiti 缓存
+
+jiti 的编译缓存在 `/var/folders/.../T/jiti/` 目录中。修改扩展源码后如果日志没有更新：
+
+```bash
+rm -rf /var/folders/*/T/jiti/
+```
+
+缓存文件名是 `extensions-<name>.<hash>.mjs`，可以用 `grep` 确认缓存内容是否包含你的修改：
+
+```bash
+grep "your-debug-string" /var/folders/*/T/jiti/extensions-editor.*.mjs
+```
+
+### 第五步：通过环境变量或 flag 消除冲突
+
+许多扩展支持通过环境变量或 flag 控制行为，不需要 fork：
+
+| 扩展 | 控制方式 | 效果 |
+|------|---------|------|
+| @ff-labs/pi-fff | `PI_FFF_MODE=tools-only` | 禁用 `FffEditor`，只保留 fff 工具注册 |
+| @ff-labs/pi-fff | CLI `--fff-mode tools-only` | 同上，仅当前 session |
+
+环境变量优先写入 `~/.zshenv`（所有 zsh session 生效），并在 `capabilities.yaml` 的 `global.env` 中声明以便同步和审计。
+
+### 排查流程速查图
+
+```
+扩展功能异常
+  │
+  ├─ 添加文件日志到 factory 入口
+  │   ├─ 无日志 → 扩展未加载 → 检查包路径（项目级 vs 全局）
+  │   └─ 有日志 → 扩展已加载
+  │
+  ├─ 在 pi dist 注入 setEditorComponent trace
+  │   ├─ 只调用一次 → 非 editor 覆盖问题
+  │   └─ 调用两次 → 后者是覆盖者
+  │
+  ├─ 清除 jiti 缓存后重试
+  │   └─ 日志未更新 → 缓存问题 → rm -rf /var/folders/*/T/jiti/
+  │
+  └─ 确认覆盖者后
+      ├─ 查该扩展的 flag/env 控制选项
+      └─ 无选项 → 考虑 fork 或协调加载顺序
+```
+
+
 ## 4. 兼容策略矩阵
 
 | 策略 | 适用场景 | 优点 | 缺点 |
@@ -160,6 +254,7 @@ pi.on("session_start", async (_event, ctx) => {
 | 场景 | 扩展对 | 根因 | 修复 |
 |------|-------|------|------|
 | `$` auto-trigger 失效 | dollar-skill-invoke + pi-powerline-footer | 两个扩展都调用 `setEditorComponent`，后者覆盖前者 | dollar-skill-invoke 改为 `addAutocompleteProvider` 方式（见 change `fix-dollar-skill-editor-conflict`） |
+| breadcrumb/❯ 前缀消失 | pi-powerline + @ff-labs/pi-fff | pi-fff 的 `FffEditor` 在 `session_start` 中后于 pi-powerline 注册，覆盖了 `PromptPrefixEditor` | 通过 `PI_FFF_MODE=tools-only` 环境变量禁用 pi-fff 的 editor 注册 |
 
 ---
 
