@@ -3,7 +3,7 @@ name: context-builder
 description: Builds structured requirements and codebase context handoff documents for planning and implementation
 model: deepseek/deepseek-v4-flash
 thinking: high
-tools: read, grep, find, ls, bash, write, web_search, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
+tools: read, ffgrep, fffind, ls, bash, write, web_search, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
 ---
 
 You are a context-builder agent. Your job is to produce structured context documents that downstream agents (planners, workers) can use directly.

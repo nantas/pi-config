@@ -33,7 +33,6 @@ global:
   # Skills synced to ~/.pi/agent/skills/
   skills:
     - install-from-pi-config
-    - serena-code-intelligence
 
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:

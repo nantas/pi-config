@@ -35,45 +35,81 @@
 - 先读错误信息确认根因：missing field / type mismatch / content overlap。
 - 根据根因选择：拆分参数、换方案、或修复参数后再试。
 
-### Grep / Find Tool
-
-使用 `grep` / `find` 搜索代码时，**必须缩小搜索范围**，避免对大仓库全量扫描导致输出截断和 token 浪费。
-
-**使用原则**：
-- **通过 `glob` 指定扩展名**：如 `glob: '*.ts'`、`glob: '**/*.yaml'`，避免命中无关文件（lock 文件、构建产物、vendor 目录等）。
-- **通过 `path` 限定目录范围**：已知目标在 `src/` 下就不要搜整个仓库根目录。
-- **组合使用**：`path: 'src/components'` + `glob: '*.tsx'` 是最优实践。
-- **find 同理**：使用 `pattern: '*.spec.ts'` 而非 `pattern: '*.ts'` 全量扫描后再过滤。
-
 ### Web Search Tool
 
 使用 `web_search_prime_web_search_prime` 工具进行 web 搜索，获取外部信息。
 
 **使用原则**：
-- 搜索已知技术或开源项目信息时，优先用 `grep`/`find`/`lsp`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
+- 搜索已知技术或开源项目信息时，优先用 `ffgrep`/`fffind`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
 - Pi 框架自身的源码和文档问题，应通过 `$cross-repo-research` 在本地仓库查找，不用 web search。
 - 构造搜索词时提取核心实体和关键词，避免自然语言长句。
 - 需要限定来源可信度时，用 `search_domain_filter` 过滤。
 - 需要时效性时，用 `search_recency_filter` 缩小范围。
 
-## LSP 代码智能
+## 代码检索与文件定位（fff）
 
-当 serena 工具可用时，**必须优先使用**而非 `grep` + `read` 组合。完整工作流、决策表、反模式和集成指南见 **`serena-code-intelligence` skill**（自动注入）。
+**当 `ffgrep` 和 `fffind` 可用时，必须作为代码检索和文件定位的默认工具。**
+
+### 决策表
+
+| 任务 | 工具 |
+|------|------|
+| 搜索代码内容（函数、变量、字符串） | `ffgrep` |
+| 定位文件或路径 | `fffind` |
+| 列出未知目录结构 | `ls` |
+| 读取已知文件 | `read` |
+| 搜索注释/字符串/文档 | `ffgrep` |
+| 搜索非代码文件（配置、markdown） | `ffgrep` + `path` 约束 |
+
+### ffgrep 使用原则
+
+- **Query 风格**：1-2 个核心关键词（bare identifier 最精确），不用自然语言长句
+- **path 约束**：已知目标在 `src/` 下就传 `path: 'src/'`，支持目录前缀、裸文件名、glob（如 `*.ts`、`src/**/*.cc`）
+- **exclude 噪声**：`exclude: 'test/, *.min.js, vendor/'` 排除无关目录和文件
+- **及时读取**：top match 出来后直接 `read`，不要超过 2 次 ffgrep 仍未读文件
+
+### fffind 使用原则
+
+- **模糊查询**：1-2 个关键词即可（frecency 排名自动优先最近访问的文件）
+- **path 约束**：同 ffgrep，支持目录前缀、裸文件名、glob
+- **精确文件名**：已知完整文件名时用 `path: '**/profile.h'` 精确定位
+
+### 反模式
+
+❌ **全量扫描**：不带 path 约束的 `ffgrep 'error'` → 命中数百文件
+✅ **范围限定**：`ffgrep 'error', path: 'src/api/'`
+
+❌ **链式 grep 缩小**：grep → grep → grep → 终于找到
+✅ **grep → read top match**：1 次 ffgrep + 1 次 read
+
+❌ **glob 全量后再过滤**：`fffind '*.ts'` 扫描全仓库
+✅ **带目录约束**：`fffind 'auth', path: 'src/components/'`
+
+### 编辑工作流（发现 → 修改）
+
+fff 只负责**检索**，代码编辑回退到基础工具：
+
+| 编辑场景 | 工具 |
+|----------|------|
+| 小范围精确替换（≤200 字符） | `edit` tool |
+| 大范围替换 / 多文件 | `bash` + `sed` |
+| 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证所有引用已更新 |
+| 批量 checkbox 替换 | `bash` + `sed -i ''` |
 
 ## Subagent 自动委派
 
-**核心原则**：当工具调用会产生大量返回数据（高 token 消耗），或需要 3+ 步工具调用才能得出结论时，**必须 delegate**。subagent 的主要价值是充当 token 屏障。
+**核心原则**：信息掌握度越低 → 越倾向委派。subagent 的主要价值是充当 token 屏障。
 
 ### 委派触发判断
 
-| 场景 | 委派？ |
-|------|--------|
-| `gitnexus_query` / `gitnexus_context` / `gitnexus_impact` 等重操作 | ✅ `scout` + 对应 skill |
-| 追踪 3+ 步跨文件调用链 | ✅ `scout` |
-| 多个独立方向同时探索 | ✅ 并行 |
+| 主 agent 状态 | 委派？ |
+|---------------|--------|
+| 目标模糊，需要在陌生代码中定位概念 | ✅ `scout` 盲探测 |
+| 需要追踪跨文件调用链但起点不明 | ✅ `scout` |
+| 多个不相关方向需要同时探索 | ✅ 并行 `scout` |
 | 实施完成后代码审查 | ✅ 并行 `reviewer` × 3 |
-| 单次 `lsp definition` / `references` / `grep` | ❌ 直接做 |
-| `gitnexus_list_repos` / `gitnexus_cypher`（小返回） | ❌ 直接做 |
+| 已知符号名/文件路径，需要 1-2 次精确检索 | ❌ 直接做 |
+| 已掌握完整上下文，只需执行具体修改 | ❌ 直接做 |
 | 主 agent 需要完整原始数据做后续推理 | ❌ 不委派 |
 
 ### 执行规范

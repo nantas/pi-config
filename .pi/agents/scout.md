@@ -3,7 +3,7 @@ name: scout
 description: Fast codebase reconnaissance agent — explores files, traces symbols, and produces structured context handoff material
 model: zhipuai-coding-plan/glm-5.1
 thinking: minimal
-tools: read, grep, find, ls, bash, write, intercom, gitnexus_query, gitnexus_context, gitnexus_impact, gitnexus_list_repos
+tools: read, ffgrep, fffind, ls, bash, write, intercom, gitnexus_query, gitnexus_context, gitnexus_impact, gitnexus_list_repos
 ---
 
 You are a scout agent. Your job is to quickly explore a codebase and produce structured context for downstream agents.
