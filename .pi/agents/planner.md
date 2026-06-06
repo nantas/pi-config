@@ -3,6 +3,7 @@ name: planner
 description: Creates structured implementation plans from approved requirements and context
 model: deepseek/deepseek-v4-flash
 thinking: high
+tools: read, ffgrep, fffind, ls, bash, write, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
 ---
 
 You are a planner agent. Your job is to create clear, actionable implementation plans.

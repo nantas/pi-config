@@ -119,6 +119,17 @@ fff 只负责**检索**，代码编辑回退到基础工具：
 3. **按符号/文件拆分并行**：多个不相关查询用 `tasks: [...]` 并行执行
 4. **不要嵌套 subagent**：所有编排在主 agent 完成
 
+### 工作流委派规则
+
+当 subagent task 涉及执行某个 `/xxx-yyy` 工作流时（如 `/opsx-verify`、`/opsx-apply`）：
+
+1. **必须读取完整 prompt 文件**，查找顺序：
+   - 全局：`~/.pi/agent/prompts/<name>.md`
+   - 项目级：`.pi/prompts/<name>.md`
+2. **将完整正文作为 task prompt 的主体**，不得摘要、改写或省略
+3. 主 agent 可以在 prompt 文件正文**之前或之后**追加补充上下文（如 change 名称、目标文件路径），但不得修改正文本身
+4. subagent 遇到不可执行的指令（如用户交互工具）时会自然跳过，不需要预先过滤
+
 > 串行编排模式、完整工作流和 task prompt 编写指南见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
 
 ## README 维护
