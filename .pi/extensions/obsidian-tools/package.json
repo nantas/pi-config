@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Obsidian CLI tools extension: obsidian_search (intelligent retrieval) and obsidian_cli (command passthrough)",
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "@ff-labs/fff-node": "^0.9.1"
   }
 }

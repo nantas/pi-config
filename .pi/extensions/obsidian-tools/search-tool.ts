@@ -1,7 +1,9 @@
 import { Type } from "typebox";
-import { spawnSync } from "node:child_process";
-import { basename, relative, resolve, sep } from "node:path";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import { resolveVault, clearVaultCache } from "./vault-resolver";
 import {
@@ -15,6 +17,28 @@ type ToolResult = {
   content: { type: "text"; text: string }[];
   details: Record<string, unknown>;
 };
+
+// ── Lazy ESM import for @ff-labs/fff-node ──────────────────────
+
+type FileFinderType = import("@ff-labs/fff-node").FileFinder;
+type GrepMatchType = import("@ff-labs/fff-node").GrepMatch;
+
+let _FileFinderClass: typeof FileFinderType | null = null;
+
+async function getFileFinderClass(): Promise<typeof FileFinderType | null> {
+  if (_FileFinderClass !== null) return _FileFinderClass;
+  try {
+    const mod = await import("@ff-labs/fff-node");
+    _FileFinderClass = mod.FileFinder;
+    return _FileFinderClass;
+  } catch (err) {
+    console.warn(
+      `[obsidian_search] @ff-labs/fff-node not available, falling back to rg:`,
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
 
 // ── Parameter Schema ────────────────────────────────────────────
 
@@ -86,7 +110,6 @@ const promptSnippet =
   "Search Obsidian vault content with intelligent ranking and automatic context expansion.";
 
 const promptGuidelines = [
-
   "Fast mode (~3s) for targeted lookups like project pages or known document titles.",
   "Deep mode (~5-8s) when decision context, backlinks, or related documents matter.",
   "Set scope to a subdirectory when the query is specific to a project area.",
@@ -100,10 +123,30 @@ const promptGuidelines = [
 // ── Session State ───────────────────────────────────────────────
 
 let _sessionConfigCache: Map<string, SearchConfig> = new Map();
+let _finder: InstanceType<FileFinderType> | null = null;
+let _finderVaultPath: string | null = null;
+let _tokenizerWorker: ChildProcess | null = null;
+let _tokenizerWorkerReady = false;
+let _tokenizerWorkerPath: string | null = null;
 
 export function resetSessionState(): void {
   _sessionConfigCache.clear();
   clearVaultCache();
+  // Clean up FFF finder
+  if (_finder && !_finder.isDestroyed) {
+    try { _finder.destroy(); } catch { /* ignore */ }
+  }
+  _finder = null;
+  _finderVaultPath = null;
+  // Clean up jieba worker
+  if (_tokenizerWorker && !_tokenizerWorker.killed) {
+    try {
+      _tokenizerWorker.stdin?.end();
+      _tokenizerWorker.kill();
+    } catch { /* ignore */ }
+  }
+  _tokenizerWorker = null;
+  _tokenizerWorkerReady = false;
 }
 
 // ── Tool Definition ─────────────────────────────────────────────
@@ -210,52 +253,24 @@ async function searchToolExecute(
     config.runtime.max_results,
   );
 
-  // Tokenize
-  const tokens = tokenizeQuery(effectiveQuery, config);
+  // Tokenize — returns raw tokens (not regex-escaped for FFF literal mode)
+  const tokens = await tokenizeQuery(effectiveQuery, config);
   if (tokens.length === 0) {
     return errorResult(
       "No valid search tokens after tokenization.",
       startTime,
     );
   }
-  const pattern = tokens.join("|");
 
-  // Resolve search directories
-  const searchDirs = resolveSearchDirs(vaultPath, config, params.scope);
-  if (searchDirs.length === 0) {
-    return errorResult(
-      "No search scopes configured. Check search-config.yaml.",
-      startTime,
-    );
-  }
-
-  // Run rg in parallel per scope
-  const rgPromises = searchDirs.map(({ dir, scope }) =>
-    Promise.resolve().then(() => {
-      const result = runRgSearch(
-        dir,
-        pattern,
-        config.runtime.rg_timeout_ms,
-        vaultPath,
-      );
-      if (result.error) {
-        console.warn(
-          `[obsidian_search] rg error in scope ${scope.path}: ${result.error}`,
-        );
-      }
-      return { scope, matches: result.matches } as ScopeSearchResult;
-    }),
-  );
-
-  const scopeResults = (await Promise.all(rgPromises)).filter(
-    (r) => r.matches.length > 0,
-  );
+  // Execute search (FFF primary, rg fallback)
+  const searchResult = await executeSearch(tokens, config, vaultPath, params.scope);
 
   // Merge results
-  const merged = mergeRgResults(scopeResults);
+  const merged = mergeRgResults(searchResult.scopeResults);
 
-  // Rank
-  const ranked = rankResults(merged, config, tokens, vaultPath);
+  // Rank — use raw tokens (strip regex escapes for filename matching)
+  const rawTokens = tokens.map(t => t.replace(/\\/g, ""));
+  const ranked = rankResults(merged, config, rawTokens, vaultPath);
   const topk = ranked.slice(0, limit);
 
   // Generate snippets
@@ -268,7 +283,7 @@ async function searchToolExecute(
   const elapsed = Date.now() - startTime;
   return buildOutput({
     ok: true,
-    mode: "rg",
+    mode: searchResult.backend,
     vault: basename(vaultPath),
     effectiveQuery,
     stats: {
@@ -310,46 +325,398 @@ function sanitizeQuery(
 
 // ── Tokenization ────────────────────────────────────────────────
 
-function tokenizeQuery(query: string, config: SearchConfig): string[] {
-  const tokens: string[] = [];
-  const parts = query.trim().split(/\s+/);
+/**
+ * Async tokenization: jieba worker uses async I/O.
+ */
+async function tokenizeQuery(query: string, config: SearchConfig): Promise<string[]> {
+  const parts = query.trim().split(/\s+/).filter(Boolean);
+
+  // Phase 1: Collect structured segments — each part produces one or more segments,
+  // with Chinese segments either resolved immediately (Intl.Segmenter) or deferred (jieba).
+  type Segment = { type: "literal"; tokens: string[] } | { type: "jieba"; text: string };
+  const segments: Segment[] = [];
 
   for (const part of parts) {
-    if (!part) continue;
-
     const hasChinese = /[\u4e00-\u9fff]/.test(part);
     if (hasChinese) {
       const chineseChars = part.replace(/[^\u4e00-\u9fff]/g, "");
       const nonChinese = part.replace(/[\u4e00-\u9fff]/g, "");
 
       if (chineseChars.length >= config.tokenization.cn_min_chars) {
-        const segmenter = new Intl.Segmenter("zh", { granularity: "word" });
-        const segments = Array.from(segmenter.segment(chineseChars));
-        for (const seg of segments) {
-          if (seg.isWordLike && seg.segment.length > 0) {
-            tokens.push(escapeRegex(seg.segment));
-          }
+        if (config.tokenization.method === "jieba") {
+          segments.push({ type: "jieba", text: chineseChars });
+        } else {
+          segments.push({ type: "literal", tokens: segmentWithIntl(chineseChars) });
         }
       } else if (chineseChars.length > 0) {
-        tokens.push(escapeRegex(chineseChars));
+        segments.push({ type: "literal", tokens: [chineseChars] });
       }
 
       if (nonChinese.length > 0) {
-        tokens.push(escapeRegex(nonChinese));
+        segments.push({ type: "literal", tokens: [nonChinese] });
       }
     } else {
-      tokens.push(escapeRegex(part));
+      segments.push({ type: "literal", tokens: [part] });
     }
   }
 
-  return [...new Set(tokens)];
+  // Phase 2: Resolve all jieba segments in one batch call
+  const jiebaIndices = segments
+    .map((s, i) => s.type === "jieba" ? i : -1)
+    .filter(i => i !== -1);
+
+  if (jiebaIndices.length > 0) {
+    const jiebaTexts = jiebaIndices.map(i => (segments[i] as { type: "jieba"; text: string }).text);
+    const jiebaResults = await tokenizeWithJieba(jiebaTexts);
+
+    for (let k = 0; k < jiebaIndices.length; k++) {
+      const idx = jiebaIndices[k];
+      const tokens: string[] = jiebaResults
+        ? jiebaResults[k]?.filter(t => t.trim().length > 0) ?? []
+        : segmentWithIntl(jiebaTexts[k]);
+      segments[idx] = { type: "literal", tokens };
+    }
+  }
+
+  // Phase 3: Flatten all segments into deduplicated token list
+  const allTokens: string[] = [];
+  for (const seg of segments) {
+    allTokens.push(...(seg as { type: "literal"; tokens: string[] }).tokens);
+  }
+  return [...new Set(allTokens)];
 }
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Segment Chinese text using Intl.Segmenter (built-in Node.js ≥ 18).
+ */
+function segmentWithIntl(text: string): string[] {
+  const tokens: string[] = [];
+  const segmenter = new Intl.Segmenter("zh", { granularity: "word" });
+  const segments = Array.from(segmenter.segment(text));
+  for (const seg of segments) {
+    if (seg.isWordLike && seg.segment.length > 0) {
+      tokens.push(seg.segment);
+    }
+  }
+  return tokens;
 }
 
-// ── Scope Resolution ────────────────────────────────────────────
+/**
+ * Async jieba tokenization via persistent Python worker.
+ * Sends texts to tokenizer-worker.py via stdin/stdout JSON line protocol.
+ * Returns null on error (caller should fall back to Intl.Segmenter).
+ */
+async function tokenizeWithJieba(texts: string[]): Promise<string[][] | null> {
+  const worker = await ensureTokenizerWorker();
+  if (!worker || worker.killed) return null;
+
+  return new Promise<string[][] | null>((resolve) => {
+    const timeout = setTimeout(() => {
+      worker.stdout!.removeListener("data", onData);
+      resolve(null);
+    }, 3000);
+
+    let buffer = "";
+    const onData = (chunk: Buffer) => {
+      buffer += chunk.toString("utf-8");
+      const newlineIdx = buffer.indexOf("\n");
+      if (newlineIdx !== -1) {
+        clearTimeout(timeout);
+        worker.stdout!.removeListener("data", onData);
+        const line = buffer.slice(0, newlineIdx);
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed && parsed.error) {
+            console.warn(`[obsidian_search] jieba worker error: ${parsed.error}`);
+            resolve(null);
+          } else if (Array.isArray(parsed)) {
+            resolve(parsed);
+          } else {
+            resolve(null);
+          }
+        } catch {
+          resolve(null);
+        }
+      }
+    };
+
+    worker.stdout!.on("data", onData);
+    worker.stdin!.write(JSON.stringify(texts) + "\n");
+  });
+}
+
+/**
+ * Resolve the path to tokenizer-worker.py.
+ */
+function getTokenizerWorkerPath(): string {
+  if (_tokenizerWorkerPath) return _tokenizerWorkerPath;
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  _tokenizerWorkerPath = resolve(thisDir, "tokenizer-worker.py");
+  return _tokenizerWorkerPath;
+}
+
+/**
+ * Ensure the persistent tokenizer worker is running.
+ * Spawns tokenizer-worker.py as a long-lived subprocess.
+ * Returns the worker process or null on failure.
+ */
+async function ensureTokenizerWorker(): Promise<ChildProcess | null> {
+  if (_tokenizerWorker && !_tokenizerWorker.killed && _tokenizerWorkerReady) {
+    return _tokenizerWorker;
+  }
+
+  // Clean up any previous worker
+  if (_tokenizerWorker && !_tokenizerWorker.killed) {
+    try { _tokenizerWorker.kill(); } catch { /* ignore */ }
+    _tokenizerWorker = null;
+    _tokenizerWorkerReady = false;
+  }
+
+  const workerPath = getTokenizerWorkerPath();
+
+  return new Promise<ChildProcess | null>((resolve) => {
+    try {
+      const worker = spawn("python3", [workerPath], {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      worker.on("error", (err) => {
+        console.warn(`[obsidian_search] jieba worker spawn error: ${err.message}`);
+        resolve(null);
+      });
+
+      worker.on("exit", (code) => {
+        if (code !== 0 && code !== null) {
+          console.warn(`[obsidian_search] jieba worker exited with code ${code}`);
+        }
+        _tokenizerWorkerReady = false;
+      });
+
+      // Wait for warmup: send a test tokenization and await response
+      const warmupTimeout = setTimeout(() => {
+        console.warn(`[obsidian_search] jieba worker warmup timed out`);
+        worker.kill();
+        resolve(null);
+      }, 5000);
+
+      let warmupBuffer = "";
+      const onWarmup = (chunk: Buffer) => {
+        warmupBuffer += chunk.toString("utf-8");
+        if (warmupBuffer.includes("\n")) {
+          clearTimeout(warmupTimeout);
+          worker.stdout!.removeListener("data", onWarmup);
+          _tokenizerWorker = worker;
+          _tokenizerWorkerReady = true;
+          resolve(worker);
+        }
+      };
+
+      worker.stdout!.on("data", onWarmup);
+      worker.stdin!.write(JSON.stringify(["初始化"]) + "\n");
+    } catch (err) {
+      console.warn(
+        `[obsidian_search] Failed to start jieba worker:`,
+        err instanceof Error ? err.message : String(err),
+      );
+      resolve(null);
+    }
+  });
+}
+
+// ── Search Execution ────────────────────────────────────────────
+
+interface SearchResult {
+  backend: "fff" | "rg";
+  scopeResults: ScopeSearchResult[];
+}
+
+/**
+ * Execute search using FFF (primary) or rg (fallback).
+ */
+async function executeSearch(
+  tokens: string[],
+  config: SearchConfig,
+  vaultPath: string,
+  explicitScope?: string,
+): Promise<SearchResult> {
+  // Try FFF first
+  const finder = await initializeFinder(vaultPath);
+  if (finder) {
+    try {
+      const fffResult = await executeFffSearch(finder, tokens, config, vaultPath, explicitScope);
+      if (fffResult) return fffResult;
+    } catch (err) {
+      console.warn(
+        `[obsidian_search] FFF search failed, falling back to rg:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  // Fallback to rg
+  return executeRgSearch(tokens, config, vaultPath, explicitScope);
+}
+
+/**
+ * Initialize FFF FileFinder lazily (once per session per vault).
+ */
+async function initializeFinder(vaultPath: string): Promise<InstanceType<FileFinderType> | null> {
+  // Reuse existing finder if same vault
+  if (_finder && !_finder.isDestroyed && _finderVaultPath === vaultPath) {
+    return _finder;
+  }
+
+  // Clean up previous finder
+  if (_finder && !_finder.isDestroyed) {
+    try { _finder.destroy(); } catch { /* ignore */ }
+    _finder = null;
+  }
+
+  const FF = await getFileFinderClass();
+  if (!FF || !FF.isAvailable()) return null;
+
+  const createResult = FF.create({
+    basePath: vaultPath,
+    disableWatch: true,
+    disableMmapCache: true,
+  });
+
+  if (!createResult.ok) {
+    console.warn(`[obsidian_search] FFF create failed: ${createResult.error}`);
+    return null;
+  }
+
+  const finder = createResult.value;
+  const scanResult = await finder.waitForIndexReady(10000);
+  if (!scanResult.ok || !scanResult.value) {
+    console.warn(`[obsidian_search] FFF scan timed out, falling back to rg`);
+    finder.destroy();
+    return null;
+  }
+
+  _finder = finder;
+  _finderVaultPath = vaultPath;
+  return finder;
+}
+
+/**
+ * Execute search using FFF multiGrep (Aho-Corasick multi-pattern literal match).
+ */
+async function executeFffSearch(
+  finder: InstanceType<FileFinderType>,
+  tokens: string[],
+  config: SearchConfig,
+  vaultPath: string,
+  explicitScope?: string,
+): Promise<SearchResult | null> {
+  // FFF multiGrep uses literal patterns (no regex escaping needed)
+  const result = finder.multiGrep({
+    patterns: tokens,
+    pageSize: config.runtime.fff_page_size,
+    timeBudgetMs: config.runtime.fff_timeout_ms,
+  });
+
+  if (!result.ok) {
+    console.warn(`[obsidian_search] FFF multiGrep error: ${result.error}`);
+    return null;
+  }
+
+  // Convert FFF GrepMatch[] to RgMatch[] and apply scope filtering
+  const allMatches = fffMatchesToRgMatches(result.value.items, vaultPath);
+
+  // Apply scope filtering
+  const scopeResults = applyScopeFilter(allMatches, config, vaultPath, explicitScope);
+
+  return { backend: "fff", scopeResults };
+}
+
+/**
+ * Convert FFF GrepMatch[] to internal RgMatch[] format.
+ */
+function fffMatchesToRgMatches(items: GrepMatchType[], vaultPath: string): RgMatch[] {
+  const matches: RgMatch[] = [];
+  for (const item of items) {
+    matches.push({
+      file: item.relativePath,
+      lineNum: item.lineNumber,
+      text: item.lineContent.trim(),
+    });
+  }
+  return matches;
+}
+
+/**
+ * Apply scope path prefix filtering to flat match list.
+ * Groups results by scope for compatibility with mergeRgResults().
+ */
+function applyScopeFilter(
+  matches: RgMatch[],
+  config: SearchConfig,
+  vaultPath: string,
+  explicitScope?: string,
+): ScopeSearchResult[] {
+  if (explicitScope) {
+    // Filter to explicit scope directory prefix
+    const scopePrefix = explicitScope.replace(/\/+$/, "") + "/";
+    const scopeRoot = explicitScope;
+    const filtered = matches.filter(m =>
+      m.file === scopeRoot || m.file.startsWith(scopePrefix)
+    );
+    return [{
+      scope: { path: explicitScope, weight: 1.0, default: false },
+      matches: filtered,
+    }];
+  }
+
+  // Group by default scopes
+  const defaultScopes = config.scopes.filter(s => s.default);
+  if (defaultScopes.length === 0) {
+    // No scopes configured — return all as single scope
+    return [{
+      scope: { path: ".", weight: 1.0, default: true },
+      matches,
+    }];
+  }
+
+  const results: ScopeSearchResult[] = [];
+  for (const scope of defaultScopes) {
+    const prefix = scope.path === "." ? "" : scope.path.replace(/\/+$/, "") + "/";
+    const filtered = matches.filter(m =>
+      prefix === "" || m.file === scope.path || m.file.startsWith(prefix)
+    );
+    if (filtered.length > 0) {
+      results.push({ scope, matches: filtered });
+    }
+  }
+  return results;
+}
+
+/**
+ * Execute search using rg (ripgrep) — the fallback path.
+ */
+function executeRgSearch(
+  tokens: string[],
+  config: SearchConfig,
+  vaultPath: string,
+  explicitScope?: string,
+): SearchResult {
+  // For rg, tokens need regex escaping and OR joining
+  const pattern = tokens.map(t => escapeRegex(t)).join("|");
+
+  const searchDirs = resolveSearchDirs(vaultPath, config, explicitScope);
+
+  const scopeResults: ScopeSearchResult[] = searchDirs.map(({ dir, scope }) => {
+    const result = runRgSearch(dir, pattern, config.runtime.rg_timeout_ms, vaultPath);
+    if (result.error) {
+      console.warn(`[obsidian_search] rg error in scope ${scope.path}: ${result.error}`);
+    }
+    return { scope, matches: result.matches };
+  }).filter(r => r.matches.length > 0);
+
+  return { backend: "rg", scopeResults };
+}
+
+// ── Scope Resolution (rg fallback path) ─────────────────────────
 
 function resolveSearchDirs(
   vaultPath: string,
@@ -369,7 +736,7 @@ function resolveSearchDirs(
     .map((s) => ({ dir: resolve(vaultPath, s.path), scope: s }));
 }
 
-// ── RG Search ───────────────────────────────────────────────────
+// ── RG Search (fallback) ───────────────────────────────────────
 
 function resolveRgPath(): string | null {
   const candidates = [
@@ -410,8 +777,6 @@ function runRgSearch(
 
   try {
     const args = ["-n", pattern, dir, "--max-count", "40"];
-    // When searching the vault root, limit to root-level files only
-    // to avoid duplicating scope-based subdirectory searches.
     if (resolve(dir) === resolve(vaultPath)) {
       args.push("--max-depth", "1");
     }
@@ -422,8 +787,6 @@ function runRgSearch(
     }
 
     if (result.status !== 0 && result.status !== null) {
-      // rg returns non-zero when no matches found — this is OK
-      // but if it was killed by signal (timeout), report it
       if (result.signal) {
         return { matches: [], error: `rg killed by signal: ${result.signal}` };
       }
@@ -434,7 +797,6 @@ function runRgSearch(
 
     for (const line of stdout.split("\n")) {
       if (!line.trim()) continue;
-      // Format: absolute_path:line:text
       const idx1 = line.indexOf(":");
       if (idx1 === -1) continue;
       const idx2 = line.indexOf(":", idx1 + 1);
@@ -449,7 +811,6 @@ function runRgSearch(
       try {
         const relPath = relative(vaultPath, fullPath);
         if (relPath.startsWith("..") || relPath === fullPath) {
-          // File outside vault — skip
           continue;
         }
         matches.push({ file: relPath, lineNum, text: text.trim() });
@@ -467,10 +828,13 @@ function runRgSearch(
   }
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ── Result Merge ────────────────────────────────────────────────
 
 function mergeRgResults(results: ScopeSearchResult[]): MergedResult[] {
-  // Collect match counts per file per scope
   const scopeCounts = new Map<string, Map<string, number>>();
   const allMatches = new Map<string, RgMatch[]>();
 
@@ -536,7 +900,7 @@ function rankResults(
     const lowerFilename = filename.toLowerCase();
     let filenameBonus = 1.0;
     for (const token of queryTokens) {
-      const lowerToken = token.toLowerCase().replace(/\\/g, "");
+      const lowerToken = token.toLowerCase();
       if (lowerFilename === lowerToken) {
         filenameBonus = Math.max(filenameBonus, config.ranking.filename_exact);
       } else if (lowerFilename.includes(lowerToken)) {
@@ -615,8 +979,6 @@ function computeMatchPositionBonus(
   config: SearchConfig,
   fmEndLine: number,
 ): number {
-  // Use precise frontmatter boundary (closing --- line number) when available,
-  // falling back to heuristic (line <= 20) for files where boundary detection failed.
   const inFrontmatter = fmEndLine > 0
     ? match.lineNum <= fmEndLine
     : match.lineNum <= 20;
@@ -659,8 +1021,6 @@ function getFileSizeKb(filePath: string): number | null {
 
 /**
  * Detect the closing line number of the frontmatter block.
- * Reads the first 30 lines, looking for a pair of '---' delimiters.
- * Returns the 1-based line number of the closing '---', or 0 if no frontmatter found.
  */
 function getFrontmatterEndLine(filePath: string): number {
   try {
@@ -672,13 +1032,13 @@ function getFrontmatterEndLine(filePath: string): number {
       const trimmed = lines[i].trim();
       if (trimmed === "---") {
         if (!inFm) {
-          inFm = true;  // opening ---
+          inFm = true;
         } else {
-          return i + 1; // closing ---, 1-based line number
+          return i + 1;
         }
       }
     }
-    return 0; // no frontmatter block found
+    return 0;
   } catch {
     return 0;
   }
@@ -706,7 +1066,6 @@ function generateSnippet(
 
   const lines = content.split("\n");
 
-  // Extract preview paragraph (first non-empty, non-frontmatter, non-heading text)
   let inFrontmatter = false;
   let frontmatterSeen = false;
   let preview = "";
@@ -730,7 +1089,6 @@ function generateSnippet(
   }
   preview = preview.slice(0, config.runtime.snippet_preview_chars).trim();
 
-  // Find best match region (highest density of matching lines)
   const matchLineNums = new Set(matches.map((m) => m.lineNum));
   let bestRegion = { start: 0, end: 0, density: 0 };
 
@@ -762,7 +1120,7 @@ function generateSnippet(
 
 interface OutputData {
   ok: boolean;
-  mode: "rg";
+  mode: "fff" | "rg";
   vault: string;
   effectiveQuery: string;
   stats: { total_hits: number; returned: number; time_ms: number };
@@ -775,7 +1133,7 @@ function buildOutput(data: OutputData): ToolResult {
   const lines: string[] = [];
   lines.push("## Obsidian Search Results");
   lines.push(
-    `**Query:** "${effectiveQuery}" | **Mode:** ${mode} | **Vault:** ${vault}`,
+    `**Query:** "${effectiveQuery}" | **Backend:** ${mode} | **Vault:** ${vault}`,
   );
   lines.push(`${stats.total_hits} total hits, returning top ${stats.returned}`);
 

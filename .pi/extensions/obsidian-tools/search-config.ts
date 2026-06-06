@@ -34,6 +34,8 @@ export interface TokenizationConfig {
 export interface RuntimeConfig {
   max_results: number;
   rg_timeout_ms: number;
+  fff_timeout_ms: number;
+  fff_page_size: number;
   snippet_context_lines: number;
   snippet_preview_chars: number;
 }
@@ -310,7 +312,7 @@ function validateTokenization(data: unknown, configPath: string): TokenizationCo
   const obj = data as Record<string, unknown>;
   return {
     cn_min_chars: typeof obj.cn_min_chars === "number" ? obj.cn_min_chars : 4,
-    method: (obj.method === "jieba" ? "jieba" : "intl_segmenter") as "intl_segmenter" | "jieba",
+    method: (obj.method === "intl_segmenter" ? "intl_segmenter" : "jieba") as "intl_segmenter" | "jieba",
   };
 }
 
@@ -324,6 +326,8 @@ function validateRuntime(data: unknown, configPath: string): RuntimeConfig {
     rg_timeout_ms: typeof obj.rg_timeout_ms === "number" ? obj.rg_timeout_ms : 15000,
     snippet_context_lines: typeof obj.snippet_context_lines === "number" ? obj.snippet_context_lines : 2,
     snippet_preview_chars: typeof obj.snippet_preview_chars === "number" ? obj.snippet_preview_chars : 200,
+    fff_timeout_ms: typeof obj.fff_timeout_ms === "number" ? obj.fff_timeout_ms : 5000,
+    fff_page_size: typeof obj.fff_page_size === "number" ? obj.fff_page_size : 200,
   };
 }
 
@@ -381,13 +385,15 @@ search:
 
   tokenization:
     cn_min_chars: 4
-    method: intl_segmenter
+    method: jieba
 
   runtime:
     max_results: 20
     rg_timeout_ms: 15000
     snippet_context_lines: 2
     snippet_preview_chars: 200
+    fff_timeout_ms: 5000
+    fff_page_size: 200
 `;
 }
 
