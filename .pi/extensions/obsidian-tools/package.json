@@ -1,7 +1,7 @@
 {
   "name": "obsidian-tools",
   "version": "1.0.0",
-  "description": "Obsidian CLI tools extension: obsidian_search (intelligent retrieval) and obsidian_cli (command passthrough)",
+  "description": "Obsidian tools extension: obsidian_search (intelligent retrieval) and obsidian_cli (Obsidian CLI passthrough)",
   "pi": {
     "extensions": [
       "./index.ts"

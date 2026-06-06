@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { searchToolDefinition, resetSessionState } from "./search-tool";
+import { rawToolDefinition } from "./raw-tool";
 
 /**
  * Obsidian Tools Extension
@@ -10,6 +11,9 @@ import { searchToolDefinition, resetSessionState } from "./search-tool";
 export default function (pi: ExtensionAPI) {
   // Register search tool
   pi.registerTool(searchToolDefinition);
+
+  // Register CLI passthrough tool
+  pi.registerTool(rawToolDefinition);
 
   // Session shutdown: clean up session-scoped state
   pi.on("session_shutdown", () => {

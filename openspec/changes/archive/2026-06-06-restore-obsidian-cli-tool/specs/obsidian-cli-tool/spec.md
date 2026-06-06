@@ -1,11 +1,20 @@
-# obsidian-cli-tool
+# Specification Delta
 
-## Purpose
+## Capability 对齐（已确认）
 
-Behavior specification for the obsidian-cli-tool capability.
+- Capability: `obsidian-cli-tool`
+- 来源: `proposal.md` / 用户在 grill-with-docs 会话中逐项确认
+- 变更类型: modified
+- 用户确认摘要: 二进制名修正（obsidian → obsidian-cli）、vault 参数改为 required 且接受名称直接透传、不恢复 session_start CLI 调用、不依赖 vault-resolver
 
----
-## Requirements
+## 规范真源声明
+
+- 本文件是该 capability 在本次 change 中的行为规范真源
+- design / tasks / verification 必须引用本文件
+- 项目页面回写不得替代本文件
+
+## MODIFIED Requirements
+
 ### Requirement: Tool Registration
 
 The system SHALL register a tool named `obsidian_cli` with the following parameters:
@@ -36,45 +45,6 @@ The tool SHALL emit promptSnippet and promptGuidelines instructing the LLM on us
 
 - **WHEN** LLM calls `obsidian_cli({ command: "read", params: { file: "My Note" } })`
 - **THEN** the tool SHALL return a validation error: "Parameter 'vault' is required. Provide the vault name (e.g., 'my-wiki')."
-
----
-
-### Requirement: Input Validation
-
-The system SHALL validate command, param keys, and flag values against the regex `/^[a-z0-9:_-]+$/i`.
-
-#### Scenario: Valid command
-
-- **WHEN** command is "search" or "property:set"
-- **THEN** the tool SHALL proceed with execution
-
-#### Scenario: Invalid command characters
-
-- **WHEN** command contains spaces, slashes, or special characters
-- **THEN** the tool SHALL return an error: "Invalid command. Use only letters, numbers, :, _, -."
-
-#### Scenario: Invalid flag
-
-- **WHEN** a flag contains disallowed characters
-- **THEN** the tool SHALL return an error identifying the invalid flag
-
----
-
-### Requirement: Dangerous Command Blocking
-
-The system SHALL block known dangerous commands unless `allowDangerous` is explicitly true.
-
-Dangerous commands: `eval`, `dev:cdp`, `dev:debug`, `restart`.
-
-#### Scenario: Dangerous command without allowDangerous
-
-- **WHEN** command is "eval" and allowDangerous is false or omitted
-- **THEN** the tool SHALL return a blocking error: "Blocked dangerous command 'eval'. Re-run with allowDangerous=true if intentional."
-
-#### Scenario: Dangerous command with allowDangerous
-
-- **WHEN** command is "eval" and allowDangerous is true
-- **THEN** the tool SHALL proceed with execution
 
 ---
 
@@ -110,12 +80,10 @@ No fallback binary path is attempted. If `obsidian-cli` is not found in PATH, th
 - **WHEN** `obsidian-cli` is not found in PATH (ENOENT)
 - **THEN** the tool SHALL return an error: "Obsidian CLI not found. Ensure Obsidian is installed and obsidian-cli is in PATH."
 
-### Requirement: Timeout and Cancellation
+## REMOVED Requirements
 
-The system SHALL support AbortSignal cancellation. On abort, all in-flight child processes SHALL be killed.
+### Requirement: Vault Resolution
 
-#### Scenario: User aborts during execution
+**Reason**: vault-resolver 返回绝对路径，而 `obsidian-cli` 只接受 vault 名称。两者标识体系不同，不再复用。Agent 通过 AGENTS.md 硬编码知识传入 vault 名称。
 
-- **WHEN** AbortSignal is triggered
-- **THEN** the child process SHALL receive SIGTERM and the tool SHALL return a cancelled error
-
+**Migration**: `vault` 参数从 optional（自动推断）变为 required（显式传入）。调用方必须提供 vault 名称。
