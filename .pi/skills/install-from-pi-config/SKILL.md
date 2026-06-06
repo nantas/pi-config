@@ -185,6 +185,7 @@ if [[ -d "$TARGET" ]]; then
     echo "Skipping: $name"
     return
   fi
+  rm -rf "$TARGET"
 fi
 
 mkdir -p "$(dirname "$TARGET")"
@@ -230,6 +231,7 @@ elif [[ -d "$SOURCE_REPO/.pi/extensions/$NAME" ]]; then
       echo "Skipping: $NAME"
       return
     fi
+    rm -rf "$TARGET"
   fi
 
   mkdir -p "$(dirname "$TARGET")"
