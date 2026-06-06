@@ -544,7 +544,7 @@ async function executeSearch(
   if (finder) {
     try {
       const fffResult = await executeFffSearch(finder, tokens, config, vaultPath, explicitScope);
-      if (fffResult) return fffResult;
+      if (fffResult.scopeResults.length > 0) return fffResult;
     } catch (err) {
       console.warn(
         `[obsidian_search] FFF search failed, falling back to rg:`,
@@ -601,6 +601,11 @@ async function initializeFinder(vaultPath: string): Promise<InstanceType<FileFin
 
 /**
  * Execute search using FFF multiGrep (Aho-Corasick multi-pattern literal match).
+ *
+ * Runs one FFF search per scope directory (matching the rg path) so that:
+ * - Each scope is constrained to its directory (no result cap leakage)
+ * - Each scope gets its correct weight
+ * - Non-scope directories are never searched
  */
 async function executeFffSearch(
   finder: InstanceType<FileFinderType>,
@@ -608,24 +613,38 @@ async function executeFffSearch(
   config: SearchConfig,
   vaultPath: string,
   explicitScope?: string,
-): Promise<SearchResult | null> {
-  // FFF multiGrep uses literal patterns (no regex escaping needed)
-  const result = finder.multiGrep({
-    patterns: tokens,
-    pageSize: config.runtime.fff_page_size,
-    timeBudgetMs: config.runtime.fff_timeout_ms,
-  });
+): Promise<SearchResult> {
+  const searchDirs = resolveSearchDirs(vaultPath, config, explicitScope);
 
-  if (!result.ok) {
-    console.warn(`[obsidian_search] FFF multiGrep error: ${result.error}`);
-    return null;
+  const scopeResults: ScopeSearchResult[] = [];
+
+  for (const { scope } of searchDirs) {
+    // Build FFF directory constraint: converts "20-synthesis" → "20-synthesis/*"
+    const constraints = scope.path === "."
+      ? undefined
+      : (scope.path.startsWith("/") ? scope.path + "/*" : scope.path + "/*");
+
+    const result = finder.multiGrep({
+      patterns: tokens,
+      constraints,
+      pageSize: config.runtime.fff_page_size,
+      timeBudgetMs: config.runtime.fff_timeout_ms,
+    });
+
+    if (!result.ok) {
+      console.warn(`[obsidian_search] FFF multiGrep error in scope ${scope.path}: ${result.error}`);
+      continue;
+    }
+
+    let matches = fffMatchesToRgMatches(result.value.items, vaultPath);
+    // For root scope, filter to root-level files only (matches rg --max-depth 1 behavior)
+    if (scope.path === ".") {
+      matches = matches.filter(m => !m.file.includes("/"));
+    }
+    if (matches.length > 0) {
+      scopeResults.push({ scope, matches });
+    }
   }
-
-  // Convert FFF GrepMatch[] to RgMatch[] and apply scope filtering
-  const allMatches = fffMatchesToRgMatches(result.value.items, vaultPath);
-
-  // Apply scope filtering
-  const scopeResults = applyScopeFilter(allMatches, config, vaultPath, explicitScope);
 
   return { backend: "fff", scopeResults };
 }
@@ -643,52 +662,6 @@ function fffMatchesToRgMatches(items: GrepMatchType[], vaultPath: string): RgMat
     });
   }
   return matches;
-}
-
-/**
- * Apply scope path prefix filtering to flat match list.
- * Groups results by scope for compatibility with mergeRgResults().
- */
-function applyScopeFilter(
-  matches: RgMatch[],
-  config: SearchConfig,
-  vaultPath: string,
-  explicitScope?: string,
-): ScopeSearchResult[] {
-  if (explicitScope) {
-    // Filter to explicit scope directory prefix
-    const scopePrefix = explicitScope.replace(/\/+$/, "") + "/";
-    const scopeRoot = explicitScope;
-    const filtered = matches.filter(m =>
-      m.file === scopeRoot || m.file.startsWith(scopePrefix)
-    );
-    return [{
-      scope: { path: explicitScope, weight: 1.0, default: false },
-      matches: filtered,
-    }];
-  }
-
-  // Group by default scopes
-  const defaultScopes = config.scopes.filter(s => s.default);
-  if (defaultScopes.length === 0) {
-    // No scopes configured — return all as single scope
-    return [{
-      scope: { path: ".", weight: 1.0, default: true },
-      matches,
-    }];
-  }
-
-  const results: ScopeSearchResult[] = [];
-  for (const scope of defaultScopes) {
-    const prefix = scope.path === "." ? "" : scope.path.replace(/\/+$/, "") + "/";
-    const filtered = matches.filter(m =>
-      prefix === "" || m.file === scope.path || m.file.startsWith(prefix)
-    );
-    if (filtered.length > 0) {
-      results.push({ scope, matches: filtered });
-    }
-  }
-  return results;
 }
 
 /**
