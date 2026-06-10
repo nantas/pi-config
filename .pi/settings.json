@@ -8,7 +8,8 @@
     "npm:pi-mcp-adapter",
     "git:github.com/rwese/pi-question",
     "git:github.com/jwu/pi-webfetch",
-    "npm:@ff-labs/pi-fff"
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-snap-edit"
   ],
   "defaultThinkingLevel": "high",
   "defaultProvider": "zhipuai-coding-plan",

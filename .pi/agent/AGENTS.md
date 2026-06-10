@@ -13,16 +13,29 @@
 
 ## Tool Call Guidelines
 
-### Edit Tool
+### 编辑工具（quick_edit / target_edit）
 
-**调用前 3 项自检（逐项确认后再发请求）：**
+> pi-snap-edit 在 session 启动时替换内置 `edit` 为 `quick_edit` + `target_edit`。
+> 以下规则适用于这两个工具。内置 `edit` 不再活跃。
 
-1. ✅ **`path` 是顶层字段**，不在 `edits[]` 内部
-2. ✅ **每条 `oldText` / `newText` ≤ 200 字符**，超过则换 bash + sed
-3. ✅ **单次 ≤ 4 条 edits**，超过则拆分为多次调用
+**quick_edit 自检：**
 
-- **Avoid overlap**: 多个 `edits[]` 的 `oldText` 不能在原始文件中重叠
-- **Prefer sed for bulk**: 简单文本替换（如 `[ ]` → `[x]`）直接用 `sed -i ''` 而非 edit
+1. ✅ **已 read 目标文件**，行号是最新的（文件未在 read 后被其他操作修改）
+2. ✅ **`expectedStartLine` 与实际行内容一致**（缩进/尾部空格不确定时用 `expectedStartLineMatch: "trim"` + `preserveIndent: true`）
+3. ✅ **批量 edits 的 start/end 范围不重叠**（快照模式，不递增编号）
+
+**target_edit 自检：**
+
+1. ✅ **`target` 是精确字面文本**，不支持正则；多行用 `\n`
+2. ✅ **`line` 或 `range` 二选一**（replace/delete）；insert 操作必须带 `line`
+3. ✅ **同一文本多处出现时**，必须用 `line` 或 `range` 限定到唯一匹配
+
+**不能覆盖 → 兜底 bash+sed：**
+
+- 多文件同时编辑
+- 行号不确定且无法先 read
+- 需要模糊/正则匹配
+- 批量 checkbox 等简单文本替换（`sed -i ''` 更直接）
 
 ### Bash Tool
 
@@ -87,14 +100,18 @@
 
 ### 编辑工作流（发现 → 修改）
 
-fff 只负责**检索**，代码编辑回退到基础工具：
+fff 只负责**检索**，代码编辑使用 snap-edit 工具或兜底 bash+sed：
 
 | 编辑场景 | 工具 |
 |----------|------|
-| 小范围精确替换（≤200 字符） | `edit` tool |
-| 大范围替换 / 多文件 | `bash` + `sed` |
-| 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证所有引用已更新 |
-| 批量 checkbox 替换 | `bash` + `sed -i ''` |
+| 已知行号的单行/小范围替换 | `quick_edit` |
+| 已知行号的大段替换或整段删除 | `quick_edit`（`lines: []` 删除） |
+| 精确文本替换/插入/删除 | `target_edit` |
+| 同文件多处不相关编辑 | `quick_edit` 批量模式（单次调用） |
+| 行号不确定或文件已被修改 | 先 `read` 获取行号，再 `quick_edit` |
+| 多文件编辑 / 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证 |
+| 批量 checkbox / 简单文本替换 | `bash` + `sed -i ''` |
+| 模糊或正则匹配需求 | `bash` + `sed` / `awk` |
 
 ## Subagent 自动委派
 

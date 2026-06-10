@@ -3,6 +3,19 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-06-10 — npm:pi-snap-edit
+
+- **Version:** 4.0.0
+- **Research Date:** 2026-06-10
+- **Resource Types:** extension (quick_edit, target_edit)
+- **Decision:** global
+- **Source Type:** npm-package
+- **Source Repo:** https://pi.dev/packages/pi-snap-edit
+- **Install Method:** pi-install
+- **Has Dependencies:** true (1 runtime: @sinclair/typebox, 2 peer: @earendil-works/pi-coding-agent, @earendil-works/pi-tui)
+- **Reason:** 解决内置 edit 工具在大段编辑、批量多位置编辑、特殊字符编辑场景下参数冗余、调用次数多的问题。基准测试显示：平均调用次数从 1.3 降至 1.0，参数大小平均减少 ~22%，大段删除场景参数节省 ~5x
+- **Notes:** session_start 时替换内置 edit 和 substitute_edit 为 quick_edit + target_edit；提供 read hook 为输出添加行号；注意与其他依赖 edit 工具名的扩展/agent 的兼容性
+
 ### 2026-05-21 — git:github.com/rwese/pi-question
 
 - **Version:** 2.3.0
