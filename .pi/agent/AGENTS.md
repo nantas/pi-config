@@ -27,15 +27,19 @@
 **target_edit 自检：**
 
 1. ✅ **`target` 是精确字面文本**，不支持正则；多行用 `\n`
+   - ⚠️ 每个 op **必须包含 `type` 字段**（`replace`/`delete`/`insert_before`/`insert_after`）。漏掉 `type` 会导致 `anyOf` 四个分支全不匹配，报错 `must have required properties type`——这在构造大 JSON 时极易发生
 2. ✅ **`line` 或 `range` 二选一**（replace/delete）；insert 操作必须带 `line`
 3. ✅ **同一文本多处出现时**，必须用 `line` 或 `range` 限定到唯一匹配
+4. ✅ **多个不相连位置的编辑优先用 `quick_edit` 批量模式**（snapshot-based）。`target_edit` 批量 ops 是 sequential 的，`line` 参数会受前序 op 行数增减影响，LLM 预算漂移极易出错。如必须用 `target_edit`，应拆成多次单 op 调用
+5. ✅ **target + replacement 合计超过 ~20 行时**建议改用 `quick_edit`（基于行号更可靠）或 `bash` + Python 脚本。target_edit 引擎本身无长度上限，但 LLM 构造超大 JSON 参数（>10KB）时格式错误风险显著增加（未转义引号、截断等），导致 Pi 框架层 schema 验证失败
 
-**不能覆盖 → 兜底 bash+sed：**
+**不能覆盖 → 兜底 bash+sed/Python：**
 
 - 多文件同时编辑
 - 行号不确定且无法先 read
 - 需要模糊/正则匹配
 - 批量 checkbox 等简单文本替换（`sed -i ''` 更直接）
+- 大段文本替换（target + replacement 合计 >20 行）
 
 ### Bash Tool
 
@@ -106,8 +110,9 @@ fff 只负责**检索**，代码编辑使用 snap-edit 工具或兜底 bash+sed�
 |----------|------|
 | 已知行号的单行/小范围替换 | `quick_edit` |
 | 已知行号的大段替换或整段删除 | `quick_edit`（`lines: []` 删除） |
-| 精确文本替换/插入/删除 | `target_edit` |
-| 同文件多处不相关编辑 | `quick_edit` 批量模式（单次调用） |
+| 精确文本替换/插入/删除（单次操作） | `target_edit` |
+| 同文件多处不相关编辑 | `quick_edit` 批量模式（snapshot-based） |
+| 多处不相连位置按文本匹配替换 | 多次单 op `target_edit` 或 `quick_edit` 批量，**不要 `target_edit` 批量**（sequential 行号漂移） |
 | 行号不确定或文件已被修改 | 先 `read` 获取行号，再 `quick_edit` |
 | 多文件编辑 / 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证 |
 | 批量 checkbox / 简单文本替换 | `bash` + `sed -i ''` |
