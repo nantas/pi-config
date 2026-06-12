@@ -115,6 +115,9 @@ catalog:
     - name: trellis-analytics
       source: trellis-analytics
       description: "Passive telemetry for Trellis workflow observability, context consumption tracking, and streaming JSONL persistence"
+    - name: wikilink-batch-replace
+      source: wikilink-batch-replace
+      description: "Batch-replace bare text references with Obsidian wikilinks, auto-escaping pipe separators in table rows"
 
   # Packages available for on-demand installation (settings-entry type)
   packages: []
