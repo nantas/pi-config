@@ -2,7 +2,7 @@
 
 ## Capability 对齐（已确认）
 
-- Capability: `notion-cli`
+- Capability: `notion`
 - 来源: `proposal.md` / 已确认 capabilities
 - 变更类型: new
 - 用户确认摘要: grill 讨论中逐项确认——脚本清单、接口设计、扁平化策略、错误处理、filter 格式、URL 解析策略
@@ -137,13 +137,13 @@
 所有脚本 SHALL 共享 `ntn_resolve.py` 模块，包含 `ntn_api()`、`extract_id_from_url()`、`resolve_id()` 三个公共函数，通过 `sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))` 引用。
 
 ### Requirement: skill-manifest-registration
-skill SHALL 注册在 `.pi/capabilities.yaml` 的 `global.skills` 列表中，通过 `scripts/sync-pi-agent.sh` 同步到 `~/.pi/agent/skills/notion-cli/`。
+skill SHALL 注册在 `.pi/capabilities.yaml` 的 `global.skills` 列表中，通过 `scripts/sync-pi-agent.sh` 同步到 `~/.pi/agent/skills/notion/`。
 
 ## MODIFIED Requirements
 
 ### Requirement: global-skills-manifest
-`.pi/capabilities.yaml` 的 `global.skills` 列表 SHALL 包含 `notion-cli` 条目。
+`.pi/capabilities.yaml` 的 `global.skills` 列表 SHALL 包含 `notion` 条目。
 
 #### Scenario: 同步后全局可用
 - **WHEN** 运行 `scripts/sync-pi-agent.sh`
-- **THEN** `~/.pi/agent/skills/notion-cli/` 目录存在，包含 SKILL.md 和 scripts/ 子目录
+- **THEN** `~/.pi/agent/skills/notion/` 目录存在，包含 SKILL.md 和 scripts/ 子目录

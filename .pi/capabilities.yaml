@@ -33,7 +33,7 @@ global:
   # Skills synced to ~/.pi/agent/skills/
   skills:
     - install-from-pi-config
-    - notion-cli
+    - notion
 
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:

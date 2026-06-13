@@ -1,5 +1,5 @@
 ---
-name: notion-cli
+name: notion
 description: Read, search, query, and edit Notion pages and databases via the ntn CLI. Use when user mentions Notion, asks to read/edit a Notion page, query a Notion database, or provides a notion.so URL.
 ---
 
@@ -129,7 +129,7 @@ ntn-write <page_id_or_url> --replace "## Replaced\n\nAll new content."
 This skill is designed for incremental improvement. When you encounter repeated friction patterns (e.g. a new property type not handled, a common multi-step workflow that should be one command), follow these steps:
 
 1. **Identify the friction**: Note what the agent consistently gets wrong or takes too many steps to accomplish.
-2. **Read the existing scripts**: Scripts are in `.pi/skills/notion-cli/scripts/` (source) synced to `~/.pi/agent/skills/notion-cli/scripts/` (runtime). All share `ntn_resolve.py` for common utilities.
+2. **Read the existing scripts**: Scripts are in `.pi/skills/notion/scripts/` (source) synced to `~/.pi/agent/skills/notion/scripts/` (runtime). All share `ntn_resolve.py` for common utilities.
 3. **Add or modify a script**: Keep scripts focused — one responsibility per script. Use the shared library for URL resolution, API calls, and property flattening.
 4. **Update this SKILL.md**: Add the new script to the Scripts section and add relevant workflow examples.
 5. **Test with a live Notion page/database**: Verify with real data before committing.
