@@ -101,6 +101,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 会话浏览、会话树 | `session-index-engine`, `session-retrieval-tools`, `browse-session-tree`（注：`session-browse` 见 extensions） |
 | Obsidian 工具 | `obsidian-tools`, `obsidian-tools-extension`, `obsidian-cli-tool`, `obsidian-vault-resolver` |
 | Obsidian 搜索 | `obsidian-search-skill`, `obsidian-search-tool`, `obsidian-search-config` |
+| Notion CLI、ntn 命令 | `notion-cli` |
 | HTML 导出 | `html-export-support` |
 | / 技能过滤 | `slash-skill-filter` |
 | 添加供应商 | 见 extensions `add-provider.ts` |

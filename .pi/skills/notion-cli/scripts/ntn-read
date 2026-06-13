@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Read a Notion page as markdown.
+
+Usage:
+  ntn-read <page_id_or_url>
+
+Output: JSON with id, title, markdown, truncated, unknown_block_ids.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntn_resolve import ntn_api, extract_id_from_url
+
+
+class JsonArgParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(json.dumps({"error": message}), file=sys.stderr)
+        sys.exit(1)
+
+
+def main():
+    parser = JsonArgParser(description="Read Notion page as markdown")
+    parser.add_argument("target", help="Page ID or URL")
+    args = parser.parse_args()
+
+    if args.target.startswith("http"):
+        raw_id, _ = extract_id_from_url(args.target)
+    else:
+        raw_id = args.target.replace("-", "").lower()
+
+    if not raw_id:
+        print(json.dumps({"error": f"Could not extract ID from: {args.target}"}), file=sys.stderr)
+        sys.exit(1)
+
+    data = ntn_api(f"v1/pages/{raw_id}/markdown")
+
+    try:
+        page = ntn_api(f"v1/pages/{raw_id}")
+        title = ""
+        for v in page.get("properties", {}).values():
+            if isinstance(v, dict) and v.get("title"):
+                title = v["title"][0]["plain_text"] if v["title"] else ""
+                break
+    except SystemExit:
+        title = ""
+
+    result = {
+        "id": data.get("id", ""),
+        "title": title,
+        "markdown": data.get("markdown", ""),
+        "truncated": data.get("truncated", False),
+        "unknown_block_ids": data.get("unknown_block_ids", []),
+    }
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Resolve a Notion URL or search keyword to structured metadata.
+
+Usage:
+  ntn-resolve --url <notion_url>
+  ntn-resolve --search <keyword> [--type page|data_source]
+  ntn-resolve <raw_id>
+
+Output: JSON array of resolved objects.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntn_resolve import ntn_api, resolve_id, extract_id_from_url
+
+
+class JsonArgParser(argparse.ArgumentParser):
+    """Argparse subclass that outputs errors as JSON to stderr."""
+    def error(self, message):
+        print(json.dumps({"error": message}), file=sys.stderr)
+        sys.exit(1)
+
+
+def search(query, filter_type=None):
+    body = {"query": query, "page_size": 10}
+    if filter_type:
+        body["filter"] = {"property": "object", "value": filter_type}
+    data = ntn_api("v1/search", "--data", json.dumps(body))
+    results = []
+    for r in data.get("results", []):
+        obj_type = r.get("object", "")
+        entry = {"type": obj_type, "id": r["id"]}
+        if obj_type == "page":
+            title = ""
+            for v in r.get("properties", {}).values():
+                if isinstance(v, dict) and v.get("title"):
+                    title = v["title"][0]["plain_text"] if v["title"] else ""
+                    break
+            entry["title"] = title
+            entry["url"] = r.get("url", "")
+        elif obj_type == "data_source":
+            tp = r.get("title", [])
+            entry["title"] = tp[0]["plain_text"] if tp else ""
+            entry["parent"] = r.get("parent", {})
+        results.append(entry)
+    return results
+
+
+def main():
+    parser = JsonArgParser(description="Resolve Notion URL or search keyword")
+    parser.add_argument("--url", help="Notion URL to resolve")
+    parser.add_argument("--search", help="Keyword to search")
+    parser.add_argument("--type", choices=["page", "data_source"], help="Filter search by type")
+    parser.add_argument("id", nargs="?", help="Raw ID to resolve")
+    args = parser.parse_args()
+
+    if args.url:
+        raw_id, view_id = extract_id_from_url(args.url)
+        if not raw_id:
+            print(json.dumps({"error": f"Could not extract ID from URL: {args.url}"}), file=sys.stderr)
+            sys.exit(1)
+        result = resolve_id(raw_id, silent=True)
+        if result:
+            if view_id:
+                result["view_id"] = view_id
+            print(json.dumps([result], indent=2, ensure_ascii=False))
+        else:
+            print(json.dumps({"error": f"ID {raw_id} not found"}), file=sys.stderr)
+            sys.exit(1)
+    elif args.search:
+        results = search(args.search, args.type)
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+    elif args.id:
+        result = resolve_id(args.id, silent=True)
+        if result:
+            print(json.dumps([result], indent=2, ensure_ascii=False))
+        else:
+            print(json.dumps({"error": f"ID {args.id} not found"}), file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(json.dumps({"error": "Provide --url, --search, or a raw ID"}), file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

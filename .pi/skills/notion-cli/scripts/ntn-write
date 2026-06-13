@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Update page properties or append content.
+
+Usage:
+  ntn-write <page_id_or_url> --set <json>          # Update properties
+  ntn-write <page_id_or_url> --append <markdown>   # Append markdown content
+  ntn-write <page_id_or_url> --replace <markdown>  # Replace all content
+
+Output: JSON with result summary.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntn_resolve import ntn_api, extract_id_from_url
+
+
+class JsonArgParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(json.dumps({"error": message}), file=sys.stderr)
+        sys.exit(1)
+
+
+def resolve_page_id(target):
+    """Resolve URL/ID to a page ID."""
+    if target.startswith("http"):
+        raw_id, _ = extract_id_from_url(target)
+    else:
+        raw_id = target.replace("-", "").lower()
+
+    if not raw_id:
+        return None
+
+    page = ntn_api(f"v1/pages/{raw_id}", silent=True)
+    if page is not None:
+        return page["id"].replace("-", "")
+    return None
+
+
+def get_page_schema(page_id):
+    """Get the data_source schema for a page's parent database, if any.
+    Returns empty dict on failure (caller falls back to rich_text)."""
+    try:
+        page = ntn_api(f"v1/pages/{page_id}")
+        parent = page.get("parent", {})
+        if parent.get("type") == "data_source_id":
+            ds_id = parent["data_source_id"].replace("-", "")
+            ds = ntn_api(f"v1/data_sources/{ds_id}")
+            return ds.get("properties", {})
+        elif parent.get("type") == "database_id":
+            db_id = parent["database_id"].replace("-", "")
+            db = ntn_api(f"v1/databases/{db_id}")
+            ds_list = db.get("data_sources", [])
+            if ds_list:
+                ds = ntn_api(f"v1/data_sources/{ds_list[0]['id'].replace('-', '')}")
+                return ds.get("properties", {})
+    except SystemExit:
+        pass
+    return {}
+
+
+def build_property_value(prop_schema, value):
+    """Convert a plain value to Notion API property format."""
+    if not prop_schema:
+        # Fallback to rich_text when schema unavailable
+        return {"rich_text": [{"text": {"content": str(value)}}]}
+
+    ptype = prop_schema.get("type", "")
+
+    if ptype == "title":
+        return {"title": [{"text": {"content": str(value)}}]}
+    if ptype == "rich_text":
+        return {"rich_text": [{"text": {"content": str(value)}}]}
+    if ptype == "select":
+        return {"select": {"name": str(value)}}
+    if ptype == "multi_select":
+        if isinstance(value, str):
+            value = [v.strip() for v in value.split(",")]
+        return {"multi_select": [{"name": v} for v in value]}
+    if ptype == "status":
+        return {"status": {"name": str(value)}}
+    if ptype == "number":
+        return {"number": float(value) if isinstance(value, str) and "." in value else (int(value) if isinstance(value, str) else value)}
+    if ptype == "checkbox":
+        if isinstance(value, str):
+            return {"checkbox": value.lower() == "true"}
+        return {"checkbox": bool(value)}
+    if ptype == "date":
+        if isinstance(value, str):
+            return {"date": {"start": value}}
+        return {"date": value}
+    if ptype == "url":
+        return {"url": str(value)}
+    if ptype == "email":
+        return {"email": str(value)}
+    if ptype == "phone_number":
+        return {"phone_number": str(value)}
+
+    # Fallback: rich_text
+    return {"rich_text": [{"text": {"content": str(value)}}]}
+
+
+def update_properties(page_id, set_json):
+    """Update page properties. Falls back to rich_text for unknown properties."""
+    updates = json.loads(set_json)
+    schema = get_page_schema(page_id)
+
+    properties = {}
+    for name, value in updates.items():
+        prop_schema = schema.get(name)
+        properties[name] = build_property_value(prop_schema, value)
+
+    ntn_api(f"v1/pages/{page_id}", "-X", "PATCH",
+            "--data", json.dumps({"properties": properties}))
+
+    return {"id": page_id, "updated_properties": list(updates.keys())}
+
+
+def append_content(page_id, markdown):
+    """Append markdown content to a page."""
+    body = {
+        "type": "insert_content",
+        "insert_content": {
+            "content": markdown,
+        }
+    }
+    data = ntn_api(f"v1/pages/{page_id}/markdown", "-X", "PATCH",
+                   "--data", json.dumps(body))
+    return {"id": page_id, "action": "append", "truncated": data.get("truncated", False)}
+
+
+def replace_content(page_id, markdown):
+    """Replace all page content with markdown."""
+    body = {
+        "type": "replace_content",
+        "replace_content": {
+            "new_str": markdown,
+        }
+    }
+    data = ntn_api(f"v1/pages/{page_id}/markdown", "-X", "PATCH",
+                   "--data", json.dumps(body))
+    return {"id": page_id, "action": "replace", "truncated": data.get("truncated", False)}
+
+
+def main():
+    parser = JsonArgParser(description="Update Notion page properties or content")
+    parser.add_argument("target", help="Page ID or URL")
+    parser.add_argument("--set", help="JSON object of property updates")
+    parser.add_argument("--append", help="Markdown content to append")
+    parser.add_argument("--replace", help="Markdown content to replace all")
+    args = parser.parse_args()
+
+    page_id = resolve_page_id(args.target)
+    if not page_id:
+        print(json.dumps({"error": f"Could not resolve page from: {args.target}"}),
+              file=sys.stderr)
+        sys.exit(1)
+
+    if args.set:
+        result = update_properties(page_id, args.set)
+    elif args.append:
+        result = append_content(page_id, args.append)
+    elif args.replace:
+        result = replace_content(page_id, args.replace)
+    else:
+        print(json.dumps({"error": "Provide --set, --append, or --replace"}),
+              file=sys.stderr)
+        sys.exit(1)
+
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

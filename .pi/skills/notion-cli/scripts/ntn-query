@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Query a Notion data_source (database rows).
+
+Usage:
+  ntn-query <data_source_id_or_url> [--filter <json>] [--sorts <json>] [--limit N] [--all]
+
+Output: JSON with data_source_id, has_more, next_cursor, results (flattened).
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntn_resolve import ntn_api, extract_id_from_url
+
+
+class JsonArgParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(json.dumps({"error": message}), file=sys.stderr)
+        sys.exit(1)
+
+
+def flatten_property(prop_value):
+    """Flatten a Notion property value to a plain Python value."""
+    if not isinstance(prop_value, dict):
+        return prop_value
+
+    ptype = prop_value.get("type", "")
+
+    if ptype == "title":
+        parts = prop_value.get("title", [])
+        return "".join(p.get("plain_text", "") for p in parts)
+
+    if ptype == "rich_text":
+        parts = prop_value.get("rich_text", [])
+        return "".join(p.get("plain_text", "") for p in parts)
+
+    if ptype == "select":
+        sel = prop_value.get("select")
+        return sel["name"] if sel else None
+
+    if ptype == "multi_select":
+        return [s["name"] for s in prop_value.get("multi_select", [])]
+
+    if ptype == "status":
+        sel = prop_value.get("status")
+        return sel["name"] if sel else None
+
+    if ptype == "number":
+        return prop_value.get("number")
+
+    if ptype == "checkbox":
+        return prop_value.get("checkbox")
+
+    if ptype == "date":
+        d = prop_value.get("date")
+        if not d:
+            return None
+        return {"start": d.get("start"), "end": d.get("end")}
+
+    if ptype == "url":
+        return prop_value.get("url")
+
+    if ptype == "email":
+        return prop_value.get("email")
+
+    if ptype == "phone_number":
+        return prop_value.get("phone_number")
+
+    if ptype == "relation":
+        return [r["id"] for r in prop_value.get("relation", [])]
+
+    if ptype == "rollup":
+        rollup = prop_value.get("rollup", {})
+        rtype = rollup.get("type", "")
+        if rtype == "number":
+            return rollup.get("number")
+        if rtype == "date":
+            d = rollup.get("date")
+            return {"start": d.get("start"), "end": d.get("end")} if d else None
+        if rtype == "array":
+            return [flatten_property(item) for item in rollup.get("array", [])]
+        return rollup
+
+    if ptype == "people":
+        return [{"id": p.get("id"), "name": p.get("name", "")}
+                for p in prop_value.get("people", [])]
+
+    if ptype == "files":
+        return [f.get("name", "") for f in prop_value.get("files", [])]
+
+    if ptype == "formula":
+        f = prop_value.get("formula", {})
+        return f.get(f.get("type", ""))
+
+    if ptype == "unique_id":
+        uid = prop_value.get("unique_id", {})
+        prefix = uid.get("prefix", "")
+        number = uid.get("number")
+        return f"{prefix}{number}" if prefix else number
+
+    return prop_value
+
+
+def resolve_data_source_id(target):
+    """Resolve URL/ID to a data_source ID string."""
+    if target.startswith("http"):
+        raw_id, _ = extract_id_from_url(target)
+    else:
+        raw_id = target.replace("-", "").lower()
+
+    if not raw_id:
+        return None
+
+    ds = ntn_api(f"v1/data_sources/{raw_id}", silent=True)
+    if ds is not None:
+        return ds["id"].replace("-", "")
+
+    db = ntn_api(f"v1/databases/{raw_id}", silent=True)
+    if db is not None:
+        ds_list = db.get("data_sources", [])
+        if ds_list:
+            return ds_list[0]["id"].replace("-", "")
+
+    return None
+
+
+def query_data_source(ds_id, filter_json=None, sorts_json=None, page_size=100,
+                      start_cursor=None, fetch_all=False):
+    """Execute a data_source query, optionally paginating all results."""
+    body = {"page_size": page_size}
+    if filter_json:
+        body["filter"] = json.loads(filter_json)
+    if sorts_json:
+        body["sorts"] = json.loads(sorts_json)
+    if start_cursor:
+        body["start_cursor"] = start_cursor
+
+    data = ntn_api(f"v1/data_sources/{ds_id}/query",
+                   "--data", json.dumps(body))
+
+    results = []
+    for r in data.get("results", []):
+        row = {"id": r["id"]}
+        for pname, pval in r.get("properties", {}).items():
+            row[pname] = flatten_property(pval)
+        results.append(row)
+
+    has_more = data.get("has_more", False)
+    next_cursor = data.get("next_cursor")
+
+    if fetch_all and has_more and next_cursor:
+        more = query_data_source(ds_id, filter_json, sorts_json,
+                                 page_size, next_cursor, fetch_all=True)
+        results.extend(more["results"])
+        has_more = more["has_more"]
+        next_cursor = more.get("next_cursor")
+
+    return {
+        "data_source_id": ds_id,
+        "has_more": has_more,
+        "next_cursor": next_cursor,
+        "count": len(results),
+        "results": results,
+    }
+
+
+def main():
+    parser = JsonArgParser(description="Query Notion data_source")
+    parser.add_argument("target", help="data_source ID, database ID, or URL")
+    parser.add_argument("--filter", help="Notion API filter as JSON string")
+    parser.add_argument("--sorts", help="Notion API sorts as JSON string")
+    parser.add_argument("--limit", type=int, default=100,
+                        help="Page size (default 100)")
+    parser.add_argument("--all", action="store_true",
+                        help="Fetch all pages automatically")
+    args = parser.parse_args()
+
+    ds_id = resolve_data_source_id(args.target)
+    if not ds_id:
+        print(json.dumps({"error": f"Could not resolve data_source from: {args.target}"}),
+              file=sys.stderr)
+        sys.exit(1)
+
+    result = query_data_source(
+        ds_id,
+        filter_json=args.filter,
+        sorts_json=args.sorts,
+        page_size=args.limit,
+        fetch_all=args.all,
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
