@@ -12,19 +12,8 @@
     "npm:pi-snap-edit"
   ],
   "defaultThinkingLevel": "high",
-  "defaultProvider": "zhipuai-coding-plan",
-  "defaultModel": "glm-5.1",
   "quietStartup": true,
   "lastChangelogVersion": "0.78.0",
-  "enabledModels": [
-    "deepseek/deepseek-v4-flash",
-    "deepseek/deepseek-v4-pro",
-    "kimi-coding/kimi-for-coding",
-    "zhipuai-coding-plan/glm-5-turbo",
-    "zhipuai-coding-plan/glm-5.1",
-    "minimax-cn/minimax-m2.7",
-    "minimax-cn/minimax-m3"
-  ],
   "hideThinkingBlock": false,
   "powerline": true,
   "breadcrumb": "inner"
