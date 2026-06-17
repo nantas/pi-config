@@ -20,15 +20,20 @@
 
 **quick_edit 自检：**
 
-1. ✅ **已 read 目标文件**，行号是最新的（文件未在 read 后被其他操作修改）
-2. ✅ **`expectedStartLine` 与实际行内容一致**（缩进/尾部空格不确定时用 `expectedStartLineMatch: "trim"` + `preserveIndent: true`）
+1. ✅ **已 read 目标文件**，行号是最新的。以下任一操作后都必须重新 read，不得沿用旧行号：
+   - 自身执行 `git checkout` / `git stash` / `git reset` 回退文件
+   - 用 bash + sed/Python 脚本修改了同一文件
+   - subagent / 其他工具可能修改了该文件
+2. ✅ **`expectedStartLine` 与实际行内容一致**。缩进/尾部空格不确定时可用 `expectedStartLineMatch: "trim"`；但 **`preserveIndent: true` 要求 `lines` 字段传入无缩进文本**——它会取文件实际行的前导空格拼到每行前面。若 `lines` 已带缩进（常见于从 `read` 直接复制），再开 `preserveIndent` 会**双倍累加**（如 8 空格变 16）。二选一：
+   - `lines` 带完整缩进（推荐，所见即所得）→ `preserveIndent` 留空/省略
+   - `lines` 不带缩进 → 显式设 `preserveIndent: true`
 3. ✅ **批量 edits 的 start/end 范围不重叠**（快照模式，不递增编号）
 
 **target_edit 自检：**
 
 1. ✅ **`target` 是精确字面文本**，不支持正则；多行用 `\n`
    - ⚠️ 每个 op **必须包含 `type` 字段**（`replace`/`delete`/`insert_before`/`insert_after`）。漏掉 `type` 会导致 `anyOf` 四个分支全不匹配，报错 `must have required properties type`——这在构造大 JSON 时极易发生
-2. ✅ **`line` 或 `range` 二选一**（replace/delete）；insert 操作必须带 `line`
+2. ✅ **`line` 或 `range` 二选一**（replace/delete 必填其一，即使 `target` 全文唯一）；insert 操作必须带 `line`。构造多行 `target`（>3 行）的大 JSON 时，落笔前自检每个 op 是否都带 `line` 或 `range`——这是构造大 JSON 时最易遗漏的字段
 3. ✅ **同一文本多处出现时**，必须用 `line` 或 `range` 限定到唯一匹配
 4. ✅ **多个不相连位置的编辑优先用 `quick_edit` 批量模式**（snapshot-based）。`target_edit` 批量 ops 是 sequential 的，`line` 参数会受前序 op 行数增减影响，LLM 预算漂移极易出错。如必须用 `target_edit`，应拆成多次单 op 调用
 5. ✅ **target + replacement 合计超过 ~20 行时**建议改用 `quick_edit`（基于行号更可靠）或 `bash` + Python 脚本。target_edit 引擎本身无长度上限，但 LLM 构造超大 JSON 参数（>10KB）时格式错误风险显著增加（未转义引号、截断等），导致 Pi 框架层 schema 验证失败
