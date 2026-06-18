@@ -1,15 +1,4 @@
 {
-  "packages": [
-    "npm:@tmustier/pi-tab-status",
-    "npm:@johnnywu/pi-subagents@1.5.0",
-    "git:github.com/jwu/pi-powerline",
-    "git:github.com/lucasmeijer/pi-terminal-signals",
-    "git:github.com/nantas/pi-tool-display",
-    "npm:pi-mcp-adapter",
-    "git:github.com/rwese/pi-question",
-    "git:github.com/jwu/pi-webfetch",
-    "npm:@ff-labs/pi-fff"
-  ],
   "defaultThinkingLevel": "high",
   "quietStartup": true,
   "lastChangelogVersion": "0.78.0",
