@@ -34,9 +34,9 @@
 
 1. ✅ **`target` 是精确字面文本**，不支持正则；多行用 `\n`
    - ⚠️ 每个 op **必须包含 `type` 字段**（`replace`/`delete`/`insert_before`/`insert_after`）。漏掉 `type` 会导致 `anyOf` 四个分支全不匹配，报错 `must have required properties type`——这在构造大 JSON 时极易发生
-2. ✅ **`line` 或 `range` 二选一**（replace/delete 必填其一，即使 `target` 全文唯一）；insert 操作必须带 `line`。构造多行 `target`（>3 行）的大 JSON 时，落笔前自检每个 op 是否都带 `line` 或 `range`——这是构造大 JSON 时最易遗漏的字段
-3. ✅ **同一文本多处出现时**，必须用 `line` 或 `range` 限定到唯一匹配
-4. ✅ **多个不相连位置的编辑优先用 `quick_edit` 批量模式**（snapshot-based）。`target_edit` 批量 ops 是 sequential 的，`line` 参数会受前序 op 行数增减影响，LLM 预算漂移极易出错。如必须用 `target_edit`，应拆成多次单 op 调用
+2. ✅ **选择器（`line`/`range`）可选**，replace/delete 支持 4 种组合：① 都省略 → `target` 必须全文唯一；② 仅 `line` → 该行恰好 1 处；③ 仅 `range` → 范围内所有出现都替换/删除；④ `line`+`range` → range 选全部 + 验证某行有交叉（`line` 作验证提示）。insert_before/insert_after 仍必带 `line`。仅当 `target` 多处出现且需要消歧时才加选择器，单次唯一 target 省略即可
+3. ✅ **`matchMode: "trim"`**（4.2.0+，对偶 quick_edit 的 `expectedStartLineMatch`）：从 `read` 复制文本但缩进/尾空格可能漂移时用 trim。整行去首尾空格比较，**保留文件原缩进**；replacement 首尾空格自动 strip（避免双缩进）；拒绝纯空格 target；不消费行尾换行。与 quick_edit `preserveIndent` 的取舍同理：replacement 自带缩进就别叠 trim 行为
+4. ✅ **多个不相连位置的编辑优先用 `quick_edit` 批量模式**（snapshot-based）。`target_edit` 批量 ops 是 sequential 的，`line`/`range` 参数会受前序 op 行数增减影响，LLM 预算漂移极易出错。如必须用 `target_edit`，应拆成多次单 op 调用
 5. ✅ **target + replacement 合计超过 ~20 行时**建议改用 `quick_edit`（基于行号更可靠）或 `bash` + Python 脚本。target_edit 引擎本身无长度上限，但 LLM 构造超大 JSON 参数（>10KB）时格式错误风险显著增加（未转义引号、截断等），导致 Pi 框架层 schema 验证失败
 
 **不能覆盖 → 兜底 bash+sed/Python：**
