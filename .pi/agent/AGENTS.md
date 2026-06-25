@@ -28,6 +28,7 @@
    - `lines` 带完整缩进（推荐，所见即所得）→ `preserveIndent` 留空/省略
    - `lines` 不带缩进 → 显式设 `preserveIndent: true`
 3. ✅ **批量 edits 的 start/end 范围不重叠**（快照模式，不递增编号）
+4. ✅ **`start` 不设 `end` = 单行替换。** 即使 `lines` 数组包含多行内容，`quick_edit` 也只替换 `start` 到 `end`（默认 `end=start`）范围内的行。替换多行 block（方法体、lambda 表达式、if/for 块）时，**必须显式指定 `end`** 覆盖到 block 的结束行。不确定 block 结束行号时优先用 `target_edit` 的 `replace` 模式。
 
 **target_edit 自检：**
 
@@ -115,6 +116,8 @@ fff 只负责**检索**，代码编辑使用 snap-edit 工具或兜底 bash+sed�
 |----------|------|
 | 已知行号的单行/小范围替换 | `quick_edit` |
 | 已知行号的大段替换或整段删除 | `quick_edit`（`lines: []` 删除） |
+| 已知起止行号替换整个 block/方法/lambda | `quick_edit`（**必须设 `end`**） |
+| 替换 block/方法但不确定结束行号 | `target_edit` `replace` 模式 |
 | 精确文本替换/插入/删除（单次操作） | `target_edit` |
 | 同文件多处不相关编辑 | `quick_edit` 批量模式（snapshot-based） |
 | 多处不相连位置按文本匹配替换 | 多次单 op `target_edit` 或 `quick_edit` 批量，**不要 `target_edit` 批量**（sequential 行号漂移） |
