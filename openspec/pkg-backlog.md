@@ -3,6 +3,24 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-06-29 — git:github.com/DietrichGebert/ponytail
+
+- **Version:** 4.8.4
+- **Research Date:** 2026-06-29
+- **Resource Types:** extension (ponytail 命令/mode 注入) + skills (ponytail, ponytail-review, ponytail-audit, ponytail-debt, ponytail-gain, ponytail-help)
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/DietrichGebert/ponytail
+- **Install Method:** pi-install
+- **Has Dependencies:** false（零运行时依赖、零 peer 依赖）
+- **Reason:** 反过度工程行为约束 skill。机制是纯 system prompt 注入——通过 before_agent_start 事件把"老练工程师阶梯规则"（YAGNI→复用→stdlib→原生平台特性→已装依赖→一行→最小可行）拼接到 systemPrompt。官方提供扎实 agentic benchmark（为回应 issue #126 批评而重建）：12 任务 Haiku 4.5 n=4，LOC -54%/tokens -22%/cost -20%/time -27%/安全 100%；大胜在原生特性替代（date picker 404→23 行）。理念与现有 AGENTS.md 简洁纪律高度契合，与 caveman（terse-prose）定位互补
+- **Notes:**
+  1. **机制**：注册 `/ponytail [lite|full|ultra|off|status|default]` 命令 + 状态栏（🌿/⚡/🔥），full 为默认模式，每次 agent 启动注入规则；session_start 从 entries 恢复上次模式（持久化）
+  2. **安全护栏**：永不简化信任边界验证/防数据丢失错误处理/安全/可访问性；永不偷懒于理解问题（先读代码追踪流程再选档）；非平凡逻辑必须留一个 assert 自检或小测试
+  3. **潜在冲突**：full 全局注入持续消耗 token；测试风格反对 frameworks/fixtures（与 TDD skill 哲学不同，需 agent 自行权衡）；全局生效影响所有 session 默认行为
+  4. **证据**：benchmarks/results/2026-06-18-agentic.md 是主证据，方法学扎实（headless Claude Code 公平基线、git diff 计量、对抗性安全测试），可复现（npx promptfoo eval -c benchmarks/promptfooconfig.yaml）；作者公开修复过自己数据的 contamination bug
+  5. **卸载**：`pi uninstall ponytail`，额外清理需 `node scripts/uninstall.js`（清 mode flag + ~/.config/ponytail/config.json + statusLine）
+
 ### 2026-06-10 — npm:pi-snap-edit
 
 - **Version:** 4.0.0

@@ -62,6 +62,7 @@ global:
       - git:github.com/jwu/pi-webfetch
       - npm:@ff-labs/pi-fff
       - npm:pi-snap-edit
+      - git:github.com/DietrichGebert/ponytail
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
