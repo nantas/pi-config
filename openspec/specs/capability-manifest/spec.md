@@ -76,3 +76,22 @@ The system SHALL distinguish between file-based catalog entries (skills, extensi
 #### Scenario: Skill has no type field
 - **WHEN** a catalog skill entry has no `type` field
 - **THEN** the install workflow treats it as file-based and copies files
+
+### Requirement: Global Settings Packages List Is Authoritative
+`.pi/capabilities.yaml` 的 `global.settings.packages` 列表 SHALL 是全局同步到 `~/.pi/agent/settings.json` 的权威 packages 来源。运行 `scripts/sync-pi-agent.sh` 时，该列表 MUST 作为 authoritative 列表驱动 settings.json 的 packages 字段——列表中不存在的条目 MUST 从 settings.json 移除。
+
+#### Scenario: 移除 package 后同步 settings
+- **WHEN** `global.settings.packages` 不再包含某个 package 且运行 sync 脚本
+- **THEN** `~/.pi/agent/settings.json` 的 `packages` 数组不再包含该 package 条目
+
+#### Scenario: manifest 为权威列表
+- **WHEN** 检查 `.pi/capabilities.yaml` 与 `~/.pi/agent/settings.json` 的 packages
+- **THEN** settings.json 的 packages 与 manifest 列表一致，manifest 为唯一权威来源
+
+### Requirement: Package Removal Must Clean Node Modules
+当从全局能力移除一个已安装的 package 时，MUST 在 sync 脚本重写 `settings.json` 之外，额外执行 `pi remove <source>`（或等价的手动清理 `~/.pi/agent/npm/node_modules/<pkg>`），因为 sync 脚本只重写配置文件、不卸载已安装的 node_modules。验证 MUST 确认 `~/.pi/agent/` 下不再存在该包目录。
+
+#### Scenario: 完整移除已安装 package
+- **WHEN** 从 manifest 移除一个已安装的 package 并完成同步
+- **THEN** 执行 `pi remove <source>` 后 `~/.pi/agent/npm/node_modules/<pkg>` 目录不再存在
+- **THEN** 新 session 不再加载该 package 注册的工具

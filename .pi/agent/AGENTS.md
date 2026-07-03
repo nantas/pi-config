@@ -13,39 +13,16 @@
 
 ## Tool Call Guidelines
 
-### 编辑工具（quick_edit / target_edit）
+### Edit Tool
 
-> pi-snap-edit 在 session 启动时替换内置 `edit` 为 `quick_edit` + `target_edit`。
-> 以下规则适用于这两个工具。内置 `edit` 不再活跃。
+**调用前 3 项自检（逐项确认后再发请求）：**
 
-**quick_edit 自检：**
+1. ✅ **`path` 是顶层字段**，不在 `edits[]` 内部
+2. ✅ **每条 `oldText` / `newText` ≤ 200 字符**，超过则换 bash + sed
+3. ✅ **单次 ≤ 4 条 edits**，超过则拆分为多次调用
 
-1. ✅ **已 read 目标文件**，行号是最新的。以下任一操作后都必须重新 read，不得沿用旧行号：
-   - 自身执行 `git checkout` / `git stash` / `git reset` 回退文件
-   - 用 bash + sed/Python 脚本修改了同一文件
-   - subagent / 其他工具可能修改了该文件
-2. ✅ **`expectedStartLine` 与实际行内容一致**。缩进/尾部空格不确定时可用 `expectedStartLineMatch: "trim"`；但 **`preserveIndent: true` 要求 `lines` 字段传入无缩进文本**——它会取文件实际行的前导空格拼到每行前面。若 `lines` 已带缩进（常见于从 `read` 直接复制），再开 `preserveIndent` 会**双倍累加**（如 8 空格变 16）。二选一：
-   - `lines` 带完整缩进（推荐，所见即所得）→ `preserveIndent` 留空/省略
-   - `lines` 不带缩进 → 显式设 `preserveIndent: true`
-3. ✅ **批量 edits 的 start/end 范围不重叠**（快照模式，不递增编号）
-4. ✅ **`start` 不设 `end` = 单行替换。** 即使 `lines` 数组包含多行内容，`quick_edit` 也只替换 `start` 到 `end`（默认 `end=start`）范围内的行。替换多行 block（方法体、lambda 表达式、if/for 块）时，**必须显式指定 `end`** 覆盖到 block 的结束行。不确定 block 结束行号时优先用 `target_edit` 的 `replace` 模式。
-
-**target_edit 自检：**
-
-1. ✅ **`target` 是精确字面文本**，不支持正则；多行用 `\n`
-   - ⚠️ 每个 op **必须包含 `type` 字段**（`replace`/`delete`/`insert_before`/`insert_after`）。漏掉 `type` 会导致 `anyOf` 四个分支全不匹配，报错 `must have required properties type`——这在构造大 JSON 时极易发生
-2. ✅ **选择器（`line`/`range`）可选**，replace/delete 支持 4 种组合：① 都省略 → `target` 必须全文唯一；② 仅 `line` → 该行恰好 1 处；③ 仅 `range` → 范围内所有出现都替换/删除；④ `line`+`range` → range 选全部 + 验证某行有交叉（`line` 作验证提示）。insert_before/insert_after 仍必带 `line`。仅当 `target` 多处出现且需要消歧时才加选择器，单次唯一 target 省略即可
-3. ✅ **`matchMode: "trim"`**（4.2.0+，对偶 quick_edit 的 `expectedStartLineMatch`）：从 `read` 复制文本但缩进/尾空格可能漂移时用 trim。整行去首尾空格比较，**保留文件原缩进**；replacement 首尾空格自动 strip（避免双缩进）；拒绝纯空格 target；不消费行尾换行。与 quick_edit `preserveIndent` 的取舍同理：replacement 自带缩进就别叠 trim 行为
-4. ✅ **多个不相连位置的编辑优先用 `quick_edit` 批量模式**（snapshot-based）。`target_edit` 批量 ops 是 sequential 的，`line`/`range` 参数会受前序 op 行数增减影响，LLM 预算漂移极易出错。如必须用 `target_edit`，应拆成多次单 op 调用
-5. ✅ **target + replacement 合计超过 ~20 行时**建议改用 `quick_edit`（基于行号更可靠）或 `bash` + Python 脚本。target_edit 引擎本身无长度上限，但 LLM 构造超大 JSON 参数（>10KB）时格式错误风险显著增加（未转义引号、截断等），导致 Pi 框架层 schema 验证失败
-
-**不能覆盖 → 兜底 bash+sed/Python：**
-
-- 多文件同时编辑
-- 行号不确定且无法先 read
-- 需要模糊/正则匹配
-- 批量 checkbox 等简单文本替换（`sed -i ''` 更直接）
-- 大段文本替换（target + replacement 合计 >20 行）
+- **Avoid overlap**: 多个 `edits[]` 的 `oldText` 不能在原始文件中重叠
+- **Prefer sed for bulk**: 简单文本替换（如 `[ ]` → `[x]`）直接用 `sed -i ''` 而非 edit
 
 ### Bash Tool
 
@@ -110,21 +87,14 @@
 
 ### 编辑工作流（发现 → 修改）
 
-fff 只负责**检索**，代码编辑使用 snap-edit 工具或兜底 bash+sed：
+fff 只负责**检索**，代码编辑回退到基础工具：
 
 | 编辑场景 | 工具 |
 |----------|------|
-| 已知行号的单行/小范围替换 | `quick_edit` |
-| 已知行号的大段替换或整段删除 | `quick_edit`（`lines: []` 删除） |
-| 已知起止行号替换整个 block/方法/lambda | `quick_edit`（**必须设 `end`**） |
-| 替换 block/方法但不确定结束行号 | `target_edit` `replace` 模式 |
-| 精确文本替换/插入/删除（单次操作） | `target_edit` |
-| 同文件多处不相关编辑 | `quick_edit` 批量模式（snapshot-based） |
-| 多处不相连位置按文本匹配替换 | 多次单 op `target_edit` 或 `quick_edit` 批量，**不要 `target_edit` 批量**（sequential 行号漂移） |
-| 行号不确定或文件已被修改 | 先 `read` 获取行号，再 `quick_edit` |
-| 多文件编辑 / 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证 |
-| 批量 checkbox / 简单文本替换 | `bash` + `sed -i ''` |
-| 模糊或正则匹配需求 | `bash` + `sed` / `awk` |
+| 小范围精确替换（≤200 字符） | `edit` tool |
+| 大范围替换 / 多文件 | `bash` + `sed` |
+| 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证所有引用已更新 |
+| 批量 checkbox 替换 | `bash` + `sed -i ''` |
 
 ## Subagent 自动委派
 

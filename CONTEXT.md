@@ -68,9 +68,6 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 **代码检索**：
 使用 fff（`ffgrep`/`fffind`）做 frecency 排序的文本搜索，替代 LSP 级别的代码智能。
 
-**行号编辑**：
-通过 `pi-snap-edit` 包注册的 `quick_edit` 和 `target_edit` 替代内置 `edit`。按行号定位编辑（`quick_edit`）或按精确文本定位编辑（`target_edit`），支持批量原子操作、行首内容守卫和 trim 匹配模式。
-
 ---
 
 ## OpenSpec 索引
@@ -86,6 +83,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 全局同步、同步脚本 | `pi-runtime-bootstrap-sync`, `pkg-global-sync`, `sync-env-check`, `global-agent-md-sync` |
 | 全局同步确认 | `pi-global-runtime-sync-confirmation`, `pi-config-closeout-settings-governance` |
 | settings 生成 | `pi-fff-env-config`, `pi-fff-global-package` |
+| 全局包移除、node_modules 清理 | `capability-manifest` |
 | 变更收尾 | `pi-config-closeout-settings-governance` |
 
 ### 扩展
