@@ -53,7 +53,7 @@ global:
   settings:
     packages:
       - npm:@tmustier/pi-tab-status
-      - npm:@johnnywu/pi-subagents@1.5.0
+      - npm:@johnnywu/pi-subagents
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
