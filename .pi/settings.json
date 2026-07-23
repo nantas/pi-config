@@ -6,6 +6,7 @@
   "powerline": true,
   "breadcrumb": "inner",
   "packages": [
-    "git:github.com/DietrichGebert/ponytail"
+    "git:github.com/DietrichGebert/ponytail",
+    "git:github.com/nantas/pi-xai"
   ]
 }

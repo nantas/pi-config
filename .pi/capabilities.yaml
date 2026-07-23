@@ -62,6 +62,7 @@ global:
       - git:github.com/jwu/pi-webfetch
       - npm:@ff-labs/pi-fff
       - git:github.com/DietrichGebert/ponytail
+      - git:github.com/nantas/pi-xai
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash

@@ -296,3 +296,35 @@ at the top of this file using the following format:
 - **Security**: CLEAN — all spawn/fetch calls are functional, no injection risks
 - **External requirements**: `scrapling` (Python CLI), `gh` (GitHub CLI, authenticated)
 - **Capabilities sync**: Added to `global.settings.packages` in capabilities.yaml
+
+### 2026-07-23 — pi-xai
+
+- **Version:** 0.17.0
+- **Research Date:** 2026-07-23
+- **Resource Types:** extension
+- **Decision:** global
+- **Source Type:** npm-package
+- **Source Repo:** https://github.com/luxus/pi-xai
+- **Install Method:** pi-install
+- **Has Dependencies:** true (typebox runtime; pi-ai/pi-coding-agent >=0.80 peer, satisfied)
+- **Reason:** 在 pi 内使用 grok 模型生图。包提供 /imagine + image_gen 工具，完全契合需求。安全审查 CLEAN（仅官方 xAI/Grok 域名 + localhost OAuth 回调，无命令执行/动态执行/混淆），运行时闭包零漏洞，无冲突。
+- **Notes:**
+  - 命令：/imagine, /imagine-video, /goal, /plan, /xai-usage, /xai-suggest, /xai-vision:status, /login grok-build
+  - 工具：image_gen, image_edit, image_to_video, web_fetch, xai_x_search
+  - 使用前需 /login grok-build (OAuth 推荐) 或设 XAI_API_KEY (公共 API 可选)
+  - 可选 env：XAI_PROMPT_SUGGESTIONS=0 禁用提示建议；XAI_PROMPT_SUGGESTIONS_MODEL 覆盖建议模型 (均未声明到 global.env，因核心功能无需)
+  - .pi/npm 共享工作区 13 个 transitive 漏洞来自其他历史包 (pi-mcp-adapter/pi-subagents/@modelcontextprotocol/sdk)，与 pi-xai 无关
+  - Requires Pi >= 0.80 (当前 0.81.1 OK)
+
+### 2026-07-23 — pi-xai (fork)
+
+- **Version:** 0.17.0 (forked from luxus/pi-xai@324b56c)
+- **Fork Date:** 2026-07-23
+- **Fork URL:** https://github.com/nantas/pi-xai
+- **Upstream:** https://github.com/luxus/pi-xai
+- **Decision:** fork (active)
+- **Reason:** 上游 registerShortcut("tab") 无条件覆盖 pi 内置 tui.input.tab (restrictOverride:false → 扩展赢得 dispatch)，导致所有场景下 '/' '$' 命令的 tab 补全失效。handler 在消费事件后 return，无 fallback。
+- **Changes:** xai-prompt-suggest.ts 移除 registerShortcut("tab") 块（8 行）+ 根因注释；CHANGELOG 加 [Unreleased] 条目。Ghost 文本仍显示，仅失去 Tab-to-accept 交互。
+- **Source switch:** npm:pi-xai → git:github.com/nantas/pi-xai (capabilities.yaml global.settings.packages + 项目 settings.json + 全局 ~/.pi/agent/settings.json)
+- **Commit:** 485c75c fix(prompt-suggest): remove unconditional tab shortcut override
+- **Upstream sync:** 待上游修复后可考虑回归 npm 源（pending issue/PR to luxus/pi-xai）
