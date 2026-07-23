@@ -46,6 +46,21 @@
 - 需要限定来源可信度时，用 `search_domain_filter` 过滤。
 - 需要时效性时，用 `search_recency_filter` 缩小范围。
 
+## 图片格式兼容性（openai-codex 后端）
+
+走 `openai-codex` provider 的模型（如 gpt-5.5，ChatGPT 登录）只接受 visual input 为 **jpeg / png / gif / webp**。其他格式（AVIF、HEIC/HEIF、BMP、TIFF 等）会触发后端拒绝**整个请求**，报错 "The image data you provided does not represent a valid image"。
+
+**触发场景**：webfetch 下载参考图、读取本地图片作视觉输入、抓取网页图片进会话时（现代 CDN 常默认下发 AVIF/WebP）。
+
+**处理**：图片进入会话前先检测格式，非支持格式转码为 png/jpeg。macOS 内置 `sips`（实测支持 AVIF/HEIC/HEIF/BMP/TIFF 读→png/jpeg 写）：
+
+```bash
+file ref.avif                              # 检测实际格式
+sips -s format png ref.avif --out ref.png  # 转码为 png（批量：for f in *.avif; do ...）
+```
+
+判定：`image/*` 中除 jpeg/png/gif/webp 外一律转码后再作视觉输入。SVG 为矢量，sips 不支持，需先栅格化（`rsvg-convert -h 1024 in.svg -o out.png` 或浏览器截图）或向用户索要位图版本。
+
 ## 代码检索与文件定位（fff）
 
 **当 `ffgrep` 和 `fffind` 可用时，必须作为代码检索和文件定位的默认工具。**
