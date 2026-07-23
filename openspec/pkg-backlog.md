@@ -328,3 +328,24 @@ at the top of this file using the following format:
 - **Source switch:** npm:pi-xai → git:github.com/nantas/pi-xai (capabilities.yaml global.settings.packages + 项目 settings.json + 全局 ~/.pi/agent/settings.json)
 - **Commit:** 485c75c fix(prompt-suggest): remove unconditional tab shortcut override
 - **Upstream sync:** 待上游修复后可考虑回归 npm 源（pending issue/PR to luxus/pi-xai）
+
+### 2026-07-23 — pi-codex-image-gen
+
+- **Version:** 0.1.12
+- **Research Date:** 2026-07-23
+- **Resource Types:** extension + skill
+- **Decision:** global
+- **Source Type:** npm-package
+- **Source Repo:** https://pi.dev/packages/pi-codex-image-gen (npm:pi-codex-image-gen)
+- **Install Method:** pi-install
+- **Has Dependencies:** false (0 runtime; pi-ai/pi-coding-agent/typebox peer, all Pi core)
+- **Reason:** 在 pi 内使用 gpt-image-2 模型生图/编辑。包提供 codex_generate_image 工具 + imagegen skill，完全契合需求。安全审查 CLEAN（仅 chatgpt.com 官方 Codex 后端 + 作者 mocito.dev 安装计数遥测，可关闭），0 运行时依赖不引入漏洞，无冲突。
+- **Notes:**
+  - 工具：codex_generate_image (gpt-image-2 生图/编辑，支持最多 5 张引用图)
+  - 认证：复用 Pi openai-codex 登录 (ChatGPT Plus/Pro)，无需 OPENAI_API_KEY
+  - 使用前需 /login 选 "ChatGPT Plus/Pro (Codex)" 完成 OAuth
+  - 配置：~/.pi/agent/extensions/codex-image-gen.json (save/model/saveDir)；env PI_CODEX_IMAGE_SAVE_MODE/PI_CODEX_IMAGE_SAVE_DIR/PI_OFFLINE/PI_TELEMETRY
+  - 遥测：作者 mocito.dev 安装计数 (仅 tool+version)，PI_OFFLINE=1 / PI_TELEMETRY=0 / settings.enableInstallTelemetry:false 可关
+  - fallback CLI: skills/imagegen/scripts/image_gen.py (需 OPENAI_API_KEY，衍生自 OpenAI Codex，Apache-2.0)
+  - .pi/npm 共享工作区 7 个漏洞为存量 (ponytail/pi-xai 等)，与本包无关
+  - Capabilities sync: Added to global.settings.packages in capabilities.yaml

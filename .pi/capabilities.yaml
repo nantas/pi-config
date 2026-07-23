@@ -63,6 +63,7 @@ global:
       - npm:@ff-labs/pi-fff
       - git:github.com/DietrichGebert/ponytail
       - git:github.com/nantas/pi-xai
+      - npm:pi-codex-image-gen
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
