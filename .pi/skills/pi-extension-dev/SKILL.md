@@ -98,7 +98,7 @@ If your extension needs `ctx.ui.setEditorComponent()`, note that **this is an ex
 
 **Preferred alternative**: Use `ctx.ui.addAutocompleteProvider()` when you only need to customize autocomplete behavior. The `addAutocompleteProvider` chain is compositional — multiple extensions can safely stack wrappers.
 
-See [docs/reference/pi-extension-editor-conflict.md](../../docs/reference/pi-extension-editor-conflict.md) for detailed explanation, diagnostic traces, compatibility strategies, and code patterns.
+See [docs/reference/pi-extension-editor-conflict.md](../../../docs/reference/pi-extension-editor-conflict.md) for detailed explanation, diagnostic traces, compatibility strategies, and code patterns.
 
 ### B2 — Tool vs Command vs Shortcut vs Flag
 
@@ -185,6 +185,17 @@ export default function (pi: ExtensionAPI) {
   // Refer to docs/plans/pi-customization-reference.md Section 3 for the minimal template
 }
 ```
+
+#### Tool 注册字段名（易踩坑，必读）
+
+`registerTool` 的配置对象有**固定字段名**，不是 MCP/OpenAI 的 convention。误用会被严格 provider（grok/xAI）暴露为 422，但在 deepseek/gpt 下静默通过，详见 [docs/reference/pi-extension-tool-registration.md](../../../docs/reference/pi-extension-tool-registration.md)。
+
+| 用途 | ❌ 误用 | ✅ 正确 |
+|------|:---:|:---:|
+| 参数 schema | `inputSchema` | `parameters: Type.Object({...})` |
+| 执行器 | `handler` | `async execute(toolCallId, params, signal, onUpdate, ctx)` |
+
+提交前确认：execute 返回 `{ content: [{ type: "text", text }] }` 或纯字符串。
 
 **Subdirectory pattern** (`.pi/extensions/<name>/index.ts`):
 - Create `.pi/extensions/<name>/package.json` with dependencies
@@ -337,7 +348,7 @@ This finalizes the change and updates the project progress page.
 | Method | Purpose | Source Location |
 |---|---|---|
 | `pi.on(event, handler)` | Subscribe to lifecycle events | extensions.md → "Key Events" |
-| `pi.registerTool(config)` | Register LLM-callable tool | extensions.md → "Tool Registration" |
+| `pi.registerTool(config)` | Register LLM-callable tool（字段名 `parameters`/`execute`，**非** `inputSchema`/`handler`，见 [tool-registration pitfall](../../../docs/reference/pi-extension-tool-registration.md)） | extensions.md → "Tool Registration" |
 | `pi.registerCommand(name, config)` | Register `/command` | extensions.md → "Commands" |
 | `pi.registerShortcut(keys, config)` | Register keyboard shortcut | extensions.md → "Shortcuts" |
 | `pi.registerFlag(name, config)` | Register `--flag` | extensions.md → "Flags" |

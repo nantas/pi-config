@@ -223,7 +223,7 @@ export default function (pi: ExtensionAPI): void {
       "the wikilink pipe separator as \\|. Skips matches already inside [[...]]. " +
       "Does NOT discover file paths — mapping must be provided by the caller. " +
       "Modifies the file in-place and returns replacement statistics.",
-    inputSchema: Type.Object({
+    parameters: Type.Object({
       file: Type.String({
         description: "Target file path (absolute or project-relative)",
       }),
@@ -247,6 +247,9 @@ export default function (pi: ExtensionAPI): void {
         },
       ),
     }),
-    handler: handleBatchReplace,
+    async execute(_toolCallId, input: ToolInput, _signal, _onUpdate, _ctx) {
+      const result = await handleBatchReplace(input);
+      return { content: [{ type: "text", text: result }] };
+    },
   });
 }
