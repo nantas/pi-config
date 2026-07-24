@@ -77,7 +77,7 @@ These values become the authoritative global defaults once global sync is later 
 - **THEN** project-local behavior SHALL remain usable independently of global runtime
 
 ### Requirement: Artifact Persistence
-The system SHALL store fusion harness run artifacts in `.scratch/fusion-harness/` within the session's working directory, instead of `/tmp/`.
+The system SHALL store fusion harness run artifacts in `.scratch/fusion-harness/` within the session's working directory, instead of `/tmp/`, and SHALL treat that tree as the sole lifecycle scope of `/fusion-housekeep` (run directories only; session cache excluded).
 
 #### Scenario: Artifacts persist across sessions
 - **WHEN** a `/fusion` or `/auto-validate` command completes
@@ -86,6 +86,10 @@ The system SHALL store fusion harness run artifacts in `.scratch/fusion-harness/
 #### Scenario: Session data follows artifacts root
 - **WHEN** persistent role sessions are stored
 - **THEN** they SHALL use `ARTIFACT_ROOT/fusion-harness-sessions/<project-slug>/` rather than `/tmp/fusion-harness-sessions/`
+
+#### Scenario: Housekeep does not manage session cache
+- **WHEN** the user runs any `/fusion-housekeep` subcommand or housekeep tools
+- **THEN** the system SHALL NOT delete or archive `fusion-harness-sessions/` contents as part of status, archive, or clean
 
 ### Requirement: Sub-agent Context Inheritance
 The system SHALL allow child agents (ARCHITECT worker, BUILDER worker, FUSION, VALIDATOR, TRIAGE) to inherit the repository's skills and context files while preventing recursive extension loading.
@@ -113,3 +117,56 @@ The system SHALL instruct the FUSION agent to write all outputs to the run's art
 #### Scenario: No contradictory path instructions
 - **WHEN** the FUSION merge prompt template is rendered
 - **THEN** it SHALL NOT contain any instruction suggesting `/tmp` as a default output location
+
+### Requirement: Run Index Dual-Write
+The system SHALL maintain a run index file at `<cwd>/.scratch/fusion-harness/run-index.jsonl` by upserting a JSON line when `/opinion`, `/fusion`, or `/auto-validate` completes with an artifacts directory (including partial failure paths), and by reconciling that index against on-disk `fusion-harness-*` run directories when housekeep tools or `/fusion-housekeep` subcommands run.
+
+#### Scenario: Command completion indexes the run
+- **WHEN** `/opinion`, `/fusion`, or `/auto-validate` finishes and has created an artifacts run directory under `ARTIFACT_ROOT`
+- **THEN** the extension SHALL upsert one index record that at least includes `ts`, `command`, `ok`, `dir`, and available cost/duration fields
+
+#### Scenario: Reconcile discovers runs without summary
+- **WHEN** reconcile scans a run directory without `summary.json`
+- **THEN** the system SHALL still create or keep an index row using directory mtime and basename (command/ok may be unknown or inferred)
+
+### Requirement: Fusion Housekeep Command And Tools
+The system SHALL register `/fusion-housekeep` and agent tools (`fusion_list_runs`, `fusion_run_inventory`, `fusion_archive_apply`) for run lifecycle management without spawning a child pi agent for housekeep itself.
+
+#### Scenario: Status lists runs after reconcile
+- **WHEN** the user runs `/fusion-housekeep status`
+- **THEN** the command SHALL reconcile the index and display each known run with command (or unknown), ok, topic when available, cost if known, archived flag, and directory identity
+
+#### Scenario: Archive is agent-driven
+- **WHEN** the user runs `/fusion-housekeep` with no args or `archive`
+- **THEN** the extension SHALL inject an agent workflow prompt (not a script "re-run with id" menu) so the agent lists runs, interacts with the user, and applies copies only after confirmation via tools
+
+#### Scenario: Empty artifact root is non-fatal
+- **WHEN** `ARTIFACT_ROOT` does not exist or contains no run directories
+- **THEN** status/list tools SHALL report that there are no runs and SHALL NOT throw
+
+### Requirement: Archive High-Value Artifacts
+The system SHALL support archiving high-value run files to project paths, recording destinations on the index row, and marking the run archived without deleting the run directory.
+
+#### Scenario: Default high-value file set
+- **WHEN** inventory classifies high-value candidates
+- **THEN** defaults SHALL include `fused-report*.md` and `gate.py` at the run root, and SHALL NOT treat `fused.md` as high-value by default
+
+#### Scenario: Apply after confirmation
+- **WHEN** the agent calls `fusion_archive_apply` (or equivalent apply mapping) with user-confirmed source→destination mappings
+- **THEN** the system SHALL copy those files, set the index row `archived` to true with `copied` records, and leave the run directory on disk
+
+### Requirement: Clean Run Directories
+The system SHALL support `/fusion-housekeep clean` that deletes whole run directories under `ARTIFACT_ROOT`, retaining the most recent N runs by default (N = 3), after reconcile.
+
+#### Scenario: Default retain last three runs
+- **WHEN** the user runs `/fusion-housekeep clean` with no retention override
+- **THEN** the command SHALL plan to delete all but the three most recent run directories and SHALL NOT delete `fusion-harness-sessions`
+
+#### Scenario: High-value unarchived confirmation
+- **WHEN** the planned delete set includes at least one run that is not archived and still contains a default high-value file
+- **THEN** the command SHALL list those paths, request a single user confirmation, and only delete if confirmed
+
+#### Scenario: Clean removes whole directory
+- **WHEN** clean proceeds after any required confirmation
+- **THEN** each selected run directory SHALL be removed entirely, and the index SHALL drop those rows on the next reconcile
+

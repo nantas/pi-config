@@ -20,7 +20,7 @@ forks:
     upstream_source: "git:github.com/disler/fusion-harness"
     status: active
     last_upstream_sync: null
-    changes_summary: "v0.1.1: added package.json with pi.extensions declaration; v0.1.0: ARTIFACT_ROOT -> .scratch/fusion-harness/; sub-agent inherit skills/context; FUSION prompt lock output; settings.json fusionHarness fallback."
+    changes_summary: "v0.1.8: archive injects agent+tools (question UX); v0.1.7: agent-driven archive inventory+apply (no fused.md HV); v0.1.6: archive folder+slug; v0.1.5: status shows prompt topic; v0.1.4: /fusion-housekeep status|archive|clean + run-index.jsonl dual-write/reconcile; v0.1.1: package.json pi.extensions; v0.1.0: ARTIFACT_ROOT .scratch/fusion-harness/, sub-agent skills/context, FUSION output lock, fusionHarness settings fallback."
   - name: pi-xai
     fork_url: "https://github.com/nantas/pi-xai"
     upstream_url: "https://github.com/luxus/pi-xai"
