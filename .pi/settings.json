@@ -9,12 +9,12 @@
     "git:github.com/DietrichGebert/ponytail",
     "git:github.com/nantas/pi-xai",
     "npm:pi-codex-image-gen",
-    "git:github.com/nantas/fusion-harness#v0.1.3"
+    "git:github.com/nantas/fusion-harness"
   ],
   "fusionHarness": {
-    "architect": "deepseek/deepseek-v4-pro",
-    "builder": "zhipuai-coding-plan/glm-5.2",
+    "architect": "kimi-coding/k3",
+    "builder": "grok-build/grok-4.5",
     "architectThinking": "high",
-    "builderThinking": "medium"
+    "builderThinking": "high"
   }
 }

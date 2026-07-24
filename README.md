@@ -239,6 +239,13 @@ export POWERLINE_NERD_FONTS=1
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.env.pi-fff`
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
+#### `fusion-harness`
+
+- **来源**: `git:github.com/nantas/fusion-harness`（无版本 pin）
+- **描述**: 多模型编排扩展，提供 `/opinion`、`/fusion`、`/auto-validate`；`global.settings.fusionHarness` 配置 architect/builder 默认模型。
+- **解决的问题**: 单模型方案偏置时，用 architect+builder 并行产出再融合，形成可复用的多模型工作流。
+- **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.settings.fusionHarness`
+
 #### 环境变量配置（`global.env` / `catalog.env`）
 
 部分能力需要环境变量才能启用全部功能（如数据库路径、API key 等）。`capabilities.yaml` 通过 `global.env` 和 `catalog.env` 字段声明这些变量，**按能力 ID 分组**，与 `global.settings.packages`、`global.extensions`、`global.skills`、`global.agents` 中的能力条目对应。

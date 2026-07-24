@@ -1,56 +1,80 @@
-# Specification Delta
+# Capability: fusion-harness-integration
 
-## Capability 对齐（已确认）
+## Purpose
 
-- Capability: `fusion-harness-integration`
-- 来源: `proposal.md` / 已确认 capabilities
-- 变更类型: new
-- 用户确认摘要: 两个 capability 确认（fusion-harness-integration + capability-manifest）
+Register and operate the nantas fusion-harness Pi package for multi-model orchestration (`/opinion`, `/fusion`, `/auto-validate`), with project-local artifact persistence, sub-agent context inheritance, and global capability-table delivery of the unpinned package source plus `fusionHarness` defaults.
 
-## 规范真源声明
-
-- 本文件是该 capability 在本次 change 中的行为规范真源
-- design / tasks / verification 必须引用本文件
-- 项目页面回写不得替代本文件
-
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Extension Registration
-The system SHALL register the fusion-harness extension as a Pi package in pi-config, making `/opinion`, `/fusion`, and `/auto-validate` slash commands available in Pi sessions without requiring `-e` or shell scripts.
+The system SHALL register the fusion-harness extension as a Pi package in pi-config’s capability delivery surfaces, making `/opinion`, `/fusion`, and `/auto-validate` available without requiring `-e` or shell scripts. Global registration SHALL use the unpinned git package source in `global.settings.packages`. Project `.pi/settings.json` MAY still list the package until global sync dedupe removes a duplicate entry.
 
-#### Scenario: Extension auto-loaded on Pi startup
-- **WHEN** Pi starts with fusion-harness listed in `.pi/settings.json` packages
-- **THEN** the three slash commands (`/opinion`, `/fusion`, `/auto-validate`) SHALL be available without manual `-e` flag
+#### Scenario: Global registration source is unpinned git URL
+- **WHEN** global registration is configured in the capability table
+- **THEN** the package source SHALL be `git:github.com/nantas/fusion-harness`
+
+#### Scenario: Project-only registration is no longer the sole delivery path
+- **WHEN** capability-table apply for global delivery is complete
+- **THEN** fusion-harness delivery SHALL be declared at global manifest scope
+- **AND** relying solely on project `.pi/settings.json` without a capability-table entry SHALL be considered incomplete for cross-repository availability
 
 #### Scenario: Extension loaded via fork with local modifications
 - **WHEN** the package source is a local dev path during development
 - **THEN** `/reload` in Pi TUI SHALL pick up code changes from the dev clone without requiring `pi install -l` or git push
 
 ### Requirement: Settings Configuration Block
-The system SHALL support a `fusionHarness` configuration block in `.pi/settings.json` that provides default values for architect model, builder model, architect thinking level, and builder thinking level.
+The system SHALL support a `fusionHarness` configuration block that provides default values for architect model, builder model, architect thinking level, and builder thinking level. For cross-repository defaults, the block SHALL be present under `.pi/capabilities.yaml` `global.settings.fusionHarness` with the values defined in **Global FusionHarness Defaults**. Project `.pi/settings.json` MAY retain a `fusionHarness` block as a local preference surface for sessions that load project settings. CLI flags override settings; missing settings fall back to extension built-in defaults.
 
-#### Scenario: Settings.json provides model defaults
-- **GIVEN** `.pi/settings.json` contains:
-  ```json
-  "fusionHarness": {
-    "architect": "deepseek/deepseek-v4-pro",
-    "builder": "zhipuai-coding-plan/glm-5.2",
-    "architectThinking": "high",
-    "builderThinking": "medium"
-  }
-  ```
-- **WHEN** no `--architect` or `--builder` CLI flags are provided
-- **THEN** the extension SHALL use the settings.json values as defaults
+#### Scenario: Global settings.json provides model defaults after deferred sync
+- **GIVEN** an operator has later synced the capability table to `~/.pi/agent/settings.json`
+- **WHEN** no `--architect` or `--builder` CLI flags are provided and no project override wins
+- **THEN** the extension SHALL use the global `fusionHarness` values as settings defaults
 
-#### Scenario: CLI flags override settings.json
-- **GIVEN** settings.json sets `architect: "deepseek/deepseek-v4-pro"`
-- **WHEN** `--architect anthropic/claude-sonnet-5` is passed
-- **THEN** the CLI flag value SHALL take precedence over settings.json
+#### Scenario: CLI flags override settings
+- **GIVEN** settings provide an architect model
+- **WHEN** `--architect <provider/model>` is passed
+- **THEN** the CLI flag value SHALL take precedence over settings
 
 #### Scenario: Missing settings block falls back to upstream defaults
-- **GIVEN** settings.json has no `fusionHarness` block
+- **GIVEN** no `fusionHarness` block is available in loaded settings
 - **WHEN** no CLI flags are provided
 - **THEN** the extension SHALL use its built-in defaults (upstream DEFAULT_ARCHITECT / DEFAULT_BUILDER)
+
+#### Scenario: Capability-table apply does not require live global settings mutation
+- **WHEN** global delivery is applied only in the capability table
+- **THEN** writing `global.settings.fusionHarness` into `.pi/capabilities.yaml` SHALL satisfy the configuration-block delivery requirement for that apply
+- **AND** live mutation of `~/.pi/agent/settings.json` MAY remain deferred until managed sync
+
+### Requirement: Global Package Delivery Via Capability Manifest
+The system SHALL deliver fusion-harness as a global Pi package by listing `git:github.com/nantas/fusion-harness` (unpinned) in `.pi/capabilities.yaml` `global.settings.packages`, so that after an operator later runs the managed global sync, `~/.pi/agent/settings.json` includes that package and any repository session under the same global agent home can load the extension without a project-local package entry.
+
+#### Scenario: Capability table declares global package source
+- **WHEN** the capability table apply for global delivery is complete
+- **THEN** `.pi/capabilities.yaml` `global.settings.packages` SHALL include `git:github.com/nantas/fusion-harness`
+- **AND** the entry SHALL NOT include a version pin fragment
+
+#### Scenario: Global sync is intentionally deferred
+- **WHEN** capability-table apply tasks finish without running sync
+- **THEN** absence of fusion-harness in `~/.pi/agent/settings.json` SHALL NOT fail verification of the capability-table work
+- **AND** verification MAY record “sync deferred” as expected status
+
+### Requirement: Global FusionHarness Defaults
+The system SHALL publish default architect/builder model settings for fusion-harness through `.pi/capabilities.yaml` `global.settings.fusionHarness` with:
+- `architect`: `kimi-coding/k3`
+- `builder`: `grok-build/grok-4.5`
+- `architectThinking`: `high`
+- `builderThinking`: `high`
+
+These values become the authoritative global defaults once global sync is later run. CLI flags and any later project-level settings continue to follow the existing override order defined by the extension (CLI > settings > built-in defaults).
+
+#### Scenario: Manifest defaults match agreed sovereign stack
+- **WHEN** `global.settings.fusionHarness` is read from the capability table after apply
+- **THEN** the four keys SHALL equal the values listed above
+
+#### Scenario: Extension still works if global block not yet synced
+- **GIVEN** only the capability table was updated and global sync has not run
+- **WHEN** a project still has a local `fusionHarness` block or the extension falls back to built-in defaults
+- **THEN** project-local behavior SHALL remain usable independently of global runtime
 
 ### Requirement: Artifact Persistence
 The system SHALL store fusion harness run artifacts in `.scratch/fusion-harness/` within the session's working directory, instead of `/tmp/`.

@@ -103,33 +103,80 @@ The system SHALL include the fusion-harness fork entry in `forks/manifest.yaml` 
 - **WHEN** `forks/manifest.yaml` is inspected
 - **THEN** it SHALL contain a `forks` list entry with `name: fusion-harness`, `fork_url: https://github.com/nantas/fusion-harness`, `upstream_url: https://github.com/disler/fusion-harness`, `upstream_source: git:github.com/disler/fusion-harness`, and `status: active`
 
+### Requirement: Global Settings Packages MUST Include Fusion Harness Without Version Pin
+The system SHALL include the fusion-harness package source `git:github.com/nantas/fusion-harness` as an entry in `.pi/capabilities.yaml` under `global.settings.packages`, and that entry MUST NOT contain a version or git-ref pin suffix (no `#…` fragment).
+
+#### Scenario: Manifest lists unpinned fusion-harness package
+- **WHEN** `.pi/capabilities.yaml` is inspected
+- **THEN** `global.settings.packages` SHALL contain the exact string `git:github.com/nantas/fusion-harness`
+- **AND** SHALL NOT contain a `#v…` or other `#…` pin on that source
+
+#### Scenario: Fusion harness is not a catalog package
+- **WHEN** the catalog section is inspected
+- **THEN** `catalog.packages` SHALL NOT be required to list fusion-harness for global delivery of this capability
+- **AND** fusion-harness SHALL NOT be registered under `global.extensions` as a local `.pi/extensions` file capability
+
+### Requirement: Global Settings MUST Define FusionHarness Configuration Block
+The system SHALL declare a top-level `fusionHarness` object under `.pi/capabilities.yaml` `global.settings` with keys `architect`, `builder`, `architectThinking`, and `builderThinking`, so that `scripts/sync-pi-agent.sh` treats those keys as authoritative when generating `~/.pi/agent/settings.json`.
+
+#### Scenario: Manifest carries fusionHarness defaults
+- **WHEN** `.pi/capabilities.yaml` `global.settings` is inspected
+- **THEN** it SHALL contain:
+  ```yaml
+  fusionHarness:
+    architect: kimi-coding/k3
+    builder: grok-build/grok-4.5
+    architectThinking: high
+    builderThinking: high
+  ```
+
+#### Scenario: Sync authority includes fusionHarness when sync is later run
+- **GIVEN** `fusionHarness` is present under `global.settings` in the manifest
+- **WHEN** an operator later runs `scripts/sync-pi-agent.sh`
+- **THEN** the generated `~/.pi/agent/settings.json` SHALL include a `fusionHarness` object matching the manifest values for those four keys
+
 ### Requirement: Settings.json Must Reference Fusion Harness Package
-The system SHALL include the fusion-harness package reference in `.pi/settings.json` packages array, using a local path during development and a git URL after shipping.
+The system SHALL include the fusion-harness package reference in the authoritative package lists used for Pi loading: project `.pi/settings.json` MAY list the package during development or local override, and `.pi/capabilities.yaml` `global.settings.packages` SHALL list `git:github.com/nantas/fusion-harness` without a version pin for global delivery. Project-level entries that duplicate the global unpinned source MAY be removed by the sync script’s project package dedupe when global sync is eventually run.
+
+#### Scenario: Global delivery uses unpinned git URL
+- **WHEN** global package delivery for fusion-harness is configured
+- **THEN** `global.settings.packages` SHALL contain `git:github.com/nantas/fusion-harness` with no `#…` pin
+
+#### Scenario: Project settings may align pin policy
+- **WHEN** project `.pi/settings.json` contains a pinned form such as `git:github.com/nantas/fusion-harness#v0.1.3`
+- **THEN** the project package entry MAY be rewritten to the unpinned form `git:github.com/nantas/fusion-harness` for consistency
+- **AND** capability-table apply SHALL NOT require executing global sync to complete
 
 #### Scenario: Development mode uses local path
 - **WHEN** the fork is under active modification
-- **THEN** `.pi/settings.json` packages SHALL contain the absolute local path to the dev clone
-
-#### Scenario: Production mode uses git URL
-- **WHEN** the fork modifications are committed and pushed
-- **THEN** `.pi/settings.json` packages SHALL contain `git:github.com/nantas/fusion-harness`
+- **THEN** project `.pi/settings.json` packages MAY contain the absolute local path to the dev clone (fork-dev workflow)
 
 ### Requirement: Settings.json Must Define Fusion Harness Configuration Block
-The system SHALL support a `fusionHarness` block in `.pi/settings.json` that specifies the architect model, builder model, architect thinking level, and builder thinking level.
+The system SHALL support a `fusionHarness` block that specifies architect model, builder model, architect thinking level, and builder thinking level. For global delivery, that block SHALL be declared under `.pi/capabilities.yaml` `global.settings.fusionHarness`. A project `.pi/settings.json` `fusionHarness` block MAY continue to exist as a project-local override surface.
 
-#### Scenario: Fusion harness block present after setup
-- **WHEN** the change is complete
-- **THEN** `.pi/settings.json` SHALL contain a `fusionHarness` object with `architect`, `builder`, `architectThinking`, and `builderThinking` keys
+#### Scenario: Global fusionHarness block present after setup
+- **WHEN** global delivery for fusion-harness is configured in the capability table
+- **THEN** `.pi/capabilities.yaml` `global.settings` SHALL contain a `fusionHarness` object with `architect`, `builder`, `architectThinking`, and `builderThinking` keys
+
+#### Scenario: Project fusionHarness may remain as local preference
+- **WHEN** project `.pi/settings.json` already defines `fusionHarness`
+- **THEN** that project block MAY remain in place
+- **AND** absence of a post-sync `~/.pi/agent/settings.json` update SHALL NOT fail capability-table apply verification when sync is intentionally deferred
 
 ### Requirement: Global Package Conflict Must Be Resolved
-When the fusion-harness fork is in development mode (local path), any conflicting global package entry in `~/.pi/agent/settings.json` SHALL be removed and the removal recorded for later restoration.
+When the fusion-harness package is delivered via `global.settings.packages` with the unpinned git source, a later global sync SHALL make that global entry authoritative for packages. Development-mode local-path overrides remain a separate fork-dev workflow: while a project uses a local path, any conflicting global package entry in `~/.pi/agent/settings.json` SHALL be removed and recorded for later restoration; when the project returns to the git URL and global delivery is active, the global unpinned entry is restored via managed sync rather than ad-hoc re-add.
 
-#### Scenario: Global conflict detected and resolved
+#### Scenario: Global delivery does not require immediate runtime mutation at apply time
+- **WHEN** capability-table apply for global fusion-harness completes without running sync
+- **THEN** the repository capability table SHALL be updated
+- **AND** `~/.pi/agent/settings.json` NEED NOT yet contain fusion-harness until an operator later runs sync
+
+#### Scenario: Global conflict detected and resolved during local-path fork-dev
 - **GIVEN** `~/.pi/agent/settings.json` contains a package entry matching fusion-harness
 - **WHEN** the project package source is switched to a local dev path
 - **THEN** the conflicting global entry SHALL be removed and recorded in `.pi-dev-state.json` or OpenSpec `writeback.md`
 
-#### Scenario: Global entries restored after shipping
+#### Scenario: Global entries restored after shipping / unpinned global delivery
 - **GIVEN** global entries were removed during development
-- **WHEN** the fork transitions to production mode (git URL)
-- **THEN** the removed global entries SHALL be restored from the override record
+- **WHEN** the fork transitions to production mode (git URL) and global sync is run with the capability-table entry present
+- **THEN** the global unpinned package entry SHALL be present in `~/.pi/agent/settings.json` from the managed sync path
