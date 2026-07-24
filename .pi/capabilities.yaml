@@ -34,6 +34,7 @@ global:
   skills:
     - install-from-pi-config
     - notion
+    - agent-reach
 
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:

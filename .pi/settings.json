@@ -5,12 +5,6 @@
   "hideThinkingBlock": false,
   "powerline": true,
   "breadcrumb": "inner",
-  "packages": [
-    "git:github.com/DietrichGebert/ponytail",
-    "git:github.com/nantas/pi-xai",
-    "npm:pi-codex-image-gen",
-    "git:github.com/nantas/fusion-harness"
-  ],
   "fusionHarness": {
     "architect": "kimi-coding/k3",
     "builder": "grok-build/grok-4.5",

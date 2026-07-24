@@ -3,6 +3,24 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-07-24 — agent-reach (skill)
+
+- **Version:** 1.5.0（上游 pyproject；skill 随仓库 main 快照）
+- **Research Date:** 2026-07-24
+- **Resource Types:** skills
+- **Decision:** global
+- **Source Type:** raw-skill（非 Pi npm/git 包；Python CLI + bundled SKILL.md）
+- **Source Repo:** https://github.com/Panniantong/Agent-Reach
+- **Install Method:** raw-copy → `.pi/skills/agent-reach/` + `global.skills`
+- **Has Dependencies:** true（CLI 运行时依赖 requests/feedparser/yt-dlp 等；上游可选 opencli/twitter-cli 等）
+- **Reason:** 用户要求评估并加入本仓库全局 skill。能力层路由 15 平台互联网读取/搜索，skill 是命令路由文档；与现有 webfetch/X 工具互补（覆盖中文社交/视频/平台 CLI 选型）。
+- **Notes:**
+  1. 安全：无混淆/远程 eval；有意的高权限安装路径（apt/brew/npm、浏览器 Cookie 本地抽取）。Cookie 写本地 `~/.agent-reach/`，check-update 仅打 GitHub API。
+  2. 官方 skill 安装目标是 `~/.agents|openclaw|claude/skills`，不含 `~/.pi/agent/skills`——本仓通过 capabilities 全局同步补齐 Pi 路径。
+  3. 本机当前无 `agent-reach` CLI、`yt-dlp`；已有 `gh`/`curl`/`mcporter`。仅加 skill 不够，需另装 CLI 才能 doctor/全渠道。
+  4. SKILL 触发描述含 MUST USE，面很广，可能抢内置 web/X 工具路由。
+  5. 本机 runtime（2026-07-24）：`uv tool install` agent-reach + browser-cookie3；`yt-dlp` 链到 `~/.local/bin`；`mcporter` 全局 Exa；`bili`（bilibili-cli）；`npm i -g @jackwener/opencli`（extension 已连通）；Chrome 抽 Cookie 配置 Twitter/XHS/B站/雪球。doctor **13/15**（缺小宇宙、LinkedIn）。全局 Pi sync **defer**。
+
 ### 2026-06-29 — git:github.com/DietrichGebert/ponytail
 
 - **Version:** 4.8.4

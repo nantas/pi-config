@@ -288,6 +288,16 @@ catalog:
 
 ### 工作流技能
 
+#### 全局技能（Global skills）
+
+##### `agent-reach`
+
+- **描述**: 互联网平台能力路由器。指导 Agent 通过上游 CLI/API 读取与搜索 15+ 平台（网页、YouTube、GitHub、Twitter、Reddit、B站、小红书等）；多后端路由，`agent-reach doctor` 体检。
+- **解决的问题**: 各平台接入方式分散、易失效，Agent 需反复选型/配置。本 skill 提供统一路由表与命令参考。
+- **源文件**: `.pi/skills/agent-reach/SKILL.md`
+- **依赖**: 运行时需要本机安装 Python CLI `agent-reach`（及可选上游工具）；skill 本身不安装 CLI。
+- **注意**: 触发面很广（调研/搜索/各平台 URL），可能与内置 `webfetch` / X 搜索等工具路由重叠，Agent 需按任务选择。
+
 #### 元技能（Meta-skills）
 
 ##### `pi-extension-dev`
