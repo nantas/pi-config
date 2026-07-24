@@ -14,6 +14,13 @@
 # Primary writers: pkg-fork-dev skill, pkg-research skill.
 
 forks:
+  - name: fusion-harness
+    fork_url: "https://github.com/nantas/fusion-harness"
+    upstream_url: "https://github.com/disler/fusion-harness"
+    upstream_source: "git:github.com/disler/fusion-harness"
+    status: active
+    last_upstream_sync: null
+    changes_summary: "v0.1.1: added package.json with pi.extensions declaration; v0.1.0: ARTIFACT_ROOT -> .scratch/fusion-harness/; sub-agent inherit skills/context; FUSION prompt lock output; settings.json fusionHarness fallback."
   - name: pi-xai
     fork_url: "https://github.com/nantas/pi-xai"
     upstream_url: "https://github.com/luxus/pi-xai"

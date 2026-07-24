@@ -104,6 +104,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | / 技能过滤 | `slash-skill-filter` |
 | 添加供应商 | 见 extensions `add-provider.ts` |
 | Wikilink 批量替换 | `wikilink-batch-replace` |
+| Fusion harness 多模型编排 | `fusion-harness-integration`, `capability-manifest` |
 
 ### 包管理
 
