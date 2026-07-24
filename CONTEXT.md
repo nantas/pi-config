@@ -115,6 +115,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 包决策、三选一 | `pkg-decision-backlog`, `pkg-global-sync` |
 | 目录安装、跨仓库安装 | `install-from-pi-config`, `install-from-pi-config-overwrite`, `install-skill-single-file` |
 | Fork 管理 | 见 skill `pkg-fork-dev`，registry `forks/manifest.yaml` |
+| pi-xai prompt ghost、next-prompt 预填 | `pi-xai-prompt-suggest` |
 
 ### Agent 与 Subagent
 

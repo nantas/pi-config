@@ -27,7 +27,7 @@ forks:
     upstream_source: "npm:pi-xai"
     status: active
     last_upstream_sync: null
-    changes_summary: "fix(prompt-suggest): removed unconditional registerShortcut('tab') that overrode pi built-in tui.input.tab and broke '/' '$' autocomplete in all contexts. Ghost text still renders; Tab-to-accept removed."
+    changes_summary: "v0.17.2: README no longer advertises prompt ghost; regression test blocks re-registration. v0.17.1: unregister next-prompt ghost at index entry (/xai-suggest unavailable; source retained). Prior: removed unconditional tab shortcut override."
   - name: pi-tool-display
     fork_url: "https://github.com/nantas/pi-tool-display"
     upstream_url: "https://github.com/MasuRii/pi-tool-display"
