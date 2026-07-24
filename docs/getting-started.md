@@ -74,7 +74,7 @@ pi login <provider>
 - `api` 可选值：`openai-completions`、`openai-responses`、`anthropic-messages`、`google-generative-ai`
 - 文件修改后无需重启，`/model` 自动重新加载
 
-更多配置参考：[Pi 供应商与模型配置指南](.pi/agent/AGENTS.d/pi-provider-model.md)
+更多配置参考：[Pi 供应商与模型配置指南](docs/reference/pi-provider-model.md)
 
 ---
 
@@ -103,11 +103,11 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 6 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`init-command`、`tool-counter-widget`、`add-provider` |
-| **Agent** | 0 | （使用 Pi 内置 agent） |
-| **技能** | 1 | `install-from-pi-config` |
-| **Prompts** | 11 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify`、`subagent` |
-| **外部包** | 5 | `pi-ask`（交互提问）、`pi-tab-status`（tab 状态图标）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化） |
+| **扩展** | 7 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`tool-counter-widget`、`init-command`、`browse-session-tree`、`session-browse` |
+| **Agent** | 8 | `unity-worker`、`scout`、`worker`、`context-builder`、`oracle`、`planner`、`researcher`、`reviewer` |
+| **技能** | 2 | `install-from-pi-config`、`notion` |
+| **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
+| **外部包** | 12 | `pi-tab-status`（tab 状态图标）、`pi-subagents`（子代理系统）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化）、`pi-mcp-adapter`（MCP 适配器）、`pi-question`（交互提问）、`pi-webfetch`（网页抓取）、`pi-fff`（模糊文件查找）、`ponytail`（极简编码）、`pi-xai`（X 集成）、`pi-codex-image-gen`（图像生成） |
 
 ### 按需安装能力（Catalog）
 
@@ -118,9 +118,12 @@ pi login <provider>
 | **技能** | `obsidian-search` | Obsidian 仓库智能检索 |
 | **技能** | `pi-extension-dev` | Pi 扩展开发完整生命周期指导 |
 | **技能** | `pkg-research` | 第三方 Pi 包研究评估工作流 |
+| **技能** | `pkg-fork-dev` | Fork 并修改已有第三方 Pi 包的完整生命周期 |
+| **扩展** | `add-provider` | 添加自定义模型供应商 |
 | **扩展** | `obsidian-tools` | Obsidian 集成工具 |
-| **包** | `pi-mcp-adapter` | MCP 适配器 |
-| **包** | `lsp-pi` | LSP 集成 |
+| **扩展** | `trellis-analytics` | Trellis 工作流遥测与上下文消耗追踪 |
+| **扩展** | `wikilink-batch-replace` | 批量将裸文本引用替换为 Obsidian wikilink |
+| **包** | （无） | `catalog.packages` 当前为空 |
 
 ---
 
@@ -133,9 +136,13 @@ pi login <provider>
    - 例如不需要 `pi-powerline` 的 Nerd Font 依赖 → 从 `capabilities.yaml` 中移除对应包
    - 例如不需要某些扩展 → 从 `capabilities.yaml` 的同步列表中排除
 3. **是否需要修改 `settings.json` 中的默认值？**
-   - `defaultProvider` / `defaultModel`
-   - `defaultThinkingLevel`
+   - 当前仓库预设：`defaultProvider: deepseek`、`defaultModel: deepseek-v4-flash`、`defaultThinkingLevel: high`
+   - `defaultProvider` / `defaultModel` / `defaultThinkingLevel`
    - `subagents.agentOverrides`
+
+4. **环境变量（与 `pi-fff` 包相关）**
+   - `pi-fff` 需要 `FFF_FRECENCY_DB`、`FFF_HISTORY_DB`（LMDB 数据库路径）、`PI_FFF_MODE=tools-only`
+   - **关键**：`PI_FFF_MODE=tools-only` 禁用 `FffEditor`（@-mention 自动补全），专门规避与 `pi-powerline` 的 `setEditorComponent` 冲突；若移除 `pi-powerline`，可放开 `FffEditor`
 
 如需调整，请修改 `.pi/capabilities.yaml` 或 `.pi/settings.json`，然后继续下一步。
 
@@ -226,12 +233,13 @@ Pi 内置的 subagent 系统（`/agents` 列表中的内置 agent）会读取 `s
 
 ## 后续扩展：可用工作流
 
-完成基础配置后，可通过以下工作流继续扩展能力：
+完成基础配置后，可通过以下工作流继续扩展能力（含 `pkg-research`、`pkg-fork-dev`、`pi-extension-dev` 等）：
 
 | 场景 | 工作流 | 使用位置 |
 |------|--------|----------|
 | **安装新的第三方 Pi 包** | `pkg-research` | 本仓库（研究评估后可能加入全局配置） |
 | **开发新的 Pi 扩展** | `pi-extension-dev` | 本仓库（开发扩展并加入 pi-config） |
+| **Fork 并修改已有的第三方 Pi 包** | `pkg-fork-dev` | 本仓库（fork 上游包并本地修改） |
 | **从本仓库 catalog 安装能力到其他仓库** | `install-from-pi-config` | **其他仓库**（运行 `$install <capability>` 安装 catalog 中的能力） |
 | **管理 OpenSpec 变更生命周期** | OpenSpec 10 步工作流 | 任意仓库（通过 `.pi/prompts/` 安装的 prompt 命令，如 `/opsx-new`、`/opsx-apply`） |
 | **更新全局 Agent 指导规则** | 编辑 `.pi/agent/AGENTS.md` | 本仓库（修改后执行 `sync-pi-agent.sh`） |
