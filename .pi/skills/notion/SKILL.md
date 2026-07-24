@@ -76,7 +76,7 @@ The `edits.json` format: `[{"old": "...", "new": "...", "replace_all": false}, .
 
 Output: `{id, truncated, changes}`.
 
-Uses `update_content` — the recommended Notion API edit mode. For large content swaps, use `ntn-write --replace`.
+Uses `update_content` — the recommended Notion API edit mode; preserves child pages/databases (deletes no blocks). **Preferred over `--replace` when the target page has child pages/databases.** For large multi-section swaps, either write a JSON ops file and use `--ops`, or use `ntn-write --safe-replace` (auto-diffs and emits `content_updates`, preserving children).
 
 ### ntn-write — Update properties or append/replace content
 
@@ -84,7 +84,10 @@ Uses `update_content` — the recommended Notion API edit mode. For large conten
 ntn-write <page_id_or_url> --set '{"Status": "done", "Priority": 2}'
 ntn-write <page_id_or_url> --append "## New Section\n\nContent here."
 ntn-write <page_id_or_url> --replace "## Replaced\n\nAll new content."
+ntn-write <page_id_or_url> --safe-replace "## Replaced\n\nAll new content."   # child-page-safe
 ```
+
+⚠️ `--replace` deletes the entire block tree. If the page has **child pages or child databases**, the Notion API rejects with `400 validation_error: "This operation would delete N child page(s) or database(s)"`. Prefer `--safe-replace` for report pages that mount sub-pages/sub-reports: it auto-diffs old vs new markdown and applies block-level `content_updates` via `update_content`, preserving all children. Fallbacks: `ntn-edit --ops` (manual block-level replace) or `ntn-write --append` (add without deleting).
 
 `--set` auto-translates plain values to Notion API format based on the data_source schema.
 
@@ -116,6 +119,7 @@ ntn-write <page_id_or_url> --replace "## Replaced\n\nAll new content."
 2. Identify sections to change
 3. ntn-edit <page_id> --old "exact old text" --new "new text"
    → For multiple changes, write a JSON file and use --ops
+   → If the page has child pages/databases (e.g. a report mounting sub-reports), NEVER use --replace — use `ntn-write --safe-replace <new_markdown>` which diffs and applies block-level updates, preserving children
 ```
 
 ## Key Concepts

@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
-"""Update page properties or append content.
+"""Update page properties, append/replace content, or SAFE-replace.
 
 Usage:
-  ntn-write <page_id_or_url> --set <json>          # Update properties
-  ntn-write <page_id_or_url> --append <markdown>   # Append markdown content
-  ntn-write <page_id_or_url> --replace <markdown>  # Replace all content
+  ntn-write <page_id_or_url> --set <json>                # Update properties
+  ntn-write <page_id_or_url> --append <markdown>         # Append markdown content
+  ntn-write <page_id_or_url> --replace <markdown>        # Replace ALL content (DANGER: fails on pages with child pages/databases)
+  ntn-write <page_id_or_url> --safe-replace <markdown>   # SAFE block-level replace (preserves child pages/databases)
 
 Output: JSON with result summary.
+
+Safety model:
+  --replace        -> replace_content API. Deletes the ENTIRE block tree. Notion API
+                      rejects with 400 if the page has child pages/databases.
+                      Use ONLY when you know the page has no children.
+  --safe-replace   -> reads current markdown, diffs against new markdown, emits
+                      content_updates via update_content. Preserves child pages/
+                      databases (deletes no blocks). PREFERRED for report iteration
+                      on pages that may mount sub-pages/sub-reports.
 """
 import argparse
+import difflib
 import json
 import os
 import sys
@@ -132,7 +143,12 @@ def append_content(page_id, markdown):
 
 
 def replace_content(page_id, markdown):
-    """Replace all page content with markdown."""
+    """Replace all page content with markdown.
+
+    DANGER: Notion API rejects with 400 validation_error if the page has any
+    child page(s) or child database(s), because replace_content deletes the
+    entire block tree. Use safe_replace_content for pages that may have children.
+    """
     body = {
         "type": "replace_content",
         "replace_content": {
@@ -144,12 +160,137 @@ def replace_content(page_id, markdown):
     return {"id": page_id, "action": "replace", "truncated": data.get("truncated", False)}
 
 
+def _nearest_nonblank_index(lines, before):
+    """Index of nearest non-blank line strictly before `before`, or None."""
+    for k in range(before - 1, -1, -1):
+        if lines[k].strip():
+            return k
+    return None
+
+
+def build_content_updates(old_md, new_md):
+    """Diff two markdown strings into Notion content_updates.
+
+    Each changed region is anchored with the nearest non-blank preceding line
+    (plus any intervening blank lines) so old_str stays specific enough for
+    Notion's first-match update_content semantics. insert/delete/replace all
+    handled. Returns a list of {"old_str", "new_str"} dicts.
+    """
+    old_lines = old_md.splitlines()
+    new_lines = new_md.splitlines()
+
+    updates = []
+    sm = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+
+        old_chunk = "\n".join(old_lines[i1:i2])
+        new_chunk = "\n".join(new_lines[j1:j2])
+        k = _nearest_nonblank_index(old_lines, i1)
+        prefix = "\n".join(old_lines[k:i1]) if k is not None else None
+
+        if tag == "insert":
+            if prefix is not None:
+                updates.append({
+                    "old_str": prefix,
+                    "new_str": prefix + ("\n" + new_chunk if new_chunk else ""),
+                })
+            elif old_lines:
+                # No non-blank before insert: anchor on first non-blank (or first) line
+                first_idx = next((i for i, L in enumerate(old_lines) if L.strip()), 0)
+                first = old_lines[first_idx]
+                updates.append({
+                    "old_str": first,
+                    "new_str": (new_chunk + "\n" + first) if new_chunk else first,
+                })
+            # else: old empty — caller (safe_replace_content) handles via append
+        elif tag == "delete":
+            if prefix is not None:
+                updates.append({
+                    "old_str": prefix + ("\n" + old_chunk if old_chunk else ""),
+                    "new_str": prefix,
+                })
+            else:
+                updates.append({"old_str": old_chunk, "new_str": ""})
+        else:  # replace
+            if prefix is not None:
+                updates.append({
+                    "old_str": prefix + ("\n" + old_chunk if old_chunk else ""),
+                    "new_str": prefix + ("\n" + new_chunk if new_chunk else ""),
+                })
+            else:
+                updates.append({"old_str": old_chunk, "new_str": new_chunk})
+
+    return updates
+
+
+def safe_replace_content(page_id, new_markdown, max_updates=100):
+    """Replace page content via block-level diff (preserves child pages/databases).
+
+    Reads current markdown, diffs against new_markdown, emits content_updates
+    through update_content. Never deletes blocks, so child pages/databases
+    survive — this is the safe alternative to replace_content.
+    """
+    # 1. Read current markdown
+    old_data = ntn_api(f"v1/pages/{page_id}/markdown")
+    old_md = old_data.get("markdown", "")
+
+    # 2. Empty old page: nothing to diff against — append is safe & correct
+    if not old_md.strip():
+        return append_content(page_id, new_markdown)
+
+    # 3. Diff
+    content_updates = build_content_updates(old_md, new_markdown)
+
+    if not content_updates:
+        return {
+            "id": page_id,
+            "action": "safe_replace",
+            "changes": 0,
+            "note": "content identical, no changes applied",
+        }
+
+    if len(content_updates) > max_updates:
+        return {
+            "id": page_id,
+            "action": "safe_replace",
+            "error": "diff_too_large",
+            "changes_requested": len(content_updates),
+            "max": max_updates,
+            "note": (
+                "diff produced too many hunks; either (a) the page has no child "
+                "pages and you can use --replace, or (b) split the new content and "
+                "call --safe-replace per section, or (c) hand-craft an --ops JSON "
+                "for ntn-edit"
+            ),
+        }
+
+    # 4. Execute via update_content (preserves children)
+    body = {
+        "type": "update_content",
+        "update_content": {"content_updates": content_updates},
+    }
+    data = ntn_api(f"v1/pages/{page_id}/markdown", "-X", "PATCH",
+                   "--data", json.dumps(body))
+    return {
+        "id": page_id,
+        "action": "safe_replace",
+        "truncated": data.get("truncated", False),
+        "changes": len(content_updates),
+    }
+
+
 def main():
     parser = JsonArgParser(description="Update Notion page properties or content")
     parser.add_argument("target", help="Page ID or URL")
-    parser.add_argument("--set", help="JSON object of property updates")
-    parser.add_argument("--append", help="Markdown content to append")
-    parser.add_argument("--replace", help="Markdown content to replace all")
+    op = parser.add_mutually_exclusive_group(required=True)
+    op.add_argument("--set", help="JSON object of property updates")
+    op.add_argument("--append", help="Markdown content to append")
+    op.add_argument("--replace", help="Markdown content to replace all (fails on pages with child pages/databases)")
+    op.add_argument("--safe-replace", dest="safe_replace",
+                    help="Markdown content to replace via block-level diff (preserves child pages/databases)")
     args = parser.parse_args()
 
     page_id = resolve_page_id(args.target)
@@ -158,16 +299,17 @@ def main():
               file=sys.stderr)
         sys.exit(1)
 
-    if args.set:
+    if args.set is not None:
         result = update_properties(page_id, args.set)
-    elif args.append:
+    elif args.append is not None:
         result = append_content(page_id, args.append)
-    elif args.replace:
+    elif args.replace is not None:
         result = replace_content(page_id, args.replace)
     else:
-        print(json.dumps({"error": "Provide --set, --append, or --replace"}),
-              file=sys.stderr)
-        sys.exit(1)
+        result = safe_replace_content(page_id, args.safe_replace)
+        if result.get("error"):
+            print(json.dumps(result, indent=2, ensure_ascii=False), file=sys.stderr)
+            sys.exit(1)
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
