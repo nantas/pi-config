@@ -277,3 +277,20 @@ Extensions not found in installed packages, whose install directory does not exi
 #### Scenario: Injection applies to all child agent roles
 - **WHEN** any child agent (ARCHITECT worker, BUILDER worker, FUSION, VALIDATOR, TRIAGE) is spawned
 - **THEN** the `-e` injection SHALL apply uniformly — no role is exempt, because provider registration is needed by any role that may use a non-built-in provider model
+
+### Requirement: Footer Builder Model Display
+The system SHALL display the configured builder model in the status bar's BUILDER cell when no builder child is running, except when the host's current model equals the configured builder model (the launch-recipe scenario where the host IS the builder brain). This prevents the footer from showing a host-chosen model that differs from the model actual builder children use.
+
+Note: this is a display-only concern. Actual builder children always receive `--model <builderModel()>`, which takes precedence over any forked session's saved model — the execution layer is unaffected.
+
+#### Scenario: Host model differs from configured builder
+- **WHEN** no builder child is running AND the host session's current model differs from `fusionSettings().builder`
+- **THEN** the BUILDER footer cell SHALL display `builderModel()` (the configured builder), not the host's current model
+
+#### Scenario: Host model matches configured builder (launch-recipe scenario)
+- **WHEN** no builder child is running AND the host session's current model equals `fusionSettings().builder`
+- **THEN** the BUILDER footer cell SHALL display the host's current model (preserving the original launch-recipe behavior where the host IS the builder brain)
+
+#### Scenario: Builder child running shows the child's actual model
+- **WHEN** a builder child is running
+- **THEN** the BUILDER footer cell SHALL display that child's actual model (unchanged — the cell already reflected the live child)
