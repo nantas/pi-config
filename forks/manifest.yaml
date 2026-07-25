@@ -1,38 +1,22 @@
-# Fork Manifest for pi-config
-# Schema: each entry in `forks` list MUST contain:
-#   name               — string  (package identifier)
-#   fork_url           — url     (fork repo URL, e.g. https://github.com/user/repo)
-#   upstream_url       — url     (upstream repo URL)
-#   upstream_source    — string  (original install source: npm:xxx or git:xxx)
-#   status             — enum    (active | archived | upstreamed)
-#   last_upstream_sync — date|null (last upstream merge date, or null)
-#   changes_summary    — string  (brief description of modifications)
-#
-# Machine-specific clone paths are NOT recorded here;
-# they are managed via repo-registry under repo://pi-fork-<name>.
-#
-# Primary writers: pkg-fork-dev skill, pkg-research skill.
-
 forks:
-  - name: fusion-harness
-    fork_url: "https://github.com/nantas/fusion-harness"
-    upstream_url: "https://github.com/disler/fusion-harness"
-    upstream_source: "git:github.com/disler/fusion-harness"
-    status: active
-    last_upstream_sync: null
-    changes_summary: "v0.1.8: archive injects agent+tools (question UX); v0.1.7: agent-driven archive inventory+apply (no fused.md HV); v0.1.6: archive folder+slug; v0.1.5: status shows prompt topic; v0.1.4: /fusion-housekeep status|archive|clean + run-index.jsonl dual-write/reconcile; v0.1.1: package.json pi.extensions; v0.1.0: ARTIFACT_ROOT .scratch/fusion-harness/, sub-agent skills/context, FUSION output lock, fusionHarness settings fallback."
-  - name: pi-xai
-    fork_url: "https://github.com/nantas/pi-xai"
-    upstream_url: "https://github.com/luxus/pi-xai"
-    upstream_source: "npm:pi-xai"
-    status: active
-    last_upstream_sync: null
-    changes_summary: "v0.17.2: README no longer advertises prompt ghost; regression test blocks re-registration. v0.17.1: unregister next-prompt ghost at index entry (/xai-suggest unavailable; source retained). Prior: removed unconditional tab shortcut override."
-  - name: pi-tool-display
-    fork_url: "https://github.com/nantas/pi-tool-display"
-    upstream_url: "https://github.com/MasuRii/pi-tool-display"
-    upstream_source: "git:github.com/MasuRii/pi-tool-display"
-    status: active
-    last_upstream_sync: null
-    changes_summary: "fix: isMcpToolCandidate() checks label for Direct Tools; formatMcpCallLine() handles MCP: format; registerMcpToolOverrides() reads execute from globalThis.__mcpToolRegistry bridge"
-
+- name: fusion-harness
+  fork_url: https://github.com/nantas/fusion-harness
+  upstream_url: https://github.com/disler/fusion-harness
+  upstream_source: git:github.com/disler/fusion-harness
+  status: active
+  last_upstream_sync: null
+  changes_summary: 'v0.2.0: /fusion --merge-existing (skip Stage1 reuse answers) + fusion_merge agent tool (natural-language merge) + child extension injection (-e fusionHarness.childExtensions, fixes grok-build provider in --no-extensions children); resolveMergeDir short-id fallback; v0.1.8: archive injects agent+tools (question UX); v0.1.7: agent-driven archive inventory+apply (no fused.md HV); v0.1.6: archive folder+slug; v0.1.5: status shows prompt topic; v0.1.4: /fusion-housekeep status|archive|clean + run-index.jsonl dual-write/reconcile; v0.1.1: package.json pi.extensions; v0.1.0: ARTIFACT_ROOT .scratch/fusion-harness/, sub-agent skills/context, FUSION output lock, fusionHarness settings fallback.'
+- name: pi-xai
+  fork_url: https://github.com/nantas/pi-xai
+  upstream_url: https://github.com/luxus/pi-xai
+  upstream_source: npm:pi-xai
+  status: active
+  last_upstream_sync: null
+  changes_summary: 'v0.17.2: README no longer advertises prompt ghost; regression test blocks re-registration. v0.17.1: unregister next-prompt ghost at index entry (/xai-suggest unavailable; source retained). Prior: removed unconditional tab shortcut override.'
+- name: pi-tool-display
+  fork_url: https://github.com/nantas/pi-tool-display
+  upstream_url: https://github.com/MasuRii/pi-tool-display
+  upstream_source: git:github.com/MasuRii/pi-tool-display
+  status: active
+  last_upstream_sync: null
+  changes_summary: 'fix: isMcpToolCandidate() checks label for Direct Tools; formatMcpCallLine() handles MCP: format; registerMcpToolOverrides() reads execute from globalThis.__mcpToolRegistry bridge'

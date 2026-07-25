@@ -71,6 +71,8 @@ global:
       builder: grok-build/grok-4.5
       architectThinking: high
       builderThinking: high
+      childExtensions:
+        - pi-xai
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash

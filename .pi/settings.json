@@ -9,6 +9,9 @@
     "architect": "kimi-coding/k3",
     "builder": "grok-build/grok-4.5",
     "architectThinking": "high",
-    "builderThinking": "high"
+    "builderThinking": "high",
+    "childExtensions": [
+      "pi-xai"
+    ]
   }
 }
