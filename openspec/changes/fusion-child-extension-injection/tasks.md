@@ -25,4 +25,4 @@
 
 - [x]4.1 生成 verification.md：覆盖 5 个 ADDED scenario + 2 个 MODIFIED scenario（含对照实验：`--no-extensions` 无注入 vs 有注入 vs 未安装跳过）
 - [x]4.2 生成 writeback.md：回写目标 = fork 代码 + manifest v0.2.1 + capabilities.yaml + settings.json
-- [ ] 4.3 执行 writeback：fork commit（与 merge-existing 同分支或紧邻 commit）→ manifest 更新 → capabilities.yaml/settings.json 更新 → 全局 sync 交用户确认
+- [x]4.3 执行 writeback：fork commit（与 merge-existing 同分支或紧邻 commit）→ manifest 更新 → capabilities.yaml/settings.json 更新 → 全局 sync 交用户确认

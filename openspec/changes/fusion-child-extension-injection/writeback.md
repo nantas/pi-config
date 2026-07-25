@@ -33,10 +33,10 @@
 
 | 目标页 | 执行结果 | 执行时间 | 执行人 | 结果说明 |
 | --- | --- | --- | --- | --- |
-| `repo://fusion-harness` commit | 待执行 | — | — | 待用户确认后 commit（与 merge-existing 同分支累积）→ merge main → tag v0.2.1 → push |
-| pi-config capabilities.yaml | 已执行 | 2026-07-25 | agent | global.settings.fusionHarness.childExtensions: ["pi-xai"] |
-| pi-config .pi/settings.json | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: ["pi-xai"] |
-| 全局 ~/.pi/agent/settings.json | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: ["pi-xai"] |
+| `repo://fusion-harness` commit | 已执行 | 2026-07-25 | agent | commit 27cbf99（与 merge-existing 合并 ship）→ tag v0.2.0 → push |
+| pi-config capabilities.yaml | 已执行 | 2026-07-25 | agent | global.settings.fusionHarness.childExtensions: [pi-xai] |
+| pi-config .pi/settings.json | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: [pi-xai] |
+| 全局 ~/.pi/agent/settings.json | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: [pi-xai] |
 | `scripts/sync-pi-agent.sh` | 跳过（deferred） | — | — | 遵循 global-delivery 约定 |
 
 ## 回写前置条件

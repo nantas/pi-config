@@ -30,4 +30,4 @@
 
 - [x] 4.1 生成 verification.md，覆盖：spec scenario → 实测证据（正常 merge-only / 显式 fusion-instruction / 不带 flag 回归 / 缺文件 fail / FAILED fail / index 字段透传）
 - [x] 4.2 生成 writeback.md：回写目标 = `repo://fusion-harness`（代码 commit + tag v0.2.0 + push）+ pi-config `forks/manifest.yaml`（`changes_summary` 追加）；字段映射与前置条件
-- [ ] 4.3 执行 writeback：fork commit/push/tag（v0.2.0）→ pi-config `forks/manifest.yaml` 更新 `changes_summary` 追加 v0.2.0 条目 → manifest commit；全局 sync（`scripts/sync-pi-agent.sh`）是否执行交由用户确认（global-delivery 约定：deferred）
+- [x]4.3 执行 writeback：fork commit/push/tag（v0.2.0）→ pi-config `forks/manifest.yaml` 更新 `changes_summary` 追加 v0.2.0 条目 → manifest commit；全局 sync（`scripts/sync-pi-agent.sh`）是否执行交由用户确认（global-delivery 约定：deferred）

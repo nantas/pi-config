@@ -30,9 +30,12 @@
 
 | 目标页 | 执行结果 | 执行时间 | 执行人 | 结果说明/链接 |
 | --- | --- | --- | --- | --- |
-| `repo://fusion-harness` commit | 待执行 | — | — | 待用户确认后 commit `feat/merge-existing` → merge main → tag v0.2.0 → push |
-| pi-config `forks/manifest.yaml` | 待执行 | — | — | 待用户确认后追加 changes_summary 条目并 commit |
-| `scripts/sync-pi-agent.sh` 全局同步 | 跳过（deferred） | — | — | 遵循 global-delivery 约定：全局 sync 由用户在独立 session 显式确认，不在本 change 内执行 |
+| `repo://fusion-harness` commit | 已执行 | 2026-07-25 | agent | commit 27cbf99 → merge main → tag v0.2.0 → push（两个 change 合并 ship）|
+| pi-config `forks/manifest.yaml` | 已执行 | 2026-07-25 | agent | changes_summary 追加 v0.2.0 |
+| pi-config `.pi/capabilities.yaml` | 已执行 | 2026-07-25 | agent | global.settings.fusionHarness.childExtensions: [pi-xai] |
+| pi-config `.pi/settings.json` | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: [pi-xai] |
+| 全局 `~/.pi/agent/settings.json` | 已执行 | 2026-07-25 | agent | fusionHarness.childExtensions: [pi-xai] |
+| `scripts/sync-pi-agent.sh` 全局同步 | 跳过（deferred） | — | — | 遵循 global-delivery 约定，用户独立 session 确认 |
 
 ## 回写前置条件
 
