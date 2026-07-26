@@ -284,6 +284,14 @@ catalog:
 - **依赖**: 运行时需要本机安装 Python CLI `agent-reach`（及可选上游工具）；skill 本身不安装 CLI。
 - **注意**: 触发面很广（调研/搜索/各平台 URL），可能与内置 `webfetch` / X 搜索等工具路由重叠，Agent 需按任务选择。
 
+##### `worktrunk-isolation`
+
+- **描述**: 让 Agent 用社区工具 worktrunk（CLI `wt`）管理 git worktree，给多 session 并行作业做文件系统隔离，并强制人确认合入门禁。
+- **解决的问题**: 多 session 同仓并行时 agent 工作互相覆盖、且无人确认就擅自合入。本 skill 用 worktree 隔离各 session 工作树，并把 merge/remove 锁在用户明确确认后。
+- **源文件**: `.pi/skills/worktrunk-isolation/SKILL.md`
+- **依赖**: 运行时需要本机安装 `worktrunk`（`brew install worktrunk`）；preflight 缺失时给出安装指引，skill 本身不安装 CLI。
+- **范围**: 管隔离与门禁，不管多 agent 编排（不做任务板/端口分配/worklease）。
+
 #### 元技能（Meta-skills）
 
 ##### `pi-extension-dev`

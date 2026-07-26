@@ -32,6 +32,7 @@ global:
     - install-from-pi-config
     - notion
     - agent-reach
+    - worktrunk-isolation
 
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:
