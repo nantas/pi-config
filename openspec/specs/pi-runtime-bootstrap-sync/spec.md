@@ -21,8 +21,8 @@ The system SHALL define bootstrap and sync as a one-way deployment flow from rep
 The system SHALL define the mapping from repository-managed source paths to runtime target paths through `.pi/capabilities.yaml` rather than a hardcoded MAPPINGS array. The sync script SHALL sync only resources declared in `global.extensions`, `global.agents`, `global.skills`, and `agent_md`. Directory targets SHALL use copy-based semantics with managed overwrite.
 
 #### Scenario: Global extension is synced
-- **WHEN** `global.extensions` lists `planner-toggle`
-- **THEN** `planner-toggle.ts` is copied to `~/.pi/agent/extensions/`
+- **WHEN** `global.extensions` lists `init-command`
+- **THEN** `init-command.ts` is copied to `~/.pi/agent/extensions/`
 
 #### Scenario: Non-global extension is not synced
 - **WHEN** `obsidian-tools` is in `catalog.extensions` but not in `global.extensions`

@@ -367,3 +367,20 @@ at the top of this file using the following format:
   - fallback CLI: skills/imagegen/scripts/image_gen.py (需 OPENAI_API_KEY，衍生自 OpenAI Codex，Apache-2.0)
   - .pi/npm 共享工作区 7 个漏洞为存量 (ponytail/pi-xai 等)，与本包无关
   - Capabilities sync: Added to global.settings.packages in capabilities.yaml
+
+### 2026-07-26 — remove-unused-extensions (session-browse / output-scroll-viewer / trellis-analytics / planner-toggle)
+
+- **Type:** Cleanup (capability removal)
+- **Removal Date:** 2026-07-26
+- **Resource Types:** extension
+- **Decision:** discard（实际测试无使用需求）
+- **Removed Extensions:**
+  - `session-browse` (global) — 历史 Pi 会话索引/检索/树状浏览；提供 session-search/expand/read/iterate 工具。连带移除专有 spec `session-index-engine`
+  - `output-scroll-viewer` (global) — 长篇输出全屏可滚动 overlay 查看器。连带移除专有 spec `output-scroll-viewer`
+  - `planner-toggle` (global) — 一键只读规划模式切换（Ctrl+Alt+P / `/planner`）。连带移除专有 spec `planner-toggle`
+  - `trellis-analytics` (catalog) — Trellis 工作流遥测。连带移除专有 spec `trellis-repo-guard`
+- **Connected Spec Removal:** `codex-plan-mode-reference`（仅服务 plan-mode 对比，文档 `docs/reference/plan-mode-comparison.md` 保留作历史参考）
+- **Capabilities sync:** `.pi/capabilities.yaml` global.extensions 移除 3 项，catalog.extensions 移除 trellis-analytics
+- **Changes archived:** session-browse-ui / trellis-analytics / trellis-analytics-prompt / trellis-analytics-simplify 移入 `archive/`（前缀 2026-07-26）
+- **Global cleanup:** 手动 rm `~/.pi/agent/extensions/` 下 output-scroll-viewer.ts、planner-toggle.ts、session-browse/；未运行 `sync-pi-agent.sh`（按治理需用户确认）
+- **Notes:** 纯减法清理未走 `/opsx-new` 全流程，单 commit 提交

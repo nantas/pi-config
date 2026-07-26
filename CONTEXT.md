@@ -93,10 +93,8 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 扩展开发、新建扩展 | `pi-extension-dev-skill`, `pi-extension-lifecycle-guidance` |
 | 扩展自去重 | `extension-dedup-mechanism`, `extension-dedup-standard`, `extension-self-dedup` |
 | $ 技能调用、$ 展开 | `dollar-skill-invoke`, `dollar-skill-autocomplete`, `dollar-skill-invoke-context`（注：后缀变体见 archive） |
-| 计划模式切换 | `planner-toggle` |
 | /init 命令 | `init-command` |
-| 输出滚动查看 | `output-scroll-viewer` |
-| 会话浏览、会话树 | `session-index-engine`, `session-retrieval-tools`, `browse-session-tree`（注：`session-browse` 见 extensions） |
+| 会话浏览、会话树 | `session-retrieval-tools`, `browse-session-tree` |
 | Obsidian 工具 | `obsidian-tools`, `obsidian-tools-extension`, `obsidian-cli-tool`, `obsidian-vault-resolver` |
 | Obsidian 搜索 | `obsidian-search-skill`, `obsidian-search-tool`, `obsidian-search-config` |
 | Notion CLI、ntn 命令 | `notion` |
@@ -150,5 +148,3 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 |----------|---------------|
 | 仓库蓝图 | `pi-customization-blueprint`, `pi-phase2-delivery-plan` |
 | 项目源层 | `pi-project-source-layer` |
-| Trellis 防护 | `trellis-repo-guard` |
-| Plan 模式对比 | `codex-plan-mode-reference` |

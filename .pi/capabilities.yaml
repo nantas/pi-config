@@ -12,12 +12,9 @@ global:
   # Extensions synced to ~/.pi/agent/extensions/ (single-file .ts)
   extensions:
     - dollar-skill-invoke
-    - planner-toggle
-    - output-scroll-viewer
     - tool-counter-widget
     - init-command
     - browse-session-tree
-    - session-browse
 
   # Agents synced to ~/.pi/agent/agents/
   agents:
@@ -124,9 +121,6 @@ catalog:
       source: obsidian-tools
       description: "Obsidian integration tools for Pi agent"
       has_package_json: true
-    - name: trellis-analytics
-      source: trellis-analytics
-      description: "Passive telemetry for Trellis workflow observability, context consumption tracking, and streaming JSONL persistence"
     - name: wikilink-batch-replace
       source: wikilink-batch-replace
       description: "Batch-replace bare text references with Obsidian wikilinks, auto-escaping pipe separators in table rows"

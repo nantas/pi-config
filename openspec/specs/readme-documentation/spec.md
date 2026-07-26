@@ -60,7 +60,7 @@ The README SHALL link to the actual source files where each capability is implem
 
 #### Scenario: source-file-links
 - **WHEN** a capability entry references a file
-- **THEN** the entry SHALL contain a relative path link to that file (e.g., `.pi/extensions/planner-toggle.ts`)
+- **THEN** the entry SHALL contain a relative path link to that file (e.g., `.pi/extensions/init-command.ts`)
 - **AND** if the capability has a spec in `openspec/specs/`, the entry SHALL also link to that spec
 
 ### Requirement: readme-architecture-overview

@@ -103,7 +103,7 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 7 | `dollar-skill-invoke`、`planner-toggle`、`output-scroll-viewer`、`tool-counter-widget`、`init-command`、`browse-session-tree`、`session-browse` |
+| **扩展** | 4 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree` |
 | **Agent** | 8 | `unity-worker`、`scout`、`worker`、`context-builder`、`oracle`、`planner`、`researcher`、`reviewer` |
 | **技能** | 3 | `install-from-pi-config`、`notion`、`agent-reach` |
 | **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
@@ -121,7 +121,6 @@ pi login <provider>
 | **技能** | `pkg-fork-dev` | Fork 并修改已有第三方 Pi 包的完整生命周期 |
 | **扩展** | `add-provider` | 添加自定义模型供应商 |
 | **扩展** | `obsidian-tools` | Obsidian 集成工具 |
-| **扩展** | `trellis-analytics` | Trellis 工作流遥测与上下文消耗追踪 |
 | **扩展** | `wikilink-batch-replace` | 批量将裸文本引用替换为 Obsidian wikilink |
 | **包** | （无） | `catalog.packages` 当前为空 |
 
@@ -176,7 +175,6 @@ pi
 验证清单：
 - [ ] `/model` 能列出预期的模型
 - [ ] Ctrl+P 能在 `enabledModels` 范围内切换模型
-- [ ] `/planner` 能进入规划模式（如同步了 `planner-toggle`）
 - [ ] `$skill-name` 能触发技能补全（如同步了 `dollar-skill-invoke`）
 - [ ] `/login` 能查看已配置的供应商
 

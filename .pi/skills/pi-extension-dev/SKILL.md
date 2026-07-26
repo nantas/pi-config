@@ -303,8 +303,8 @@ Append the extension name to `global.extensions` in `.pi/capabilities.yaml`. If 
 global:
   extensions:
     - dollar-skill-invoke
-    - planner-toggle
-    - output-scroll-viewer
+    - tool-counter-widget
+    - init-command
     - <new-extension-name>   # ← appended here
 ```
 

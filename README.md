@@ -81,20 +81,6 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/dollar-skill-invoke.ts`
 - **OpenSpec Spec**: `openspec/specs/dollar-skill-invoke/spec.md` / `openspec/specs/dollar-skill-autocomplete/spec.md` / `openspec/specs/slash-skill-filter/spec.md`
 
-#### `planner-toggle`
-
-- **描述**: 通过键盘快捷键 `Ctrl+Alt+P` 或 `/planner` 命令切换只读规划模式。在规划模式下，模型切换为 `deepseek/deepseek-v4-pro`，仅开放只读工具集（read、bash、grep、find、ls）。
-- **解决的问题**: 需要做架构决策或规划时，防止 agent 在思考过程中误修改文件。本扩展提供安全的规划隔离环境。
-- **源文件**: `.pi/extensions/planner-toggle.ts`
-- **OpenSpec Spec**: `openspec/specs/planner-toggle/spec.md`
-
-#### `output-scroll-viewer`
-
-- **描述**: Agent 完成长篇输出后，检测文本是否超过一屏，弹窗确认是否从开头查看，并提供全屏可滚动 overlay 查看器。支持 Markdown 渲染和完整键盘导航（↑↓/jk 逐行滚动、PgUp/Dn/Ctrl+u/d 翻页、Home/g/End/G 跳转、Esc/q 关闭）。
-- **解决的问题**: 长篇 Agent 输出超过终端可见范围时，用户需手动向上滚动 scrollback 才能从开头阅读，打断阅读流。本扩展自动检测并弹出可选择的可滚动查看器。
-- **源文件**: `.pi/extensions/output-scroll-viewer.ts`
-- **OpenSpec Spec**: `openspec/specs/output-scroll-viewer/spec.md`
-
 #### `subagent` (prompt)
 
 - **描述**: 多 agent 编排 prompt，提供 `/subagent` 入口，引导主 agent 使用原生 `subagent` 工具完成 single/parallel/chain/async 工作流。
@@ -429,7 +415,7 @@ openspec/
 
 | 类别 | 数量 | 归档示例 |
 |---|---|---|
-| 自定义扩展 | 3 | `dollar-skill-invoke`、`planner-toggle`、`planner-toggle-dedup` |
+| 自定义扩展 | 3 | `dollar-skill-invoke`、`init-command`、`browse-session-tree` |
 | 外部包管理 | 4 | `pkg-research-workflow`、`fix-global-subagent-package-delivery`、`phase2-pi-mcp-baseline`、`add-pi-subagent-baseline` |
 | 治理与同步 | 3 | `govern-pi-config-closeout-sync`、`global-agent-md-tool-guide`、`fix-subagent-model-override` |
 | 技能与蓝图 | 3 | `pi-extension-dev-skill`、`define-pi-customization-blueprint`、`establish-pi-config-hub-baseline` |
