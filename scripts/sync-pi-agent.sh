@@ -209,6 +209,62 @@ os.rename(tmp_path, target_path)
 PYEOF
 }
 
+# --- Render models.json from manifest global.models ---
+# Manifest-declared providers are authoritative (replaced wholesale);
+# providers NOT declared in the manifest are preserved from the target file.
+render_models_file() {
+  local target_path="$1"
+
+  mkdir -p "$(dirname "${target_path}")"
+
+  local manifest_file="${REPO_ROOT}/.pi/capabilities.yaml"
+
+  if [[ ! -f "${manifest_file}" ]]; then
+    echo "ERROR: ${manifest_file} not found. Cannot sync models without manifest." >&2
+    exit 1
+  fi
+
+  python3 <<'PYEOF'
+import yaml, json, os
+
+manifest_path = os.environ["MANIFEST_PATH"]
+target_path = os.environ["TARGET_PATH"]
+
+# Parse capabilities.yaml
+with open(manifest_path, "r") as f:
+    manifest = yaml.safe_load(f)
+
+manifest_models = (manifest.get("global") or {}).get("models") or {}
+
+result = {"providers": {}}
+
+# Preserve target top-level keys and providers NOT declared in the manifest
+if os.path.exists(target_path):
+    try:
+        with open(target_path, "r") as f:
+            existing = json.load(f)
+        for key, value in existing.items():
+            if key != "providers":
+                result[key] = value
+        for name, cfg in (existing.get("providers") or {}).items():
+            if name not in manifest_models:
+                result["providers"][name] = cfg
+    except (json.JSONDecodeError, IOError):
+        pass
+
+# Manifest providers are authoritative
+for name, cfg in manifest_models.items():
+    result["providers"][name] = cfg
+
+# Atomic write via temp file
+tmp_path = target_path + ".tmp"
+with open(tmp_path, "w") as f:
+    json.dump(result, f, indent=2)
+    f.write("\n")
+os.rename(tmp_path, target_path)
+PYEOF
+}
+
 # --- Sync managed paths from manifest ---
 sync_from_manifest() {
   local manifest_file="${REPO_ROOT}/.pi/capabilities.yaml"
@@ -661,6 +717,16 @@ echo ""
 echo "--- Syncing settings.json ---"
 render_settings_file "${TARGET_PATH}"
 echo "  Synced settings.json (generated from manifest)"
+
+# 2b. Sync models.json with manifest filtering
+#     (manifest global.models providers authoritative, unlisted providers preserved)
+echo ""
+echo "--- Syncing models.json ---"
+(
+  export TARGET_PATH="${TARGET_PATH%settings.json}models.json"
+  render_models_file "${TARGET_PATH}"
+)
+echo "  Synced models.json (generated from manifest global.models)"
 
 # 3. Sync themes (unchanged, full copy)
 echo ""

@@ -75,6 +75,36 @@ global:
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
 
+  # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
+  # Manifest-declared providers are authoritative (replaced wholesale);
+  # providers NOT declared here (e.g. local-only zhipuai-coding-plan) are preserved from the target.
+  # apiKey MUST reference an environment variable - never commit plaintext keys.
+  models:
+    deepseek:
+      apiKey: "$DEEPSEEK_API_KEY"
+      models:
+        - id: deepseek-v4-flash
+          name: DeepSeek V4 Flash
+          api: openai-responses
+          baseUrl: https://api.deepseek.com
+          reasoning: true
+          input:
+            - text
+          contextWindow: 1048576
+          maxTokens: 384000
+          cost:
+            input: 0.14
+            output: 0.28
+            cacheRead: 0.0028
+            cacheWrite: 0
+          thinkingLevelMap:
+            minimal: null
+            low: low
+            medium: null
+            high: high
+            xhigh: null
+            max: max
+
   # Environment variables declared per-capability (global scope)
   # Each key is a capability ID matching an entry in packages/extensions/skills/agents
   env:

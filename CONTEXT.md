@@ -83,6 +83,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 全局同步、同步脚本 | `pi-runtime-bootstrap-sync`, `pkg-global-sync`, `sync-env-check`, `global-agent-md-sync` |
 | 全局同步确认 | `pi-global-runtime-sync-confirmation`, `pi-config-closeout-settings-governance` |
 | settings 生成 | `pi-fff-env-config`, `pi-fff-global-package` |
+| models.json 生成、模型配置治理 | `models-manifest-governance` |
 | 全局包移除、node_modules 清理 | `capability-manifest` |
 | 变更收尾 | `pi-config-closeout-settings-governance` |
 

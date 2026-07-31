@@ -232,6 +232,33 @@ export POWERLINE_NERD_FONTS=1
 - **解决的问题**: 单模型方案偏置时，用 architect+builder 并行产出再融合，形成可复用的多模型工作流。
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.settings.fusionHarness`
 
+#### 模型提供方配置（`global.models`）
+
+- **描述**: 跨设备共享的自定义 provider 声明。`capabilities.yaml` 通过 `global.models` 段声明：**manifest 中声明的 provider 为权威（整体替换目标端同名 provider），未声明的 provider（如本机私有配置）从目标端原样保留**。`apiKey` 必须引用环境变量（如 `$DEEPSEEK_API_KEY`），禁止提交明文密钥。
+- **解决的问题**: `~/.pi/agent/models.json` 中的 provider 配置原本不在 sync 管理范围，跨设备共享只能手工复制，无法版本化与审计。
+- **源文件**: `.pi/capabilities.yaml` → 由 `scripts/sync-pi-agent.sh` 的 `render_models_file()` 渲染（复用 settings.json 同款 merge-preserve + atomic-write 模式）
+- **OpenSpec Spec**: `openspec/changes/models-manifest-governance/specs/models-manifest-governance/spec.md`
+
+```yaml
+# global.models 示例：deepseek-v4-flash 走 Responses API
+# 由 sync-pi-agent.sh 渲染到 ~/.pi/agent/models.json
+# （provider 声明语法与 pi models.json 的 provider schema 一致）
+global:
+  models:
+    deepseek:
+      apiKey: "$DEEPSEEK_API_KEY"   # ← 仅允许 env 引用
+      models:
+        - id: deepseek-v4-flash
+          name: DeepSeek V4 Flash
+          api: openai-responses
+          baseUrl: https://api.deepseek.com
+          reasoning: true
+          input: [text]
+          contextWindow: 1048576
+          maxTokens: 384000
+          thinkingLevelMap: { minimal: null, low: low, medium: null, high: high, xhigh: null, max: max }
+```
+
 #### 环境变量配置（`global.env` / `catalog.env`）
 
 部分能力需要环境变量才能启用全部功能（如数据库路径、API key 等）。`capabilities.yaml` 通过 `global.env` 和 `catalog.env` 字段声明这些变量，**按能力 ID 分组**，与 `global.settings.packages`、`global.extensions`、`global.skills`、`global.agents` 中的能力条目对应。
