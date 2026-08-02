@@ -1,0 +1,23 @@
+# x-reach 账号占位模板（accounts.txt.example）
+#
+# ⚠️ 安全红线：这是仓库内的占位模板，真实账号永不出现在这里。
+#    真实 accounts.db / cookie 只放本机 ~/.x-reach/，绝不进 pi-config 仓库、
+#    绝不随 sync-pi-agent.sh 同步。每台机器各自重导。
+#
+# 用法：复制本模板到 ~/.x-reach/accounts.txt，替换占位符为真实值，
+#      然后 `twscrape --db ~/.x-reach/accounts.db add_accounts ~/.x-reach/accounts.txt username:password:email:email_password`
+#
+# ─── 格式：cookie 模式（推荐，无头/SSH 可用）──────────────────────
+# 推荐：直接用 add_cookie 命令，不走文件：
+#   twscrape --db ~/.x-reach/accounts.db add_cookie myacc "auth_token=REPLACE_ME; ct0=REPLACE_ME"
+#
+# ─── 格式：账密模式（需 email 验证码，IMAP 或手动）──────────────
+# 每行一个账号，字段用冒号分隔，line_format 决定列顺序。
+# username:password:email:email_password:cookies
+REPLACE_ME_username:REPLACE_ME_password:REPLACE_ME_email@example.com:REPLACE_ME_email_password:REPLACE_ME_auth_token=...;ct0=...
+REPLACE_ME_username2:REPLACE_ME_password2:REPLACE_ME_email2@example.com:REPLACE_ME_email_password2:REPLACE_ME_auth_token=...;ct0=...
+#
+# cookie 获取：浏览器登录 x.com → DevTools(F12) → Application → Cookies
+#             复制 auth_token 和 ct0 两个值。
+#
+# ⚠️ 不要把填好真实值的文件提交回仓库。真实文件只存在于 ~/.x-reach/。
