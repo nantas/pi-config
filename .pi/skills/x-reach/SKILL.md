@@ -49,8 +49,12 @@ bash .pi/skills/x-reach/scripts/x-reach-init.sh
 twscrape --db ~/.x-reach/accounts.db add_cookie myacc "auth_token=xxx; ct0=yyy"
 ```
 
-> 🪄 **桌面可选便利**：Chrome 已登录 x.com 时，可用 `bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc`
-> 自动从浏览器提 cookie 导入（首次自举 venv + Keychain 授权）。仅桌面；失败/无头环境回退手贴。见 [setup.md](references/setup.md)。
+> 🪄 **桌面可选便利（仅首账号）**：Chrome 已登录 x.com 时，可用 `bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc`
+> 自动从浏览器提 cookie 导入。**仅首账号**——抓完别动浏览器（登出/切号会让该 session 失效）。
+> 多账号走账密 `login_accounts`（见 [setup.md](references/setup.md)）。不要靠浏览器换号抓取。
+
+> ℹ️ **大多数场景单号就够**。即使只一个号，twscrape（持久 session + TLS 指纹）已远超 agent-reach
+> OpenCLI 后端。多账号是「单号不够用时按需升级」，见 setup.md「多账号升级」。
 
 ## 常用命令（命令模板，照抄）
 
@@ -87,6 +91,15 @@ twscrape --db ~/.x-reach/accounts.db trends news
 2. **升级 twscrape**（X 改了 GraphQL 端点，维护者已修）：`pipx upgrade twscrape`
 3. **换稳定命令兜底**：search 失败时改用 `user_tweets` / `tweet_details`（不同端点）。
 4. **降级到 agent-reach OpenCLI**：`opencli twitter search "query" -f yaml`（桌面，浏览器登录态）。
+
+### 特殊错误：`XClIdAccountError: Logged-out X web app`
+
+**不在重试链里**——这不是偶发/限流，是 **session 服务端失效**，重试和升级都救不了。根因：
+- 浏览器里登出/切号了（cookie 模式最常见；实测 Chrome x.com 域 cookie 只 1 份，换号必触发失效）
+- 或 IP 被风控（共享代理被标记）
+
+恢复：账密号 `relogin`，cookie 号删号重加。⚠️ `reset_locks` **无效**（只清限流锁）。
+详见 [setup.md](references/setup.md)「诊断与恢复」。
 
 > ⚠️ **预期管理**：twscrape 同样依赖 X 的 GraphQL 端点。X 改端点会导致临时 404/failure，
 > 只能靠 twscrape 维护者跟进修端点（活跃，几乎每天提交）。这是不可控外部风险，**任何

@@ -80,14 +80,14 @@ if [ "${print_import_guide:-0}" = "1" ]; then
   # 复制 auth_token 和 ct0 两个值，然后：
   twscrape --db ${DB_PATH} add_cookie myacc "auth_token=粘贴值; ct0=粘贴值"
 
-  # 建议导入 2-3 个账号成轻量池（单号限流自动切下一个）：
-  twscrape --db ${DB_PATH} add_cookie acc2 "auth_token=...; ct0=..."
-  twscrape --db ${DB_PATH} add_cookie acc3 "auth_token=...; ct0=..."
+  # 单号已足够务实。多账号需求走账密 login_accounts（见 setup.md「多账号升级」），
+  # 不要靠浏览器换号抓取（实测会触发服务端失效）。
 
   # 验证：
   twscrape --db ${DB_PATH} accounts
   twscrape --db ${DB_PATH} user_by_login elonmusk    # 拉一个公开用户
 
+⚠️  抓完别动浏览器：不登出、不在 X 切换器切号，否则 session 服务端失效。
 ⚠️  安全红线：
   - ${DB_PATH} 含明文 cookie = 账号登录态，仅限本机，永不进 pi-config 仓库。
   - 中国大陆 IP 访问 x.com 需代理：export TWS_PROXY=socks5://user:pass@host:port

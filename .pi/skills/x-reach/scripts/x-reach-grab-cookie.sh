@@ -2,14 +2,15 @@
 # x-reach-grab-cookie.sh — 桌面便利脚本：从 Chrome 自动提取当前登录的 x.com cookie，
 # 并导入 twscrape 账号池。
 #
-# 定位：可选便利，仅桌面 + 当前 Chrome 已登录 x.com 时可用。
-#       手贴仍是全环境通用的主推路径（见 SKILL.md / setup.md）。
+# 定位：**仅首账号便利**。手贴仍是全环境通用的主推路径（见 SKILL.md / setup.md）。
+#       多账号需求走账密 login_accounts，不要靠浏览器换号抓取（见下警告）。
 #
 # 用法：bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh <账号名>
 #   例：bash .../x-reach-grab-cookie.sh acc1
 #
-# ⚠️ 提取的是「Chrome 当前登录的那个 x.com 账号」——要加第 2、3 个号，
-#    先在浏览器切/重登 x.com 账号再跑本脚本。
+# ⚠️ 抓完**别动浏览器**：不登出、不在 X 切换器切到别的号。实测 Chrome x.com 域
+#    auth_token/ct0 各只 1 份，换号会替换单槽 session 并触发服务端失效，导致 db 里
+#    之前存的 cookie 快照报 XClIdAccountError: Logged-out。多号走账密，别换号抓。
 # ⚠️ 首次运行会弹 macOS Keychain 授权框（请点「始终允许」），并自举 venv（~/.x-reach/grab-venv）。
 # ⚠️ 无头/SSH 环境无浏览器，本脚本不可用 → 走手贴（见 setup.md）。
 set -euo pipefail
@@ -71,6 +72,10 @@ EOF
 twscrape --db "${DB_PATH}" add_cookie "${USERNAME}" "${COOKIE}" >/dev/null 2>&1
 ok "已导入账号「${USERNAME}」。当前账号池："
 twscrape --db "${DB_PATH}" accounts 2>&1 | tail -n +2
+echo ""
+warn "⚠️ 抓完别动浏览器：不登出、不在 X 切换器切到别的号！"
+echo "   实测 Chrome x.com 域 cookie 只 1 份，换号会触发服务端失效，让本 session 报"
+echo "   XClIdAccountError: Logged-out。多账号需求走账密 login_accounts（见 setup.md）。"
 echo ""
 log "验证 cookie 是否真的工作（拉一个公开用户）："
 echo "  twscrape --db ${DB_PATH} user_by_login elonmusk"
