@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Web research agent — finds official docs, specs, ecosystem context, and primary sources to answer technical questions
-model: kimi-coding/kimi-for-coding
+model: deepseek/deepseek-v4-flash
 thinking: high
 tools: read, ffgrep, fffind, ls, bash, write, web_search, fetch_content, get_search_content, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
 ---

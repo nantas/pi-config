@@ -6,7 +6,7 @@
   "powerline": true,
   "breadcrumb": "inner",
   "fusionHarness": {
-    "architect": "kimi-coding/k3",
+    "architect": "deepseek/deepseek-v4-flash",
     "builder": "grok-build/grok-4.5",
     "architectThinking": "high",
     "builderThinking": "high",
