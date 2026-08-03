@@ -15,3 +15,7 @@ package-lock.json
 # Sensitive config with tokens (synced by script, not tracked)
 .pi/agent/mcp.json
 .scratch/
+
+# x-reach 安全红线：cookie/账密文件永不进仓（~/.x-reach/ 本机隔离）
+accounts.db
+accounts.txt

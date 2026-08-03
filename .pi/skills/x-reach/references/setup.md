@@ -23,14 +23,16 @@ bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc
 
 - 首次自举 `~/.x-reach/grab-venv`（装 browser_cookie3，约 10s），之后秒开
 - 会弹 macOS Keychain 授权框，点「始终允许」
-- **仅首账号便利**——抓完**别动浏览器**：不登出、不在 X 切换器切到别的号（会触发服务端失效，见下警告）
+- **读到的是当前激活号**——`browser_cookie3` 按 cookie 名取值，`x.com` 域
+  `auth_token`/`ct0` 读到的是浏览器此刻激活的那个号。要抓第二个号，先在 X 里
+  切到它激活，再用**不同账号名**重跑脚本（见下「多账号升级 · 方式一」）
 - 失败（无浏览器/未登录/Chrome 加密漂移/Keychain 被拒）自动回退手贴指引
 - 无头/SSH 环境不可用 → 直接走手贴
 
-> ⚠️ **同浏览器换号 = 必然失效（实测铁证）**：Chrome 的 `x.com` 域下 `auth_token`/`ct0` 各只存 1 份，
-> X 的浏览器内多账号切换器本质是「替换单槽 session」。在浏览器里切号会触发服务端把旧 session 标记失效，
-> 导致 db 里之前存的 cookie 快照报 `XClIdAccountError: Logged-out X web app`。**这不是偶发，是构造性必然。**
-> 多账号需求见下文「多账号升级（可选）」，不要靠浏览器换号抓取。
+> ℹ️ **多号 cookie 实测可共存**：X 的「add existing account」流程为每个号维持
+> **独立并发服务端 session**，切换不顶替旧号 session。抓多号 = 每号各抓一次
+> （每次确保目标号当前激活）。真正会让某号 session 失效的是浏览器里**登出**它，
+> 不是切换。详见下文「多账号升级」。
 
 ## 单号 cookie 模式（务实默认）
 
@@ -48,18 +50,45 @@ twscrape --db ~/.x-reach/accounts.db stats
 > 不代表 cookie 失效。以 `total_req` 增长 + 实际请求成功为准。跑一次
 > `user_by_login <known-user>` 即可验证 cookie 是否真的工作。
 
-> ⚠️ **保持浏览器里那个号登录着**。单号模式下 cookie 是那个号 session 的快照——
-> 一旦你在浏览器里登出它（或在 X 切换器切到别的号），服务端 session 失效，
-> db 里的快照会报 `XClIdAccountError: Logged-out`。详见「诊断与恢复」。
+> ⚠️ **保持浏览器里那个号登录着**（别登出）。单号模式下 cookie 是那个号 session 的快照——
+> 一旦你在浏览器里**登出**它，服务端 session 失效，db 里的快照会报 `XClIdAccountError: Logged-out`。
+> 切换/添加其他号不影响它（每号独立 session）。详见「诊断与恢复」。
 
 ## 多账号升级（可选，单号不够用时）
 
 **为什么需要**：单号被频繁限流、等待明显；或担心单号失效无冗余。twscrape 多账号会
 **自动轮换**——某号某操作被限流即锁，自动切下一个活跃账号。
 
-**为什么 cookie 做不了多号**：实测 Chrome `x.com` 域 `auth_token`/`ct0` 各只 1 份，
-X 切换器换号=替换单槽 session 并触发服务端失效。要凑多号，必须用账密 `login_accounts`，
-twscrape 对每号跑独立 login 流程，session 互不顶替。
+两条路凑多号，按推荐度排序：
+
+### 方式一：cookie 分次抓取（推荐 · 免账密）
+
+X 浏览器的 **「add existing account」** 流程为每个号维持**独立并发服务端 session**，
+切换不顶替旧号 session（实测双号 cookie 可长期共存互不失效）。`browser_cookie3`
+读到的是当前激活号的 cookie，所以抓多号 = **每号各抓一次**：
+
+```bash
+# 1. 浏览器登录第一个号 → 确保它当前激活 → 抓
+bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh acc1
+
+# 2. 浏览器里用「add existing account」加第二个号，切到它激活 → 再抓（不同账号名）
+bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh acc2
+
+# 3. 想要更多号重复上一步，每号一个名字
+```
+
+要点：
+- **用 add existing account，不要登出再登入**——后者会作废旧 session
+- 手贴路径同理：切换激活号后，从 DevTools 复制该号的 `auth_token`/`ct0`，用新名 `add_cookie`
+- 检索时 twscrape **轮换全自动**，agent/用户无需手动切号
+
+> ⚠️ **真正会失效的操作**：浏览器里**登出**某号（不是切换）。登出即作废该号 auth_token，
+> db 里对应快照报 `XClIdAccountError: Logged-out`。日常切号浏览互不影响。
+
+### 方式二：账密 login_accounts（无需浏览器 · 无头/SSH 可用）
+
+cookie 路依赖桌面浏览器抓取。无 GUI 或想全自动时用账密，twscrape 对每号跑独立
+login 流程，session 互不顶替：
 
 ```bash
 # 1. 准备账号文件 ~/.x-reach/accounts.txt（每行：用户名:密码:邮箱:邮箱授权码）
@@ -75,10 +104,10 @@ twscrape --db ~/.x-reach/accounts.db add_accounts ~/.x-reach/accounts.txt \
 twscrape --db ~/.x-reach/accounts.db login_accounts
 
 # 4. 验证
- twscrape --db ~/.x-reach/accounts.db accounts
+twscrape --db ~/.x-reach/accounts.db accounts
 ```
 
-**账密模式要点**：
+账密模式要点：
 - `login_accounts`（无参数）只 login `active=false` 的号，**热扩安全**——边用边加，老号继续可用
 - X 几乎必触发邮箱验证码，twscrape 通过 IMAP 自动读（需邮箱开启 IMAP + 应用专用密码）
 - 可选每账号绑独立代理（issue #268 实战：IP 风控是失效主因，独立代理能大幅降低）
@@ -105,7 +134,8 @@ twscrape --db ~/.x-reach/accounts.db del_accounts acc3
 ### `XClIdAccountError: Logged-out X web app`（session 服务端失效）
 
 **根因**（非限流，非偶发）：X 服务端判定该 session 已死。两个原因：
-1. **浏览器里登出/切号了**——cookie 模式最常见。登出即作废 auth_token，db 里的快照同步失效
+1. **浏览器里登出了某号**——cookie 模式最常见。登出即作废该号 auth_token，db 里对应
+   快照同步失效（切换/添加其他号不影响，每号独立 session）
 2. **IP 风控**——共享/被标记的代理 IP 被服务端拒绝（issue #268 实战：这是失效主因之一）
 
 **恢复**：
@@ -114,7 +144,7 @@ twscrape --db ~/.x-reach/accounts.db del_accounts acc3
 twscrape --db ~/.x-reach/accounts.db relogin acc1
 
 # cookie 模式导入的号 → 没有账密无法 relogin，只能删号重加
-#   重新抓取前确保浏览器里那个号是登录着的状态（没被登出/切走）
+#   重新抓取前确保浏览器里那个号是登录着的状态（没被登出）
 twscrape --db ~/.x-reach/accounts.db del_accounts acc1
 #   然后重新 add_cookie 或 grab-cookie.sh
 ```

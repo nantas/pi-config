@@ -49,9 +49,9 @@ bash .pi/skills/x-reach/scripts/x-reach-init.sh
 twscrape --db ~/.x-reach/accounts.db add_cookie myacc "auth_token=xxx; ct0=yyy"
 ```
 
-> 🪄 **桌面可选便利（仅首账号）**：Chrome 已登录 x.com 时，可用 `bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc`
-> 自动从浏览器提 cookie 导入。**仅首账号**——抓完别动浏览器（登出/切号会让该 session 失效）。
-> 多账号走账密 `login_accounts`（见 [setup.md](references/setup.md)）。不要靠浏览器换号抓取。
+> 🪄 **桌面可选便利（抓当前激活号）**：Chrome 已登录 x.com 时，可用 `bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc`
+> 自动从浏览器提**当前激活号**的 cookie 导入。多号 = 每号各抓一次（切换激活号后重跑，见 [setup.md](references/setup.md)）。
+> 真正会让某号失效的是浏览器里**登出**它，切换/添加号不影响。
 
 > ℹ️ **大多数场景单号就够**。即使只一个号，twscrape（持久 session + TLS 指纹）已远超 agent-reach
 > OpenCLI 后端。多账号是「单号不够用时按需升级」，见 setup.md「多账号升级」。
@@ -95,7 +95,7 @@ twscrape --db ~/.x-reach/accounts.db trends news
 ### 特殊错误：`XClIdAccountError: Logged-out X web app`
 
 **不在重试链里**——这不是偶发/限流，是 **session 服务端失效**，重试和升级都救不了。根因：
-- 浏览器里登出/切号了（cookie 模式最常见；实测 Chrome x.com 域 cookie 只 1 份，换号必触发失效）
+- 浏览器里**登出**了某号（cookie 模式最常见；切换/添加其他号不影响，每号独立 session）
 - 或 IP 被风控（共享代理被标记）
 
 恢复：账密号 `relogin`，cookie 号删号重加。⚠️ `reset_locks` **无效**（只清限流锁）。
