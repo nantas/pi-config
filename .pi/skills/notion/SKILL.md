@@ -64,6 +64,17 @@ Output: `{data_source_id, has_more, next_cursor, count, results: [{id, prop1: va
 
 All property values are flattened to plain values (strings, numbers, lists). Use `ntn-schema` first to understand property types before constructing filters.
 
+### ntn-create — Create a data_source row (page)
+
+```
+ntn-create <data_source_id_or_url> --set '{"Key": "tut_xxx", "Type": "UI", "使用": true}'
+ntn-create <data_source_id_or_url> --set @props.json
+```
+
+Output: `{id, url, properties_set}`.
+
+Resolves data_source (or database → first data_source), loads schema, translates plain `--set` values to Notion API property format, then `POST v1/pages`. Prefer this over hand-written `ntn api -X POST v1/pages`.
+
 ### ntn-edit — Search-and-replace page edits (markdown)
 
 ```
@@ -82,6 +93,7 @@ Uses `update_content` — the recommended Notion API edit mode; preserves child 
 
 ```
 ntn-write <page_id_or_url> --set '{"Status": "done", "Priority": 2}'
+ntn-write <page_id_or_url> --set @props.json
 ntn-write <page_id_or_url> --append "## New Section\n\nContent here."
 ntn-write <page_id_or_url> --replace "## Replaced\n\nAll new content."
 ntn-write <page_id_or_url> --safe-replace "## Replaced\n\nAll new content."   # child-page-safe
@@ -89,7 +101,7 @@ ntn-write <page_id_or_url> --safe-replace "## Replaced\n\nAll new content."   # 
 
 ⚠️ `--replace` deletes the entire block tree. If the page has **child pages or child databases**, the Notion API rejects with `400 validation_error: "This operation would delete N child page(s) or database(s)"`. Prefer `--safe-replace` for report pages that mount sub-pages/sub-reports: it auto-diffs old vs new markdown and applies block-level `content_updates` via `update_content`, preserving all children. Fallbacks: `ntn-edit --ops` (manual block-level replace) or `ntn-write --append` (add without deleting).
 
-`--set` auto-translates plain values to Notion API format based on the data_source schema.
+`--set` auto-translates plain values to Notion API format based on the data_source schema (inline JSON or `@file.json`). **Default path for property updates** — do not hand-write `PATCH v1/pages` for covered types.
 
 ## Workflow Guide
 
@@ -110,6 +122,19 @@ ntn-write <page_id_or_url> --safe-replace "## Replaced\n\nAll new content."   # 
    → Returns property names, types, and select options
 3. ntn-query <data_source_id> --filter '{"property":"Status","status":{"equals":"done"}}'
    → Returns flattened rows
+```
+
+### Multi data_source reminder
+
+The same project may have multiple data_sources with **different property shapes** (e.g. i18n terms vs dialogue lines vs mail templates). **Always run `ntn-schema` on the target data_source first.** Never reuse filter property names or `--set` keys across data_sources without checking schema.
+
+### Creating or updating rows (properties)
+
+```
+1. ntn-schema <data_source_id>     # confirm property names + types
+2. Create: ntn-create <data_source_id> --set '{"Title":"...","Status":"todo"}'
+   Update: ntn-write <page_id> --set '{"Status":"done"}'
+3. Only fall back to raw `ntn api` for uncovered property types (relation / people / files / ...)
 ```
 
 ### Editing a long page
@@ -139,8 +164,8 @@ This skill is designed for incremental improvement. When you encounter repeated 
 5. **Test with a live Notion page/database**: Verify with real data before committing.
 
 Common extension candidates:
-- **ntn-create**: Create new pages in a data_source (row creation)
 - **ntn-move**: Move pages between databases
 - **ntn-batch-edit**: Multi-page property updates
 - Improved filter DSL for `ntn-query`
 - Schema caching to reduce API calls
+- Broader property types for `--set` (relation / people / files)

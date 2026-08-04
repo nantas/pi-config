@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Create a new page (row) in a Notion data_source.
+
+Usage:
+  ntn-create <data_source_id_or_url> --set '{"Name": "row", "Status": "todo"}'
+  ntn-create <data_source_id_or_url> --set @props.json
+
+Output: JSON {id, url, properties_set}.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ntn_resolve import (
+    load_set_arg,
+    ntn_api,
+    resolve_data_source,
+    translate_properties,
+)
+
+
+class JsonArgParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(json.dumps({"error": message}), file=sys.stderr)
+        sys.exit(1)
+
+
+def main():
+    parser = JsonArgParser(description="Create a Notion data_source row (page)")
+    parser.add_argument("target", help="data_source ID, database ID, or URL")
+    parser.add_argument(
+        "--set",
+        required=True,
+        help="JSON object of properties, or @file.json",
+    )
+    args = parser.parse_args()
+
+    ds = resolve_data_source(args.target)
+    if not ds:
+        print(
+            json.dumps({"error": f"Could not resolve data_source from: {args.target}"}),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    updates = load_set_arg(args.set)
+    schema = ds.get("properties", {}) or {}
+    properties = translate_properties(updates, schema)
+    ds_id = ds["id"]
+
+    body = {
+        "parent": {"data_source_id": ds_id},
+        "properties": properties,
+    }
+    data = ntn_api("v1/pages", "-X", "POST", "--data", json.dumps(body))
+
+    result = {
+        "id": data.get("id", ""),
+        "url": data.get("url", ""),
+        "properties_set": list(updates.keys()),
+    }
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
