@@ -109,6 +109,25 @@ at the top of this file using the following format:
 
 ## Entries
 
+### 2026-08-04 — git:github.com/nantas/pi-xai（从 global 降级）
+
+- **Version:** 0.17.x（fork of luxus/pi-xai）
+- **Research Date:** 2026-08-04（退役决策）
+- **Resource Types:** extension（provider / OAuth / vision / imagine / video / …）
+- **Decision:** backlog（废弃自 global；不 discard 源码/fork 记录）
+- **Source Type:** git-package（fork）
+- **Source Repo:** https://github.com/nantas/pi-xai
+- **Upstream:** https://github.com/luxus/pi-xai
+- **Install Method:** 曾 pi-install；现已从 `capabilities.yaml` `global.settings.packages` 移除
+- **Has Dependencies:** true（typebox；pi-ai/pi-coding-agent peer）
+- **Reason:** 官方 Pi 已支持 `/login xai`、默认 `xai/grok-4.5`（Responses）与原生看图（`input: text+image`）。继续挂 pi-xai 与官方 provider/登录双轨冲突，维护成本高于收益。生图（Imagine 直连）官方仍无内置工具——需求不紧急，设计冻结于 `docs/design/xai-imagine-extension.md`，**暂不实现**。
+- **Notes:**
+  1. 移除项：`global.settings.packages` 中 `git:github.com/nantas/pi-xai`；`fusionHarness.childExtensions` 清空；builder 改为 `xai/grok-4.5`。
+  2. `forks/manifest.yaml` 中 pi-xai `status: archived`（fork 仓可保留，不再作为全局能力）。
+  3. 用户侧建议：`/login xai` → 选 subscription 或 API key → `/model xai/grok-4.5` 验证看图；全局生效需自行 `scripts/sync-pi-agent.sh` 并视需要 `pi uninstall`/清理 packages。
+  4. 生图替代：现可用 `pi-codex-image-gen` 或 OpenRouter 图像模型；将来若要 xAI 直连生图，按 design 做薄 extension，勿回装整包 pi-xai。
+  5. 历史：2026-07-23 因生图进 global；同日 fork 修 tab 冲突；2026-07-24 关 prompt-suggest。
+
 <!-- New entries go here, inserted at the top above this comment -->
 
 ### 2026-05-07 — git:github.com/nantas/pi-mcp-adapter

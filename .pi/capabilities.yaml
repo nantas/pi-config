@@ -62,16 +62,14 @@ global:
       - git:github.com/jwu/pi-webfetch
       - npm:@ff-labs/pi-fff
       - git:github.com/DietrichGebert/ponytail
-      - git:github.com/nantas/pi-xai
       - npm:pi-codex-image-gen
       - git:github.com/nantas/fusion-harness
     fusionHarness:
       architect: kimi-coding/k3
-      builder: grok-build/grok-4.5
+      builder: xai/grok-4.5
       architectThinking: high
       builderThinking: high
-      childExtensions:
-        - pi-xai
+      childExtensions: []
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash

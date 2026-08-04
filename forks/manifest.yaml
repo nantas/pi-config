@@ -10,9 +10,9 @@ forks:
   fork_url: https://github.com/nantas/pi-xai
   upstream_url: https://github.com/luxus/pi-xai
   upstream_source: npm:pi-xai
-  status: active
+  status: archived
   last_upstream_sync: null
-  changes_summary: 'v0.17.2: README no longer advertises prompt ghost; regression test blocks re-registration. v0.17.1: unregister next-prompt ghost at index entry (/xai-suggest unavailable; source retained). Prior: removed unconditional tab shortcut override.'
+  changes_summary: 'Archived 2026-08-04: removed from pi-config capability map (official Pi xai provider covers login/chat/vision). Imagine-only extension design frozen at docs/design/xai-imagine-extension.md. Prior fork: v0.17.2 prompt-suggest off; tab shortcut fix.'
 - name: pi-tool-display
   fork_url: https://github.com/nantas/pi-tool-display
   upstream_url: https://github.com/MasuRii/pi-tool-display
