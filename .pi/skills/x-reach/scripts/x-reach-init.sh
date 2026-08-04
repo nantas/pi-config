@@ -53,7 +53,8 @@ ok "目录就绪: ${XREACH_HOME} (权限 700)"
 # --- 5. 自检：账号池状态 ------------------------------------------------------
 log "当前账号池状态（${DB_PATH}）："
 if twscrape --db "${DB_PATH}" accounts 2>/dev/null; then
-  ACCT_COUNT=$(twscrape --db "${DB_PATH}" accounts 2>/dev/null | grep -c 'True' || true)
+  # cookie 模式 logged_in 恒为 0/False，不能用 logged_in 判可用性；数数据行（跳表头）
+  ACCT_COUNT=$(twscrape --db "${DB_PATH}" accounts 2>/dev/null | tail -n +2 | grep -c . || true)
   if [ "${ACCT_COUNT}" -ge 1 ]; then
     ok "检测到已登录账号。环境可用，可直接检索。"
     echo ""
@@ -79,6 +80,9 @@ if [ "${print_import_guide:-0}" = "1" ]; then
   # 浏览器登录 x.com → DevTools(F12) → Application → Cookies
   # 复制 auth_token 和 ct0 两个值，然后：
   twscrape --db ${DB_PATH} add_cookie myacc "auth_token=粘贴值; ct0=粘贴值"
+
+  # 桌面便利：Chrome 已登录 x.com 时，自动抓取当前激活号 cookie（免手贴）：
+  bash .pi/skills/x-reach/scripts/x-reach-grab-cookie.sh myacc
 
   # 多号：每号在浏览器激活后各抓一次（见 setup.md「多账号升级 · 方式一」）。
 

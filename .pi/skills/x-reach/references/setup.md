@@ -189,7 +189,7 @@ twscrape --db ~/.x-reach/accounts.db search "query" --limit=10
 默认 `httpx` 后端。装 `curl-cffi` 后端可伪装浏览器 TLS 指纹，降低被 X 识别为脚本的概率：
 
 ```bash
-pipx install 'twscrape[curl]'
+pipx inject twscrape curl-cffi   # twscrape 已装，用 inject 注入依赖（非 pipx install 重装）
 export TWS_HTTP_BACKEND=curl
 twscrape --db ~/.x-reach/accounts.db search "query" --limit=10
 ```
