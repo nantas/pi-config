@@ -3,6 +3,25 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-07-25 — skill-up（alibaba）
+
+- **Version:** v0.7.0
+- **Research Date:** 2026-07-25
+- **Resource Types:** 独立 Go CLI（非 Pi package，不能走 pi install）+ bundled skill（skill-upper）
+- **Decision:** backlog
+- **Source Type:** git-package（外部 CLI，未安装）
+- **Source Repo:** https://github.com/alibaba/skill-up
+- **Install Method:** 未安装（如需接入：`install.sh` 装二进制 + custom engine local 包装 `pi -p`）
+- **Has Dependencies:** false（单一 Go 二进制；评测运行依赖被测引擎 CLI 与模型凭据）
+- **Reason:** 用户决策：当前以流程型/交互型 skill（grilling/chrome-agent/trellis-brainstorm）为主，skill-up 只能覆盖「行为约束回归」层，测不到交互质量与真实环境效果，fixture 维护成本 + 评测模型调用费用在现有规模下 ROI 为负。详见 `docs/reference/skill-up-evaluation.md`
+- **Notes:**
+  1. 安全审查 CLEAN：无混淆/可疑外联，依赖少且知名，OTel 默认关闭
+  2. 关键能力：声明式 eval.yaml/cases、多引擎（claude_code/codex/qodercli/qwen_code + custom local/http）、rule_based（含 tool_called 断言）/script/agent_judge 三种评分、with/without skill benchmark、多轮 turns（脚本化用户）已实现
+  3. 评估定位校准：对交互型 skill 的有效定位是「行为约束的回归测试」而非质量度量；试点顺序建议 grilling → chrome-agent 路由层（stub CLI）→ trellis 防退化回归
+  4. 重启信号：skill 数量增长 / 多人协作改 skill / 出现 skill 行为退化事故 / 需要 CI 门禁
+  5. 若重启：可选移植 skill-upper 为 Pi skill（references 为 claude/codex 语境需适配）
+
+
 ### 2026-07-24 — agent-reach (skill)
 
 - **Version:** 1.5.0（上游 pyproject；skill 随仓库 main 快照）
