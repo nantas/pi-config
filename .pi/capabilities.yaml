@@ -119,8 +119,8 @@ global:
           description: "Path to LMDB history database for query persistence"
           required: true
         PI_FFF_MODE:
-          value: tools-only
-          description: "Disable FffEditor (@-mention autocomplete) to avoid setEditorComponent conflict with pi-powerline"
+          value: override
+          description: "Override built-in grep/find so fff engine is the sole search path (root-cause fix for grep/ffgrep tool competition). Safe since pi-fff v0.10+: migrated to addAutocompleteProvider, no longer touches setEditorComponent — coexists with pi-powerline editor."
           required: true
 
 catalog:
