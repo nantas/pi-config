@@ -19,4 +19,4 @@ forks:
   upstream_source: git:github.com/MasuRii/pi-tool-display
   status: active
   last_upstream_sync: null
-  changes_summary: 'fix: isMcpToolCandidate() checks label for Direct Tools; formatMcpCallLine() handles MCP: format; registerMcpToolOverrides() reads execute from globalThis.__mcpToolRegistry bridge'
+  changes_summary: 'v0.3.7: release grep/find ownership when the effective pi-fff mode is override, preventing duplicate extension tool conflicts while preserving other display overrides. Previous fixes: isMcpToolCandidate() checks label for Direct Tools; formatMcpCallLine() handles MCP: format; registerMcpToolOverrides() reads execute from globalThis.__mcpToolRegistry bridge.'

@@ -1,14 +1,15 @@
 # pi-tool-display Fork Assessment
 
-> Last reviewed: 2026-06-06
+> Last reviewed: 2026-08-07
 > Fork status: **active — still required**
 
 ## Context
 
-`pi-tool-display` is forked from [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) to [nantas/pi-tool-display](https://github.com/nantas/pi-tool-display). The fork carries a single commit on top of upstream v0.3.6:
+`pi-tool-display` is forked from [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) to [nantas/pi-tool-display](https://github.com/nantas/pi-tool-display). The fork release `v0.3.7` carries two fixes on top of upstream v0.3.6:
 
 ```
 bd352d4 fix: recognize MCP Direct Tools via label field
+c192370 fix(search): yield grep and find to pi-fff override
 ```
 
 Registered in `forks/manifest.yaml` with status `active`.
@@ -48,11 +49,13 @@ Two files modified:
    toolLabel.replace(/^MCP[:\s]+/, "") || toolLabel
    ```
 
+3. **`src/capabilities.ts` and `src/index.ts`** — Detect the effective pi-fff mode before tool registration. When CLI flag or `PI_FFF_MODE` resolves to `override`, the effective tool-display config releases `grep` and `find` ownership so pi-fff can register those standard names without a cross-extension conflict. Other tool-display overrides remain active.
+
 ## Upstream v0.4.2 Comparison
 
 Upstream v0.4.2 significantly expanded MCP detection in `isMcpToolCandidate()`:
 
-| Detection rule | Fork (v0.3.6+1) | Upstream v0.4.2 |
+| Detection rule | Fork (v0.3.7) | Upstream v0.4.2 |
 |---|---|---|
 | `name === "mcp"` | ✅ | ✅ |
 | `description` matches `/\bmcp\b/i` | ✅ | ✅ |
@@ -75,13 +78,13 @@ The fork's `formatMcpCallLine` fix is **not actually needed for Direct Tools**. 
 
 ## Conclusion
 
-The fork is **still required** because of the `label` field check in `isMcpToolCandidate()`. The only effective change from the fork's two modifications is the label check; the `formatMcpCallLine` change is harmless but irrelevant for Direct Tools.
+The fork is **still required** for two active behaviors: the `label` field check in `isMcpToolCandidate()`, and the pi-fff override ownership guard that prevents duplicate `grep`/`find` registrations. The `formatMcpCallLine` change remains harmless but irrelevant for Direct Tools.
 
 ## Recommended Path Forward
 
-1. **Short term** — Keep the fork as-is; the label check remains necessary.
-2. **Medium term** — Rebase onto upstream v0.4.2+ to benefit from performance improvements and other fixes, keeping only the label check.
-3. **Long term** — Submit the label check as an upstream PR. Once merged, the fork can be retired (status → `upstreamed`).
+1. **Short term** — Keep `v0.3.7`; both the label check and pi-fff ownership guard remain necessary.
+2. **Medium term** — Rebase onto upstream v0.4.2+ to benefit from performance improvements and other fixes, retaining both active behaviors.
+3. **Long term** — Submit both fixes upstream. Once merged, the fork can be retired (status → `upstreamed`).
 
 ## References
 

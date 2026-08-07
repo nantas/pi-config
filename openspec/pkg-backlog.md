@@ -422,3 +422,16 @@ at the top of this file using the following format:
 - **Changes archived:** session-browse-ui / trellis-analytics / trellis-analytics-prompt / trellis-analytics-simplify 移入 `archive/`（前缀 2026-07-26）
 - **Global cleanup:** 手动 rm `~/.pi/agent/extensions/` 下 output-scroll-viewer.ts、planner-toggle.ts、session-browse/；未运行 `sync-pi-agent.sh`（按治理需用户确认）
 - **Notes:** 纯减法清理未走 `/opsx-new` 全流程，单 commit 提交
+
+### 2026-08-07 — pi-tool-display modification
+
+- **Version:** 0.3.7
+- **Research Date:** 2026-08-07
+- **Resource Types:** extension (tool display)
+- **Decision:** forked
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/pi-tool-display
+- **Install Method:** pi-install
+- **Has Dependencies:** true
+- **Reason:** Prevent duplicate `grep` and `find` registrations when `@ff-labs/pi-fff` runs in `override` mode.
+- **Notes:** Fork of https://github.com/MasuRii/pi-tool-display. The effective pi-fff mode now follows CLI flag over environment precedence; `grep` and `find` ownership is released only for `override`, while all other display overrides remain active. Commit: `c192370`; tag: `v0.3.7`.

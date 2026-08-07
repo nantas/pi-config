@@ -1,4 +1,7 @@
 {
+  "packages": [
+    "git:github.com/nantas/pi-tool-display"
+  ],
   "defaultThinkingLevel": "high",
   "quietStartup": true,
   "lastChangelogVersion": "0.78.0",
