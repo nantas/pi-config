@@ -26,7 +26,16 @@
 
 ### Bash Tool
 
-- 优先用 bash 工具做**文件读取、查找、替换**，而非多次 edit。
+- **批量文本编辑用 `bash` + `sed`**，不要对同一文件发多次 `edit` 调用
+  (例：替换全文 `[ ]` → `[x]`、跨文件重命名)。
+- 小范围精确改动（≤200 字符、单点）仍用 `edit` 工具。
+- **禁止在 bash 里用 `grep`/`rg`/`find` 做代码检索和路径定位** —— 改用 `ffgrep`/`fffind`。
+  fff 工具有 frecency 排序、git 感知、path/exclude 约束，比裸 grep 快且噪声小。
+- 合法例外：
+  - 管道内过滤：`cmd | grep foo`（不是在检索仓库）
+  - 纯系统命令：`ps aux | grep node`
+  - 确认 fff 工具不可用时降级
+- 读取文件内容用 `read` 工具（支持 offset/limit/图片），不要用 `cat`/`head`。
 - 临时文件用 `mktemp -d` 创建，用完后清理。
 
 ### Error Recovery
