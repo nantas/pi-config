@@ -1,7 +1,7 @@
 ---
 name: unity-worker
 description: "Implementation agent for Unity projects — edits C# scripts, manages assets, reads/modifies scenes/prefabs via Unity MCP, and cross-references code symbols with GitNexus"
-model: zhipuai-coding-plan/glm-5.1
+model: zhipuai-coding-plan/glm-5.3
 thinking: low
 systemPromptMode: replace
 tools: read, ffgrep, fffind, ls, bash, edit, write, contact_supervisor, mcp, gitnexus_query, gitnexus_context, gitnexus_impact, gitnexus_cypher

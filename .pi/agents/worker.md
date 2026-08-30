@@ -1,7 +1,7 @@
 ---
 name: worker
 description: Implementation agent — executes approved plans, makes targeted code changes, and validates results
-model: zhipuai-coding-plan/glm-5.1
+model: zhipuai-coding-plan/glm-5.3
 thinking: low
 tools: read, ffgrep, fffind, ls, bash, edit, write, contact_supervisor, gitnexus_query, gitnexus_context
 ---
