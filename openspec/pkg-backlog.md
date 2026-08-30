@@ -435,3 +435,16 @@ at the top of this file using the following format:
 - **Has Dependencies:** true
 - **Reason:** Prevent duplicate `grep` and `find` registrations when `@ff-labs/pi-fff` runs in `override` mode.
 - **Notes:** Fork of https://github.com/MasuRii/pi-tool-display. The effective pi-fff mode now follows CLI flag over environment precedence; `grep` and `find` ownership is released only for `override`, while all other display overrides remain active. Commit: `c192370`; tag: `v0.3.7`.
+
+### 2026-08-30 — fusion-harness modification
+
+- **Version:** 0.2.5
+- **Research Date:** 2026-08-30
+- **Resource Types:** extension (multi-model orchestration)
+- **Decision:** forked
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/fusion-harness
+- **Install Method:** pi-install
+- **Has Dependencies:** false
+- **Reason:** Fix Zhipu 1210 (API 参数有误) — v0.2.4's empty-string boot banner content becomes an empty-text-block role:user message via pi convertToLlm; OpenAI-compatible backends reject it when the request carries tool-call/tool-result history (e.g. glm-5.3-flash reading an image). Contentless panels now send an empty array, which every pi protocol serializer skips entirely.
+- **Notes:** Fork of https://github.com/disler/fusion-harness. Managed by OpenSpec change `fix-fusion-harness-boot-content` (spec delta: Boot Banner Context Hygiene). Verification: paired curl experiments (empty-string payload → 1210, empty-array payload → 200) + live pi image-read on glm-5.3-flash. Commit: `a953ebd`; tag: `v0.2.5`.
