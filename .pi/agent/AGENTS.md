@@ -72,12 +72,12 @@
 - **批量文本编辑用 `bash` + `sed`**，不要对同一文件发多次 `edit` 调用
   (例：替换全文 `[ ]` → `[x]`、跨文件重命名)。
 - 小范围精确改动（≤200 字符、单点）仍用 `edit` 工具。
-- **禁止在 bash 里用 `grep`/`rg`/`find` 做代码检索和路径定位** —— 改用 `ffgrep`/`fffind`。
-  fff 工具有 frecency 排序、git 感知、path/exclude 约束，比裸 grep 快且噪声小。
+- **禁止在 bash 里用 `grep`/`rg`/`find` 做代码检索和路径定位** —— 改用 Pi 工具 `grep`/`find`（pi-fff override 模式）。
+  它们有 frecency 排序、git 感知、path/exclude 约束，比 bash `rg`/`grep` 快且噪声小。
 - 合法例外：
   - 管道内过滤：`cmd | grep foo`（不是在检索仓库）
   - 纯系统命令：`ps aux | grep node`
-  - 确认 fff 工具不可用时降级
+  - 确认 Pi `grep`/`find` 工具不可用时才降级 bash
 - 读取文件内容用 `read` 工具（支持 offset/limit/图片），不要用 `cat`/`head`。
 - 临时文件用 `mktemp -d` 创建，用完后清理。
 
@@ -92,7 +92,7 @@
 使用 `web_search_prime_web_search_prime` 工具进行 web 搜索，获取外部信息。
 
 **使用原则**：
-- 搜索已知技术或开源项目信息时，优先用 `ffgrep`/`fffind`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
+- 搜索已知技术或开源项目信息时，优先用 Pi `grep`/`find`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
 - Pi 框架自身的源码和文档问题，应通过 `$cross-repo-research` 在本地仓库查找，不用 web search。
 - 构造搜索词时提取核心实体和关键词，避免自然语言长句。
 - 需要限定来源可信度时，用 `search_domain_filter` 过滤。
@@ -118,54 +118,63 @@ sips -s format png ref.gif --out ref.png   # 转码为 png（批量：for f in *
 
 判定：以**当前 provider 白名单**为准，不在表内的格式（含 xAI 下的 gif，以及 AVIF/HEIC/HEIF/BMP/TIFF 等）一律先转 png 再作视觉输入。GIF 动图转 png 只保留一帧。SVG 为矢量，sips 不支持，需先栅格化（`rsvg-convert -h 1024 in.svg -o out.png` 或浏览器截图）或向用户索要位图版本。
 
-## 代码检索与文件定位（fff）
+## 代码检索与文件定位（fff override）
 
-**当 `ffgrep` 和 `fffind` 可用时，必须作为代码检索和文件定位的默认工具。**
+当前运行时 `PI_FFF_MODE=override`：pi-fff 以内置工具名 **`grep` / `find`** 注册（fff 引擎），**不会**再出现 `ffgrep` / `fffind`。
+看到工具列表里的 `grep`/`find` 就是 fff，直接用；不要找 `ffgrep`/`fffind`，也不要用 bash `rg`/`grep`/`find` 检索仓库。
+
+**`grep` 和 `find` 是代码检索与路径定位的默认工具。**
 
 ### 决策表
 
 | 任务 | 工具 |
 |------|------|
-| 搜索代码内容（函数、变量、字符串） | `ffgrep` |
-| 定位文件或路径 | `fffind` |
+| 搜索代码内容（函数、变量、字符串） | `grep` |
+| 定位文件或路径 | `find` |
 | 列出未知目录结构 | `ls` |
 | 读取已知文件 | `read` |
-| 搜索注释/字符串/文档 | `ffgrep` |
-| 搜索非代码文件（配置、markdown） | `ffgrep` + `path` 约束 |
+| 搜索注释/字符串/文档 | `grep` |
+| 搜索非代码文件（配置、markdown） | `grep` + `path` 约束 |
 
-### ffgrep 使用原则
+### grep 使用原则
 
 - **Query 风格**：1-2 个核心关键词（bare identifier 最精确），不用自然语言长句
 - **path 约束**：已知目标在 `src/` 下就传 `path: 'src/'`，支持目录前缀、裸文件名、glob（如 `*.ts`、`src/**/*.cc`）
 - **exclude 噪声**：`exclude: 'test/, *.min.js, vendor/'` 排除无关目录和文件
-- **及时读取**：top match 出来后直接 `read`，不要超过 2 次 ffgrep 仍未读文件
+- **及时读取**：top match 出来后直接 `read`，不要超过 2 次 grep 仍未读文件
 
-### fffind 使用原则
+### find 使用原则
 
 - **模糊查询**：1-2 个关键词即可（frecency 排名自动优先最近访问的文件）
-- **path 约束**：同 ffgrep，支持目录前缀、裸文件名、glob
+- **path 约束**：同 grep，支持目录前缀、裸文件名、glob
 - **精确文件名**：已知完整文件名时用 `path: '**/profile.h'` 精确定位
 
 ### 反模式
 
-❌ **全量扫描**：不带 path 约束的 `ffgrep 'error'` → 命中数百文件
-✅ **范围限定**：`ffgrep 'error', path: 'src/api/'`
+❌ **bash 检索仓库**：`bash` 里跑 `rg` / `grep -rn` / `find . -name`
+✅ **Pi 工具**：`grep` / `find`
+
+❌ **找不存在的工具名**：调用 `ffgrep` / `fffind`（override 下未注册）
+✅ **用列表里的名字**：`grep` / `find`
+
+❌ **全量扫描**：不带 path 约束的 `grep 'error'` → 命中数百文件
+✅ **范围限定**：`grep 'error', path: 'src/api/'`
 
 ❌ **链式 grep 缩小**：grep → grep → grep → 终于找到
-✅ **grep → read top match**：1 次 ffgrep + 1 次 read
+✅ **grep → read top match**：1 次 grep + 1 次 read
 
-❌ **glob 全量后再过滤**：`fffind '*.ts'` 扫描全仓库
-✅ **带目录约束**：`fffind 'auth', path: 'src/components/'`
+❌ **glob 全量后再过滤**：`find '*.ts'` 扫描全仓库
+✅ **带目录约束**：`find 'auth', path: 'src/components/'`
 
 ### 编辑工作流（发现 → 修改）
 
-fff 只负责**检索**，代码编辑回退到基础工具：
+`grep`/`find` 只负责**检索**，代码编辑回退到基础工具：
 
 | 编辑场景 | 工具 |
 |----------|------|
 | 小范围精确替换（≤200 字符） | `edit` tool |
 | 大范围替换 / 多文件 | `bash` + `sed` |
-| 跨文件重命名 | `bash` + `sed`，完成后 `ffgrep` 验证所有引用已更新 |
+| 跨文件重命名 | `bash` + `sed`，完成后 `grep` 验证所有引用已更新 |
 | 批量 checkbox 替换 | `bash` + `sed -i ''` |
 
 ## Subagent 自动委派
