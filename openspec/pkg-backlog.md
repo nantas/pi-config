@@ -448,3 +448,16 @@ at the top of this file using the following format:
 - **Has Dependencies:** false
 - **Reason:** Fix Zhipu 1210 (API 参数有误) — v0.2.4's empty-string boot banner content becomes an empty-text-block role:user message via pi convertToLlm; OpenAI-compatible backends reject it when the request carries tool-call/tool-result history (e.g. glm-5.3-flash reading an image). Contentless panels now send an empty array, which every pi protocol serializer skips entirely.
 - **Notes:** Fork of https://github.com/disler/fusion-harness. Managed by OpenSpec change `fix-fusion-harness-boot-content` (spec delta: Boot Banner Context Hygiene). Verification: paired curl experiments (empty-string payload → 1210, empty-array payload → 200) + live pi image-read on glm-5.3-flash. Commit: `a953ebd`; tag: `v0.2.5`.
+
+### 2026-08-30 — fusion-harness modification (command rename)
+
+- **Version:** 0.2.6
+- **Research Date:** 2026-08-30
+- **Resource Types:** extension (multi-model orchestration)
+- **Decision:** forked
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/fusion-harness
+- **Install Method:** pi-install
+- **Has Dependencies:** false
+- **Reason:** pi 0.84.3 added a built-in /thinking command that shadows same-named extension commands (skipped in autocomplete, intercepted in dispatch), making fusion's /thinking <architect> [builder] role override unreachable and emitting an [Extension issues] warning at every startup. Renamed to /fh-thinking (matches /fh-reset); no logic changes.
+- **Notes:** Fork of https://github.com/disler/fusion-harness. Light fork-dev loop (no OpenSpec change — main spec does not document the command name). Verified: /fh-thinking registered and consumed as extension command in -p mode, no conflict diagnostics. Commit: `2cdcc8e`; tag: `v0.2.6`.
