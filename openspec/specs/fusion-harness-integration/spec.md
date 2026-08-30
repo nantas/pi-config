@@ -296,27 +296,22 @@ Note: this is a display-only concern. Actual builder children always receive `--
 - **THEN** the BUILDER footer cell SHALL display that child's actual model (unchanged — the cell already reflected the live child)
 
 ### Requirement: Boot Banner Context Hygiene
-The fusion-harness extension SHALL NOT inject non-semantic decorative text into the LLM conversation context. Specifically, the `kind: "boot"` banner message emitted on TUI session startup (`session_start` with `reason === "startup"` and `ctx.mode === "tui"`) SHALL carry an empty string as its message `content`, because the boot banner's renderer does not read `content` and pi's `convertToLlm` unconditionally converts any non-empty `CustomMessage.content` into a `role: "user"` message sent to the model.
+The fusion-harness extension SHALL NOT inject non-semantic decorative text into the LLM conversation context, and SHALL NOT emit message content shapes that any pi protocol serializer forwards as an empty text block. Specifically, the `kind: "boot"` banner message emitted on TUI session startup (`session_start` with `reason === "startup"` and `ctx.mode === "tui"`) SHALL carry an **empty array** (`[]`) as its message `content`, because pi's `convertToLlm` unconditionally converts any string `CustomMessage.content` — including the empty string — into a `role: "user"` message with a single empty text block, which OpenAI-compatible backends (e.g., Zhipu's coding endpoint, error 1210) reject when the request also carries tool-call/tool-result sequences; every pi protocol serializer (openai-completions, openai-responses, anthropic-messages, google-generative-ai) skips messages whose content array is empty, so an empty array guarantees the banner never enters the request body on any protocol.
 
-Rationale: pi's `CustomMessage` `display` field only governs TUI rendering — it does NOT gate context injection. The boot banner exists purely as visual decoration (big centered title, subtitle, role-colored mark), all of which the renderer hardcodes. A non-empty `content` therefore pollutes the context of every TUI session with an isolated `[user]: FUSION HARNESS` line, which can trigger instruction-following models to autonomously attempt two-model comparison behavior even when no fusion slash command was issued.
+Rationale: the v0.2.4 approach (empty string) stopped the context leak for human-readable text but still produced a `role: "user"` message containing `[{"type":"text","text":""}]`. Zhipu's parameter validation rejects that empty text block whenever the request contains tool_calls/tool-result history (empirically reproduced via local recording proxy + session replay: requests with the empty-string boot message and a tool sequence fail with 1210; identical requests without it succeed). The boot banner's renderer reads only `details`, so content shape changes have zero display impact. The context-hygiene intent of the original requirement is preserved and strengthened: the banner is now invisible to every protocol serializer, not just textually empty.
 
-#### Scenario: Boot banner content is empty
+#### Scenario: Boot banner content is an empty array
 - **WHEN** the extension emits the `kind: "boot"` banner message on TUI session startup
-- **THEN** the message's `content` field SHALL be the empty string `""`
-- **AND** the message SHALL still carry `customType`, `display: true`, and its `details` (`{ kind: "boot", ok: true }`) so the renderer still fires
-- **AND** pi's `convertToLlm` SHALL produce no visible user-role text from this message (empty string content)
+- **THEN** the message's `content` field SHALL be the empty array `[]`, not the empty string `""`
 
-#### Scenario: Boot banner visual rendering is unchanged
-- **WHEN** the TUI renders a `kind: "boot"` message whose `content` is empty
-- **THEN** the rendered banner SHALL be visually identical to before the change — the centered fullwidth-glyph title, "Combine Your Compute" subtitle, and `● + ●` role-colored mark SHALL all still appear
-- **AND** no regression SHALL occur because the renderer never read `content`
+#### Scenario: Empty banner message is skipped by all protocol serializers
+- **WHEN** pi serializes a conversation containing the boot banner message into an API request for any supported protocol (openai-completions, openai-responses, anthropic-messages, google-generative-ai)
+- **THEN** the serialized request body SHALL NOT contain any message with an empty text block originating from the boot banner (the message is dropped entirely)
 
-#### Scenario: Other panels keep their semantic content
-- **WHEN** any non-boot panel (`prompt`, `banner`, `duo`, `opinion`, `fused`, `gate`, `validation`, `triage`, `error`, `system-prompt`) is emitted
-- **THEN** its `content` SHALL remain whatever semantic text that panel's contract requires (e.g. the echoed `/fusion <input>` prompt, the fused markdown body)
-- **AND** only the `boot` panel SHALL have its content emptied — no other panel is altered by this change
+#### Scenario: Tool-sequence requests on OpenAI-compatible backends succeed
+- **WHEN** a TUI session that received the boot banner continues with a tool call (e.g., reading an image via the `read` tool) and the follow-up request is sent to an OpenAI-compatible backend (e.g., `zhipuai-coding-plan/glm-5.3-flash`)
+- **THEN** the request SHALL be accepted without a `1210` parameter-validation error, and multimodal image content in tool results SHALL be unaffected
 
-#### Scenario: Headless and non-startup sessions are unaffected
-- **WHEN** the session mode is not `tui` OR the session_start reason is not `startup` (e.g. `/new`, resume, fork, extension reload)
-- **THEN** no boot banner message SHALL be emitted at all (unchanged from prior behavior)
-- **AND** the content-hygiene fix SHALL have no observable effect on those paths
+#### Scenario: Non-boot panels keep real text content
+- **WHEN** the extension emits any other panel (opinion, fusion, duo, gate, validation, triage, error)
+- **THEN** that message's `content` SHALL remain its actual text payload (truncated per existing limits) — the empty-array treatment applies only to messages whose content would otherwise be empty
