@@ -73,6 +73,13 @@ global:
     defaultThinkingLevel: high
     defaultProvider: deepseek
     defaultModel: deepseek-v4-flash
+    # Restrict Ctrl+P (/model) switching scope. Exact IDs (no glob) → exact match.
+    enabledModels:
+      - zai-coding-cn/glm-5.3
+      - zai-coding-cn/glm-5.3-flash
+      - xai/grok-4.6
+      - deepseek/deepseek-v4-flash
+      - deepseek/deepseek-v4-pro
 
   # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
   # Manifest-declared providers are authoritative (replaced wholesale);
