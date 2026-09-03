@@ -456,6 +456,41 @@ function getTokenizerWorkerPath(): string {
 }
 
 /**
+ * Resolve a usable Python interpreter for the jieba tokenizer worker.
+ * Windows often lacks a working `python3` (the MS Store stub is a real exe
+ * that exits non-zero), so probe platform-appropriate candidates in order.
+ * Returns null when none works — caller falls back to Intl.Segmenter.
+ * Override with PI_OBSIDIAN_PYTHON env var.
+ */
+let _pythonBin: string | null | undefined;
+
+function resolvePythonBin(): string | null {
+  if (_pythonBin !== undefined) return _pythonBin;
+  const envBin = process.env.PI_OBSIDIAN_PYTHON;
+  const candidates = envBin
+    ? [envBin]
+    : process.platform === "win32"
+      ? ["python", "python3", "py"]
+      : ["python3", "python"];
+  for (const cmd of candidates) {
+    try {
+      const probe = spawnSync(cmd, ["-c", "import sys"], {
+        stdio: "ignore",
+        timeout: 5000,
+      });
+      if (probe.status === 0) {
+        _pythonBin = cmd;
+        return cmd;
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+  _pythonBin = null;
+  return null;
+}
+
+/**
  * Ensure the persistent tokenizer worker is running.
  * Spawns tokenizer-worker.py as a long-lived subprocess.
  * Returns the worker process or null on failure.
@@ -474,9 +509,17 @@ async function ensureTokenizerWorker(): Promise<ChildProcess | null> {
 
   const workerPath = getTokenizerWorkerPath();
 
+  const pythonBin = resolvePythonBin();
+  if (!pythonBin) {
+    console.warn(
+      "[obsidian_search] no Python interpreter found for jieba tokenizer; falling back to Intl.Segmenter",
+    );
+    return null;
+  }
+
   return new Promise<ChildProcess | null>((resolve) => {
     try {
-      const worker = spawn("python3", [workerPath], {
+      const worker = spawn(pythonBin, [workerPath], {
         stdio: ["pipe", "pipe", "pipe"],
       });
 

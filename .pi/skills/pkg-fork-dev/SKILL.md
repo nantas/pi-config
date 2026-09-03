@@ -106,13 +106,13 @@ git remote -v  # verify both origin and upstream
 
 Register the dev clone path in repo-registry:
 ```bash
-python3 "/Users/nantasmac/.agents/skills/repo-registry/scripts/repo-registry.py" \
+python3 "$HOME/.agents/skills/repo-registry/scripts/repo-registry.py" \
   set --repo-id "<name>" --path "$CLONE_PATH"
 ```
 
 Verify:
 ```bash
-python3 "/Users/nantasmac/.agents/skills/repo-registry/scripts/repo-registry.py" \
+python3 "$HOME/.agents/skills/repo-registry/scripts/repo-registry.py" \
   get --repo-id "<name>"
 ```
 
@@ -250,7 +250,7 @@ for p in s.get('packages', []):
 
 Read the fork codebase structure via `repo://<name>`:
 ```bash
-python3 "/Users/nantasmac/.agents/skills/repo-registry/scripts/repo-registry.py" \
+python3 "$HOME/.agents/skills/repo-registry/scripts/repo-registry.py" \
   resolve --repo-ref "repo://<name>"
 ```
 
@@ -989,7 +989,7 @@ When `pkg-fork-dev` is used on a different machine:
 
 1. Check repo-registry for existing mapping:
    ```bash
-   python3 "/Users/nantasmac/.agents/skills/repo-registry/scripts/repo-registry.py" \
+   python3 "$HOME/.agents/skills/repo-registry/scripts/repo-registry.py" \
      get --repo-id "<name>"
    ```
 

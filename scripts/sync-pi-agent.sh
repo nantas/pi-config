@@ -7,6 +7,40 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SOURCE_ROOT="${PI_SOURCE_ROOT:-${REPO_ROOT}/.pi}"
 TARGET_ROOT="${PI_AGENT_HOME:-${HOME}/.pi/agent}"
 
+# --- Python interpreter resolution ---
+# `python3` is conventional on macOS/Linux; Windows often only has `python`
+# (or an MS Store stub that exits non-zero without a real interpreter).
+# Probe candidates in order and require PyYAML (used by settings/models/env
+# rendering below). Override with PI_PYTHON=/path/to/python.
+resolve_python() {
+  local candidates
+  if [[ -n "${PI_PYTHON:-}" ]]; then
+    candidates=("${PI_PYTHON}")
+  else
+    candidates=(python3 python)
+  fi
+  local cand
+  for cand in "${candidates[@]}"; do
+    if command -v "${cand}" >/dev/null 2>&1 &&
+       "${cand}" -c "import sys, yaml" >/dev/null 2>&1; then
+      printf '%s' "${cand}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PY_BIN="$(resolve_python)" || {
+  echo "ERROR: no Python interpreter with PyYAML found (tried: ${PI_PYTHON:-python3, python})." >&2
+  echo "       Fix: python -m pip install pyyaml" >&2
+  echo "       Or:  export PI_PYTHON=/path/to/python" >&2
+  exit 1
+}
+
+# Windows consoles default to a legacy codepage (e.g. GBK) and crash on the
+# UTF-8 icons printed below. Force UTF-8 stdio for all python heredocs.
+export PYTHONIOENCODING=utf-8
+
 
 
 # --- Helper Functions ---
@@ -174,14 +208,14 @@ render_settings_file() {
 
   # Generate settings directly from capabilities.yaml global.settings,
   # merging with existing target to preserve user-managed keys.
-  python3 <<'PYEOF'
+  "$PY_BIN" <<'PYEOF'
 import yaml, json, os, sys
 
 manifest_path = os.environ["MANIFEST_PATH"]
 target_path = os.environ["TARGET_PATH"]
 
 # Parse capabilities.yaml
-with open(manifest_path, "r") as f:
+with open(manifest_path, "r", encoding="utf-8") as f:
     manifest = yaml.safe_load(f)
 
 manifest_settings = (manifest.get("global") or {}).get("settings") or {}
@@ -192,7 +226,7 @@ result = dict(manifest_settings)
 # Read existing target and preserve keys NOT in manifest_settings
 if os.path.exists(target_path):
     try:
-        with open(target_path, "r") as f:
+        with open(target_path, "r", encoding="utf-8") as f:
             existing = json.load(f)
         for key, value in existing.items():
             if key not in result:
@@ -200,12 +234,13 @@ if os.path.exists(target_path):
     except (json.JSONDecodeError, IOError):
         pass
 
-# Atomic write via temp file
+# Atomic write via temp file (os.replace: overwrites existing target on Windows,
+# where os.rename raises FileExistsError)
 tmp_path = target_path + ".tmp"
-with open(tmp_path, "w") as f:
+with open(tmp_path, "w", encoding="utf-8") as f:
     json.dump(result, f, indent=2)
     f.write("\n")
-os.rename(tmp_path, target_path)
+os.replace(tmp_path, target_path)
 PYEOF
 }
 
@@ -224,14 +259,14 @@ render_models_file() {
     exit 1
   fi
 
-  python3 <<'PYEOF'
+  "$PY_BIN" <<'PYEOF'
 import yaml, json, os
 
 manifest_path = os.environ["MANIFEST_PATH"]
 target_path = os.environ["TARGET_PATH"]
 
 # Parse capabilities.yaml
-with open(manifest_path, "r") as f:
+with open(manifest_path, "r", encoding="utf-8") as f:
     manifest = yaml.safe_load(f)
 
 manifest_models = (manifest.get("global") or {}).get("models") or {}
@@ -241,7 +276,7 @@ result = {"providers": {}}
 # Preserve target top-level keys and providers NOT declared in the manifest
 if os.path.exists(target_path):
     try:
-        with open(target_path, "r") as f:
+        with open(target_path, "r", encoding="utf-8") as f:
             existing = json.load(f)
         for key, value in existing.items():
             if key != "providers":
@@ -256,12 +291,12 @@ if os.path.exists(target_path):
 for name, cfg in manifest_models.items():
     result["providers"][name] = cfg
 
-# Atomic write via temp file
+# Atomic write via temp file (os.replace: overwrites existing target on Windows)
 tmp_path = target_path + ".tmp"
-with open(tmp_path, "w") as f:
+with open(tmp_path, "w", encoding="utf-8") as f:
     json.dump(result, f, indent=2)
     f.write("\n")
-os.rename(tmp_path, target_path)
+os.replace(tmp_path, target_path)
 PYEOF
 }
 
@@ -845,12 +880,12 @@ echo "--- Checking environment variables ---"
 MANIFEST_PATH="${REPO_ROOT}/.pi/capabilities.yaml"
 
 if [[ -f "${MANIFEST_PATH}" ]]; then
-  python3 <<'ENV_CHECK_PY'
+  "$PY_BIN" <<'ENV_CHECK_PY'
 import os, sys, yaml
 
 manifest_path = os.environ.get("MANIFEST_PATH", "")
 try:
-    with open(manifest_path) as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = yaml.safe_load(f)
 except Exception as e:
     print(f"  ERROR: Failed to parse manifest: {e}")
@@ -936,7 +971,9 @@ for cap_id, cap_conf in env_section.items():
             cap_ok = False
         elif expected_value:
             expanded_expected = expected_value.replace("$HOME", os.path.expanduser("~"))
-            if actual != expanded_expected:
+            # Normalize separators/case: expanduser yields backslashes on Windows
+            # while declared values (and setx values) may use forward slashes.
+            if os.path.normcase(os.path.normpath(actual)) != os.path.normcase(os.path.normpath(expanded_expected)):
                 print(f"  ⚠  WARNING: {cap_id} — {var_name} mismatch")
                 print(f"       Current:  {actual}")
                 print(f"       Expected: {expected_value}")
