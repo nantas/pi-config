@@ -83,12 +83,11 @@ global:
       - deepseek/deepseek-v4-pro
       - kimi-coding/k3
       - openai-codex/gpt-5.6-sol
-      - scnet/qwen3.8-max
       - openlux/claude-opus-5
 
   # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
   # Manifest-declared providers are authoritative (replaced wholesale);
-  # providers NOT declared here (e.g. local-only zhipuai-coding-plan) are preserved from the target.
+  # providers NOT declared here (e.g. user-local providers) are preserved from the target.
   # apiKey MUST reference an environment variable - never commit plaintext keys.
   models:
     deepseek:
