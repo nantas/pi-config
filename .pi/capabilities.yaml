@@ -26,6 +26,7 @@ global:
     - planner
     - researcher
     - reviewer
+    - image-reader
 
   # Skills synced to ~/.pi/agent/skills/
   skills:
