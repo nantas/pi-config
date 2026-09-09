@@ -118,6 +118,19 @@ sips -s format png ref.gif --out ref.png   # 转码为 png（批量：for f in *
 
 判定：以**当前 provider 白名单**为准，不在表内的格式（含 xAI 下的 gif，以及 AVIF/HEIC/HEIF/BMP/TIFF 等）一律先转 png 再作视觉输入。GIF 动图转 png 只保留一帧。SVG 为矢量，sips 不支持，需先栅格化（`rsvg-convert -h 1024 in.svg -o out.png` 或浏览器截图）或向用户索要位图版本。
 
+## 图表输出规范（mermaid 宽度纪律）
+
+画图一律用 mermaid（对话内与落盘文档皆是）。pi TUI 会把对话消息中的 mermaid
+代码块渲染为 Unicode 框线图，但渲染宽度超过终端可用宽度时会**静默降级为源码**
+（无警告，agent 无从察觉）。宽度纪律：
+
+1. 渲染宽度 **≤ 90 列**（实测安全线）：节点标签 ≤ 10 个全角字符、
+   避免 subgraph 嵌套、箭头标签尽量短。
+2. 一张图放不下 → 拆成多张小图（按流程阶段 / 子系统切分），不用 ASCII 手画。
+3. 无把握时预检宽度：pi 包路径 `$(npm root -g)/@earendil-works/pi-coding-agent`，
+   预检脚本放包目录内运行（ESM 限制），`import { render } from "grok-mermaid"`
+   后取 `render(src).width`，≤ 90 再输出。
+
 ## 代码检索与文件定位（fff override）
 
 当前运行时 `PI_FFF_MODE=override`：pi-fff 以内置工具名 **`grep` / `find`** 注册（fff 引擎），**不会**再出现 `ffgrep` / `fffind`。
