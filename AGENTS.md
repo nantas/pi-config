@@ -29,10 +29,10 @@ When a package already in use needs modification (bug fix, feature addition, or 
 
 When the task requires creating a new dispatch agent or modifying an existing agent's behavior (model, thinking level, tools, system prompt):
 
-- **Scenarios**: Adding a new specialized subagent (e.g., config auditor, migration helper), overriding builtin agent settings via `subagents.agentOverrides`, or creating a project-level agent file for repo-specific delegation.
+- **Scenarios**: Adding a new specialized subagent (e.g., config auditor, migration helper), or creating a project-level agent file for repo-specific delegation. Overriding an existing agent is done by placing a same-name file in a higher-scope directory (project overrides global) — there is no `agentOverrides` settings mechanism.
 - **Reference**: See `docs/reference/pi-subagents-extend-agent.md` for the full frontmatter reference, creation workflows (TUI / manual / programmatic), and prompt assembly rules.
 - **Convention**: Project agents go in `.pi/agents/{name}.md`. Overrides go in `.pi/settings.json` under `subagents.agentOverrides`.
-- **Validation**: After creating, verify via `/agents` list and `/run {name}` before marking the task done.
+- **Validation**: After creating, verify via startup warning absence and `/run {name}` before marking the task done. Agent files must use LF line endings (see the reference doc).
 
 ## Agent skills
 

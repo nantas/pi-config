@@ -1,74 +1,42 @@
 # Pi Subagents — Extending & Creating New Agents
 
-> Reference for creating, configuring, and managing custom agents in the `pi-subagents` framework.
-> Source: `pi-subagents` builtin agents + `pi-config` project agents.
-> pi-subagents version: current installed.
+> Reference for creating, configuring, and managing custom agents via the
+> `@johnnywu/pi-subagents` extension (verified against installed v2.2.1:
+> `~/.pi/agent/npm/node_modules/@johnnywu/pi-subagents/`).
 
 ## 1. Agent 文件规范
 
-每个 agent 是一个 **Markdown 文件**，包含 YAML frontmatter 和 Markdown body（即 system prompt）。按优先级从低到高：
+每个 agent 是一个 **Markdown 文件**，包含 YAML frontmatter 和 Markdown body（即 system prompt）。加载顺序：global 先读，project 后读，**同名时 project 覆盖 global**。
 
 | 作用域 | 路径 | 说明 |
 |--------|------|------|
-| Builtin | `~/.pi/agent/npm/node_modules/pi-subagents/agents/` | 扩展自带的 8 个 agent |
-| User | `~/.pi/agent/agents/{name}.md` | 全局可用 |
-| Project | `.pi/agents/{name}.md` | 仅当前仓库可用，**最高优先级** |
+| Global | `~/.pi/agent/agents/{name}.md` | 所有项目可用 |
+| Project | `.pi/agents/{name}.md` | 仅当前仓库可用，优先级更高 |
 
-同名 aget 时高优先级覆盖低优先级。Project 也兼容读取 `.agents/{name}.md`。
+只扫描 `.md` 文件。解析在扩展加载时完成；解析错误产生启动警告，但不阻塞其它 agent。
+
+**行尾要求：文件必须使用 LF（Unix）行尾。** 解析器要求内容以 `---\n` 开头，CRLF 文件（`---\r\n`）会触发 `missing frontmatter` 警告且整个 agent 被跳过。仓库已通过 `.gitattributes`（`.pi/agents/** text eol=lf`）锁定。
 
 ## 2. Frontmatter 完整字段
 
-```yaml
----
-name: my-agent                     # 必填，agent 名称
-description: My custom agent       # 必填，展示给 LLM 的描述
+以下为 v2.2.1 实际支持的全部字段（不在此列的键会被静默忽略）：
 
-# --- 模型与思考 ---
-model: deepseek/deepseek-v4-flash  # 默认模型，支持 provider/id 或 bare id
-fallbackModels: openai/gpt-5-mini  # 后备模型，逗号分隔
-thinking: high                     # off | minimal | low | medium | high | xhigh
+| 字段 | 必填 | 默认 | 说明 |
+|------|------|------|------|
+| `name` | **yes** | — | agent 唯一标识 |
+| `description` | no | — | 人类可读摘要 |
+| `tools` | no | _none_ | 工具白名单，逗号分隔（`read, write, bash, grep` 等） |
+| `model` | no | parent's model | `provider/model-id`（如 `deepseek/deepseek-v4-flash`） |
+| `thinking` | no | `off` | `off` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` |
+| `systemPrompt` | no | `append` | body 的应用方式（见第 4 节） |
+| `skills` | no | _none_ | 注入的技能，逗号分隔，支持 `*` 和 `obsidian-*` 前缀通配 |
+| `allowedAgents` | no | _all_ | 该 agent 可派生的子 agent 白名单 |
+| `maxDepth` | no | `10` | 递归深度上限（`0` = 不可再派生） |
+| `debug` | no | `false` | `true` 时导出运行时 system prompt 到 `debug-system-prompt.md` |
 
-# --- 工具与扩展 ---
-tools: read, grep, find, ls, bash, write, mcp:chrome-devtools
-                                   # 内置工具 allowlist
-                                   # mcp: 前缀 = MCP 直连工具（需 pi-mcp-adapter）
-extensions:                        # 留空=正常扩展；空值=无扩展；路径列表=只加载指定扩展
+frontmatter 是逐行解析的简易 `key: value` 格式（非完整 YAML）：每行必须含 `:`，值可用引号包裹去除。不支持嵌套结构、列表、多行值。
 
-# --- 行为控制 ---
-systemPromptMode: replace          # replace（完全替换Pi基础prompt）| append（追加）
-inheritProjectContext: true        # 是否继承项目 AGENTS.md/CLAUDE.md
-inheritSkills: false               # 是否继承 Pi 技能目录
-skills:                            # 直接注入技能，不受 inheritSkills 影响
-
-# --- 输出与读取 ---
-output: result.md                  # 默认输出文件路径
-defaultReads: context.md           # chain/parallel 下默认先读取的文件
-defaultProgress: true              # 是否维护 progress.md
-
-# --- 其它 ---
-interactive: true                  # 兼容保留字段，v1 未强制
-maxSubagentDepth: 1                # 限制该 agent 的子代理嵌套深度
----
-```
-
-## 3. 三种创建方式
-
-### 3.1 通过 `/agents` TUI（推荐）
-
-1. 输入 `/agents` 或按 `Ctrl+Shift+A` 打开 Agents Manager
-2. 按 `Alt+N` 选择模板：
-   - **Scout** — 代码侦察模板
-   - **Planner** — 计划生成模板
-   - **Implementer** — 实现模板
-   - **Code Reviewer** — 审查模板
-   - **Blank Agent** — 空白模板
-   - **Blank Chain** — 空白 chain 模板
-3. 填写各字段和 system prompt
-4. 保存后立即可用
-
-### 3.2 手动创建 `.md` 文件
-
-在 `.pi/agents/` 或 `~/.pi/agent/agents/` 下新建 `{name}.md`，参考：
+### 示例
 
 ```markdown
 ---
@@ -77,98 +45,70 @@ description: 审计 Pi 配置文件的正确性与一致性
 model: deepseek/deepseek-v4-flash
 thinking: medium
 tools: read, grep, find, ls
-systemPromptMode: replace
-inheritProjectContext: true
-inheritSkills: false
 ---
 
-你是 Pi 配置审计员。
-
-审计内容：
-- `.pi/settings.json` 的字段完整性
-- `openspec/` 与实现的一致性
-- package 引入的安全性
-
-输出格式：
+你是 Pi 配置审计员。……
 
 ## 审计结果
 - ✅ 通过项
 - ⚠️ 警告项
 - ❌ 失败项
-
-## 建议
-...
 ```
 
-### 3.3 通过 programmatic `create` action 创建
+## 3. 创建方式
 
-LLM 可调用 `subagent` 工具的 `create` action：
+手动在 `.pi/agents/`（project）或 `~/.pi/agent/agents/`（global）下新建 `{name}.md`，参考第 2 节示例。保存后重启 pi 生效。
 
-```ts
-{ action: "create", config: {
-  name: "my-agent",
-  description: "...",
-  scope: "project",              // "user" | "project"
-  systemPrompt: "You are...",
-  systemPromptMode: "replace",
-  inheritProjectContext: true,
-  inheritSkills: false,
-  model: "deepseek/deepseek-v4-flash",
-  thinking: "high",
-  tools: "read, bash, write",
-  skills: "",
-  output: "result.md"
-}}
-```
+验证：
 
-## 4. 覆盖已有 Builtin Agent
+- 启动时无 agent 解析警告
+- `/run {name} "你的任务"` 直接调用
+- 自然语言委托由父 session 的 `subagent` 工具路由
 
-不改文件，只在 settings.json 中覆写部分字段：
+## 4. Prompt 组装（`systemPrompt` 三模式）
 
-```json
-{
-  "subagents": {
-    "agentOverrides": {
-      "reviewer": {
-        "model": "deepseek/deepseek-v4-pro",
-        "thinking": "high",
-        "inheritProjectContext": false
-      }
-    }
-  }
-}
-```
+| 模式 | 结果 |
+|------|------|
+| `append`（默认） | Pi 默认 system prompt + 项目上下文 + agent body |
+| `replace` | agent body 替换 Pi 默认 prompt，**保留**项目上下文（AGENTS.md 等） |
+| `replace-all` | agent body 替换 Pi 默认 prompt 且**跳过**项目上下文 |
 
-支持覆写的字段：`model`、`fallbackModels`、`thinking`、`systemPromptMode`、`inheritProjectContext`、`inheritSkills`、`disabled`、`skills`、`tools`、`systemPrompt`。
+在 `replace` / `replace-all` 模式下，运行时会自动注入工具说明块。
 
-也可通过 `/agents` 进入内置 agent 详情 → 按 `e` 编辑 → 选择 user/project 作用域保存。
+> v2 breaking change：v1 的 `replace`（完全替换、跳过项目上下文）在 v2 中改名为 `replace-all`；v2 的 `replace` 是新语义（保留项目上下文）。从 v1 迁移且需要跳过 AGENTS.md 的 agent 应使用 `replace-all`。
 
-## 5. Prompt 组装规则
+## 5. 递归控制
 
-| `systemPromptMode` | `inheritProjectContext` | 结果 |
-|-------------------|------------------------|------|
-| `replace` (默认) | `true` | 纯 agent prompt + 项目指令块 |
-| `replace` | `false` | 纯 agent prompt，无上下文继承 |
-| `append` | `true` | Pi 基础 prompt + agent prompt + 项目指令块 |
-| `append` | `false` | Pi 基础 prompt + agent prompt |
+子 agent 的 `tools` 白名单含 `subagent` 时可继续派生，两层防护：
 
-## 6. 已注册的项目 Agent
+- **`maxDepth`** — 从最初 agent 起算的硬上限，默认 `10`
+- **`allowedAgents`** — 父 agent 的白名单，子进程看不到白名单之外的 agent
 
-| Agent | 文件 | 用途 |
-|-------|------|------|
-| `code-writer` | `.pi/agents/code-writer.md` | 仓库本地编码任务实现 |
-| `dispatch-planner` | `.pi/agents/dispatch-planner.md` | dispatch 流中的规划委托 |
+控制变量通过环境变量传递（`PI_SUBAGENT_DEPTH`、`PI_SUBAGENT_MAX_DEPTH`、`PI_SUBAGENT_ALLOWED`）。
 
-## 7. 验证
+## 6. 已注册的项目 Agent（`.pi/agents/`）
 
-创建后可在 Pi 中验证：
+| Agent | systemPrompt | 用途 |
+|-------|--------------|------|
+| `context-builder` | append | 构建需求/代码库上下文交接文档 |
+| `image-reader` | replace-all | 视觉子代理，读图并返回结构化文本描述 |
+| `oracle` | append | 方向审查与建议（advisory） |
+| `planner` | append | 从已批准需求生成实施计划 |
+| `researcher` | append | Web 调研，官方文档/规范/一手来源 |
+| `reviewer` | append | 代码审查，按严重度输出证据化发现 |
+| `scout` | append | 快速代码侦察与上下文交接 |
+| `unity-worker` | replace-all | Unity 项目实现代理（Unity MCP + GitNexus） |
+| `worker` | append | 执行已批准计划的目标代码修改 |
 
-- `/agents` 列表是否出现新 agent
-- 自然语言："使用 {name} 帮我检查..."
-- `/run {name} "你的任务"`
+## 7. 已知限制（v2.2.1）
+
+- 不存在 per-agent 覆写机制（无 `subagents.agentOverrides` 之类的 settings 键）；定制 builtin/已有 agent 的唯一方式是建同名文件覆盖。
+- 不存在 `/agents` TUI 或 programmatic `create` action；agent 只能以 `.md` 文件创建。
+- frontmatter 不支持完整 YAML 语法（见第 2 节）。
+- 解析器只接受 LF 行尾（见第 1 节）。
 
 ## 8. 参考
 
-- `pi-subagents` README：`~/.pi/agent/npm/node_modules/pi-subagents/README.md`
-- 内置 agent 示例：`~/.pi/agent/npm/node_modules/pi-subagents/agents/*.md`
+- `pi-subagents` README：`~/.pi/agent/npm/node_modules/@johnnywu/pi-subagents/README.md`
+- 解析器源码（字段与行为的最终依据）：`.../pi-subagents/extensions/agent-loader.ts`
 - `pi-config` 项目 agent：`.pi/agents/*.md`

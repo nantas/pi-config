@@ -1,0 +1,3 @@
+# pi-subagents agent files are parsed with a strict LF frontmatter parser
+# (content must start with "---\n"); CRLF checkout breaks them.
+.pi/agents/** text eol=lf
