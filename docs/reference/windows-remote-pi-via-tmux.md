@@ -232,6 +232,22 @@ pi
 
 这种方式在退出 Pi 后仍会保留 shell。直接把 Pi 作为 pane 命令时，退出 Pi 通常也会结束该 pane；如果它是 session 中最后一个 pane，session 随之结束。
 
+### 多个终端窗口
+
+重复执行同一连接命令会 attach 到同名 session，多个 client attach 同一个 session 时默认显示并跟随同一个 window，两个终端画面互为镜像。按需求选择：
+
+- 只是想多一个工作区：不需要第二个终端，在 session 内用 `Ctrl-b c` 新建 window、`Ctrl-b %` 分屏。
+- 第二个终端跑另一个项目：换 session 名，如 `tmux new-session -A -s pi-mono -c ...`。
+- 第二个终端查看同一 session 的其他 window：
+
+```powershell
+ssh -t mac-pi "tmux new-session -A -s pi-config-v2 -t pi-config"
+```
+
+`-t pi-config` 使新 session 与 `pi-config` 分组（grouped session）：共享同一组 window，但各自独立切换当前 window，两个终端不再互相跟随。
+
+若 Ctrl+Shift+M 等快捷键绑定到 Windows Terminal 的某个 profile，可为其他用法复制该 profile、修改 session 名，并绑定第二个快捷键。
+
 ## 8. SSH 公钥登录
 
 当前 Mac 尚未配置 `authorized_keys`，可以先使用账户密码。需要免密登录时，在 Windows PowerShell 执行：
