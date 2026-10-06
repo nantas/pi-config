@@ -232,6 +232,14 @@ export POWERLINE_NERD_FONTS=1
 - **解决的问题**: 单模型方案偏置时，用 architect+builder 并行产出再融合，形成可复用的多模型工作流。
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.settings.fusionHarness`
 
+#### `sol-pi`
+
+- **来源**: `git:github.com/NVlabs/SoL-Pi`（无版本 pin；上游 dev 锁 Pi 0.85.1，peer `*`）
+- **描述**: NVIDIA 出品的效率扩展（SoL-Pi），4 个 opt-in 机制：Action Fusion（编辑+验证命令同调用合并）、ObservationPack（大观测句柄化+分页召回 `obs_recall`）、Evidence-Preserving Reducer（长日志证据保留压缩）、Online Context Compact（在线上下文压缩）。默认全关；配置 `.pi/sol-pi.json` 或 `~/.pi/agent/sol-pi.json`。
+- **解决的问题**: 长任务中重复模型轮次、上下文重放、超大工具观测与长日志读取造成的 token 浪费。
+- **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.files`（配置文件 `.pi/managed/sol-pi.json` 同步到 `~/.pi/agent/sol-pi.json`）
+- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
+
 #### 模型提供方配置（`global.models`）
 
 - **描述**: 跨设备共享的自定义 provider 声明。`capabilities.yaml` 通过 `global.models` 段声明：**manifest 中声明的 provider 为权威（整体替换目标端同名 provider），未声明的 provider（如本机私有配置）从目标端原样保留**。`apiKey` 必须引用环境变量（如 `$DEEPSEEK_API_KEY`），禁止提交明文密钥。

@@ -51,6 +51,10 @@ global:
 
   # Settings generated directly into ~/.pi/agent/settings.json
   # Keys listed here are authoritative — keys NOT listed are preserved from target.
+  # Managed config files: target filename -> repo-relative source under .pi/
+  # Manifest-declared files are authoritative (wholesale replace on sync).
+  files:
+    sol-pi.json: managed/sol-pi.json
   settings:
     packages:
       - npm:@tmustier/pi-tab-status
@@ -65,6 +69,7 @@ global:
       - git:github.com/DietrichGebert/ponytail
       - npm:pi-codex-image-gen
       - git:github.com/nantas/fusion-harness
+      - git:github.com/NVlabs/SoL-Pi
     fusionHarness:
       architect: kimi-coding/k3
       builder: xai/grok-4.5

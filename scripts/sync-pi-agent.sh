@@ -725,6 +725,34 @@ sync_agents_md() {
   fi
 }
 
+# --- Sync managed config files from manifest global.files ---
+# Manifest-declared files are authoritative (replaced wholesale).
+# Each entry maps target filename -> repo-relative source path under .pi/.
+sync_managed_files() {
+  "$PY_BIN" <<'PYEOF'
+import yaml, os, shutil, sys
+
+manifest_path = os.environ["MANIFEST_PATH"]
+target_root = os.environ["TARGET_ROOT"]
+repo_root = os.environ["REPO_ROOT"]
+
+with open(manifest_path, "r", encoding="utf-8") as f:
+    manifest = yaml.safe_load(f)
+
+files = (manifest.get("global") or {}).get("files") or {}
+
+for target_name, source_rel in files.items():
+    source = os.path.join(repo_root, ".pi", source_rel)
+    target = os.path.join(target_root, target_name)
+    if not os.path.isfile(source):
+        print(f"ERROR: global.files entry '{target_name}' source missing: {source}", file=sys.stderr)
+        sys.exit(1)
+    os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+    shutil.copyfile(source, target)
+    print(f"  Synced {target_name} (from .pi/{source_rel})")
+PYEOF
+}
+
 # --- Main ---
 
 echo "Checking extension dependencies..."
@@ -762,6 +790,11 @@ echo "--- Syncing models.json ---"
   render_models_file "${TARGET_PATH}"
 )
 echo "  Synced models.json (generated from manifest global.models)"
+
+# 2c. Sync managed config files (global.files, wholesale replace)
+echo ""
+echo "--- Syncing managed config files ---"
+sync_managed_files
 
 # 3. Sync themes (unchanged, full copy)
 echo ""

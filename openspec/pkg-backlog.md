@@ -3,6 +3,23 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-10-05 — SoL-Pi (NVlabs)
+
+- **Version:** 0.1.0（commit e1a586a）
+- **Research Date:** 2026-10-05
+- **Resource Types:** extensions（单入口 → 4 机制：Action Fusion / ObservationPack / Evidence-Preserving Reducer / Online Context Compact）
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/NVlabs/SoL-Pi
+- **Install Method:** pi-install
+- **Has Dependencies:** false（0 runtime / 5 peer 由 Pi 运行时满足）
+- **Reason:** NVIDIA 出品的 Pi 效率扩展：减少重复模型轮次、上下文重放、超大观测与长日志读取。安全审查 CLEAN（无网络外联/命令执行/动态代码/混淆），上游测试 195/195 通过，Pi 1.0.2 实测加载与特性注册成功。全机制 opt-in 默认禁用，无配置时零行为，与现有全局能力无重叠。
+- **Notes:**
+  1. 配置：`.pi/sol-pi.json`（trusted project）或 `~/.pi/agent/sol-pi.json`，两文件不合并，schema 见包内 `docs/configuration.md` + `scripts/check-sol-pi-config.mjs`
+  2. Evidence-Preserving Reducer 开启远程缩减会把日志发给 reducer model（Pi 托管认证，含 likely-secret 预检但非完整扫描）——敏感日志勿开
+  3. ObservationPack/EPR 归档写入 session 目录或系统临时目录，session 结束不自动清理
+  4. 上游 dev 锁 Pi 0.85.1，peer 范围 `*`；当前全局 Pi 1.0.2 冒烟通过
+
 ### 2026-07-25 — skill-up（alibaba）
 
 - **Version:** v0.7.0

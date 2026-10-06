@@ -69,6 +69,7 @@ corresponding update to `.pi/capabilities.yaml`:
 - **Prompts** — `.md` files under `.pi/prompts/`
 - **Packages** — Entries in `global.settings.packages` in `.pi/capabilities.yaml`
 - **Settings** — All keys under `global.settings` in `.pi/capabilities.yaml` are authoritative for `~/.pi/agent/settings.json`; keys not listed are preserved from the target file
+- **Managed files** — Entries in `global.files` map a target filename under `~/.pi/agent/` to a repo-relative source under `.pi/` (e.g. `sol-pi.json: managed/sol-pi.json`); manifest-declared files are replaced wholesale on sync. Adding/removing a managed file MUST update `global.files`.
 - **Env** — Entries in `global.env` and `catalog.env` declare environment variables required by capabilities, keyed by capability ID. `sync-pi-agent.sh` validates `global.env` during sync; `catalog.env` is checked by `install-from-pi-config` during catalog installation.
 
 ### Workflow Guidance
