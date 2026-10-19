@@ -71,7 +71,6 @@ Present the available capabilities to the user:
 - obsidian-tools — Obsidian integration tools (has package.json: true)
 
 ### Packages
-- pi-mcp-adapter@2.5.1 — Pi MCP adapter (settings-entry)
 - lsp-pi — LSP integration (settings-entry)
 ```
 

@@ -11,7 +11,7 @@
 1. [Architecture Overview](#1-architecture-overview)
 2. [Skill System](#2-skill-system)
 3. [Extension System](#3-extension-system)
-4. [MCP Integration via pi-mcp-adapter](#4-mcp-integration-via-pi-mcp-adapter)
+4. [MCP Integration (Native)](#4-mcp-integration-native)
 5. [Session Start Hooks](#5-session-start-hooks)
 6. [Package Management](#6-package-management)
 7. [justfile Pattern](#7-justfile-pattern)
@@ -39,7 +39,7 @@
 
 - **Minimal system prompt (~200 tokens)** — trusts frontier models to code without hand-holding
 - **Opt-in extensions** — no bloat, only what you need
-- **No native MCP** — CLI tools with READMEs (Skills) are the preferred alternative. MCP available via extensions (`pi-mcp-adapter`)
+- **Native MCP since 1.3.0** — stdio/HTTP servers from `mcp.json`; CLI tools with READMEs (Skills) remain the preferred alternative for simple needs
 - **Four built-in tools** — `read`, `write`, `edit`, `bash` + optional `grep`, `find`, `ls` via `--tools` flag
 
 ---
@@ -217,108 +217,47 @@ Extensions can export async factories. Pi awaits the returned Promise before con
 
 ---
 
-## 4. MCP Integration via pi-mcp-adapter
+## 4. MCP Integration (Native)
 
-> Source: `npm:pi-mcp-adapter` (nicobailon), v2.3.4
+> Since pi 1.3.0, MCP support is built in. The former `npm:pi-mcp-adapter` package was removed — installing any extension that registers `/mcp` would shadow the built-in support, so do not reinstall it.
 
-### Installation
+### Configuration
 
-```bash
-pi install npm:pi-mcp-adapter
-```
-
-### How It Works
-
-- Single `mcp` proxy tool (~200 tokens) instead of hundreds of tool definitions per server
-- Servers are **lazy by default** — connect on first tool call, not at startup
-- Tool metadata cached to disk (`~/.pi/agent/mcp-cache.json`) — search/list/describe work without live connections
-- Idle servers disconnect after 10 minutes (configurable), reconnect automatically on next use
-- npx-based servers resolve to direct binary paths (skips ~143 MB npm parent process)
-
-### MCP Tool Usage
-
-| Mode | Example |
-|------|---------|
-| Status | `mcp({ })` |
-| List server | `mcp({ server: "name" })` |
-| Search tools | `mcp({ search: "screenshot navigate" })` |
-| Describe tool | `mcp({ describe: "tool_name" })` |
-| Call tool | `mcp({ tool: "...", args: '{"key": "value"}' })` |
-| Connect server | `mcp({ connect: "server-name" })` |
-| UI messages | `mcp({ action: "ui-messages" })` |
-
-Search includes both MCP tools and Pi tools (from extensions). Pi tools appear first with `[pi tool]` prefix. Tool names are fuzzy-matched on hyphens and underscores.
-
-### Config File Loading Order
-
-Precedence (highest wins):
-
-1. `~/.config/mcp/mcp.json` — user-global shared MCP config
-2. `~/.pi/agent/mcp.json` — Pi global override
-3. `.mcp.json` — project-local shared MCP config
-4. `.pi/mcp.json` — Pi project override
-
-### Server Lifecycle Modes
-
-| Mode | Startup | Reconnect | Idle Timeout |
-|------|---------|-----------|--------------|
-| `lazy` (default) | Don't connect | On next tool call | 10 min |
-| `eager` | Connect at startup | No auto-reconnect | None (configurable) |
-| `keep-alive` | Connect at startup | Auto-reconnect via health checks | None |
-
-### Direct Tools
-
-By default, all MCP tools are accessed through the single `mcp` proxy tool. Specific tools can be promoted to first-class Pi tools via `directTools` config:
+Pi reads servers from `~/.pi/agent/mcp.json` (user) and `.pi/mcp.json` (project, requires project trust). A project entry replaces a user-level entry with the same name. In this repo, `.pi/agent/mcp.json` is the source and `scripts/sync-pi-agent.sh` syncs it to the global path.
 
 ```json
 {
   "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"],
-      "directTools": true
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "directTools": ["search_repositories", "get_file_contents"]
-    }
+    "serena": { "command": "serena", "args": ["start-mcp-server", "--context=ide", "--project-from-cwd"] },
+    "gitnexus": { "command": "gitnexus", "args": ["mcp"], "exposure": "direct" },
+    "docs": { "url": "https://example.com/mcp", "headers": { "Authorization": "Bearer ${DOCS_TOKEN}" } }
   }
 }
 ```
 
-Each direct tool costs ~150-300 tokens in the system prompt (name + description + schema). Good for targeted sets of 5-20 tools.
+CLI: `pi mcp add <name> -- <command>`, `pi mcp add <name> --url <url>`, `pi mcp list`, `pi mcp remove`. HTTP servers support OAuth via `/mcp login <server>` and `bearer-token-env-var` for static tokens.
 
-### Compatibility Imports
+### Tool Access
 
-`/mcp setup` can import server configs from other tools:
+Each server tool is registered as `mcp__<server>__<tool>`. The server's `exposure` controls how the model reaches it:
 
-| Host | Import Key |
-|------|-----------|
-| Cursor | `cursor` |
-| Claude Code | `claude-code` |
-| Claude Desktop | `claude-desktop` |
-| VS Code | `vscode` |
-| Windsurf | `windsurf` |
-| Codex / OpenCode | `codex` |
+| Exposure | Behavior |
+|---|---|
+| `codemode` (default) | Callable from codemode scripts or after `tool_search` loads it |
+| `deferred` | Not declared until `tool_search` finds a match |
+| `direct` | Declared to the model like a built-in tool |
+| `hidden` | Registered but unreachable |
 
-### Commands
+`toolExposure` overrides exposure per tool (`"get_*": "codemode"` patterns allowed). Text results over 20 KB are truncated with the full text saved to a temp file.
 
-| Command | Purpose |
-|---------|---------|
-| `/mcp` | Interactive panel |
-| `/mcp setup` | Guided setup, imports, scaffolding |
-| `/mcp tools` | List all tools |
-| `/mcp reconnect` | Reconnect all servers |
-| `/mcp reconnect <server>` | Connect/reconnect single server |
-| `/mcp-auth <server>` | OAuth setup |
+Resources are exposed via `list_mcp_resources` / `read_mcp_resource` tools.
 
-### Project Config Suggestion
+### Migrating from pi-mcp-adapter
 
-Use `.mcp.json` for project-local shared MCP config (opencode compatible). Use `.pi/mcp.json` only for Pi-specific overrides.
-
----
-
+- `mcpServers` entries are format-compatible; copy them as-is (drop adapter-only fields like `directTools`; use `exposure` instead).
+- The adapter's cross-client auto-import (cursor/claude configs) does not exist natively — copy needed entries into `mcp.json` explicitly.
+- The `mcp({ search/describe/tool })` gateway tool is gone — call `mcp__<server>__<tool>` directly or use codemode/`tool_search`.
+- Repo-root `.mcp.json` is not read natively; the project path is `.pi/mcp.json`.
 ## 5. Session Start Hooks
 
 ### Why This Exists

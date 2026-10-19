@@ -166,6 +166,17 @@ at the top of this file using the following format:
 
 <!-- New entries go here, inserted at the top above this comment -->
 
+### 2026-10-19 — npm:pi-mcp-adapter（移除）
+
+- **Resource Types:** extension (MCP adapter)
+- **Decision:** removed
+- **Reason:** pi 1.3.0 内建原生 MCP 支持；适配器注册的 `/mcp` 会整体遮蔽内建能力（官方文档 mcp.md「Replace the built-in MCP support」），卸载即自动恢复原生。mcp.json 格式 100% 兼容，零配置迁移。
+- **Notes:**
+  1. 移除项：`global.settings.packages` 中 `npm:pi-mcp-adapter`；`mcp_config: true` 保留（原生同样读 `~/.pi/agent/mcp.json`）。
+  2. 失去能力：跨客户端自动导入（cursor/claude.json）、`mcp({search/describe/tool})` 单 gateway 工具、npx 解析缓存、project-approval 门禁。gitnexus 按用户决策迁入用户级 mcp.json 并启用（`exposure: direct`）；claude.json 6 个 server 不迁移。
+  3. 其他项目：neonspark/neonnew/data-art-data 的仓库根 `.mcp.json` 原生不读，已另行落地 `.pi/mcp.json`（见各项目）。
+  4. 勿回装：任何注册 `/mcp` 的扩展都会重新遮蔽原生支持。
+
 ### 2026-05-07 — git:github.com/nantas/pi-mcp-adapter
 
 - **Version:** 2.5.1

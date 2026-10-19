@@ -56,13 +56,15 @@ global:
   files:
     sol-pi.json: managed/sol-pi.json
   settings:
+    # Purge adapter-era "-builtin:mcp" from target on every sync (pi-mcp-adapter
+    # uninstall does not restore it; empty list = built-in MCP enabled).
+    extensions: []
     packages:
       - npm:@tmustier/pi-tab-status
       - npm:@johnnywu/pi-subagents
       - git:github.com/jwu/pi-powerline
       - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
-      - npm:pi-mcp-adapter
       - git:github.com/rwese/pi-question
       - git:github.com/jwu/pi-webfetch
       - npm:@ff-labs/pi-fff

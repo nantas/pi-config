@@ -89,7 +89,7 @@
 
 ### Web Search Tool
 
-使用 `web_search_prime_web_search_prime` 工具进行 web 搜索，获取外部信息。
+若已配置 `web-search-prime` MCP 服务器，可用其工具（Pi 原生命名 `mcp__web_search_prime__web_search_prime`）进行 web 搜索；未配置时改用 `$agent-reach` 技能。
 
 **使用原则**：
 - 搜索已知技术或开源项目信息时，优先用 Pi `grep`/`find`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。

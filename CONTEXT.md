@@ -39,7 +39,7 @@ TypeScript 单文件（`.ts`）或带 `package.json` 的目录，通过 Pi Exten
 `.pi/prompts/` 下的 Markdown 文件，通过 `/模板名` 触发引导式工作流（如 `/opsx-new`）。
 
 **包**：
-通过 npm 或 git 安装的第三方 Pi 包（如 `pi-fff`、`pi-mcp-adapter`）。由 `pkg-research` 技能管理评估和安装决策。
+通过 npm 或 git 安装的第三方 Pi 包（如 `pi-fff`、`fusion-harness`）。由 `pkg-research` 技能管理评估和安装决策。MCP 服务器由 Pi 原生支持（`~/.pi/agent/mcp.json`，仓内源 `.pi/agent/mcp.json`）。
 
 ## 全局 vs 仓库层
 
@@ -142,7 +142,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 用户术语 | 相关 spec slug |
 |----------|---------------|
 | fff 检索 | `fff-retrieval` |
-| MCP 配置 | `pi-mcp-shared-bridge`, `global-mcp-config` |
+| MCP 配置 | `global-mcp-config` |
 
 ### 仓库架构
 

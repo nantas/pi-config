@@ -19,7 +19,7 @@ Your job is to execute the assigned task with narrow, coherent edits. You have t
 
 ## Unity MCP Tool Reference
 
-Call Unity tools through `mcp({ server: "unity-mcp", tool: "<tool_name>", args: { ... } })`.
+Call Unity tools directly as `mcp__mcp-unity__<tool_name>` (native Pi MCP naming, e.g. `mcp__mcp-unity__unity_scene_info`). Tool parameters are declared in each tool's schema.
 
 ### Core Tools (high-frequency)
 
