@@ -7,7 +7,7 @@
   "breadcrumb": "inner",
   "fusionHarness": {
     "architect": "deepseek/deepseek-v4-flash",
-    "builder": "xai/grok-4.5",
+    "builder": "xai/grok-4.7",
     "architectThinking": "high",
     "builderThinking": "high",
     "childExtensions": []

@@ -1,7 +1,7 @@
 ---
 name: image-reader
 description: Vision subagent — reads and analyzes images (screenshots, reference art, UI mockups, charts) and returns structured text descriptions for other agents. Handles format transcoding for the xai provider whitelist.
-model: xai/grok-4.6
+model: xai/grok-4.7
 thinking: medium
 tools: read, grep, find, ls, bash, webfetch
 systemPrompt: replace-all

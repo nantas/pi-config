@@ -74,7 +74,7 @@ global:
       - git:github.com/NVlabs/SoL-Pi
     fusionHarness:
       architect: kimi-coding/k3
-      builder: xai/grok-4.5
+      builder: xai/grok-4.7
       architectThinking: high
       builderThinking: high
       childExtensions: []
@@ -85,7 +85,7 @@ global:
     enabledModels:
       - zai-coding-cn/glm-5.3
       - zai-coding-cn/glm-5.3-flash
-      - xai/grok-4.6
+      - xai/grok-4.7
       - deepseek/deepseek-v4-flash
       - deepseek/deepseek-v4-pro
       - kimi-coding/k3
