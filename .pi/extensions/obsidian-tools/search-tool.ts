@@ -754,27 +754,31 @@ function resolveSearchDirs(
 
 // ── RG Search (fallback) ───────────────────────────────────────
 
+let _rgPathResolved: string | null | undefined;
+
 function resolveRgPath(): string | null {
+  if (_rgPathResolved !== undefined) return _rgPathResolved;
+  const { accessSync, constants } = require("node:fs");
+  const isWin = process.platform === "win32";
+  const home = process.env.USERPROFILE ?? process.env.HOME;
   const candidates = [
-    "rg",
-    "/Users/nantas-agent/.pi/agent/bin/rg",
-    "/opt/homebrew/bin/rg",
-    "/usr/local/bin/rg",
-    process.env.HOME
-      ? resolve(process.env.HOME, ".pi", "agent", "bin", "rg")
-      : null,
+    isWin ? null : "/opt/homebrew/bin/rg",
+    isWin ? null : "/usr/local/bin/rg",
+    home ? resolve(home, ".pi", "agent", "bin", isWin ? "rg.exe" : "rg") : null,
   ].filter(Boolean) as string[];
 
-  const { accessSync, constants } = require("node:fs");
   for (const candidate of candidates) {
     try {
       accessSync(candidate, constants.X_OK);
-      return candidate;
+      return (_rgPathResolved = candidate);
     } catch {
       continue;
     }
   }
-  return null;
+  // Bare "rg" from PATH as last resort — accessSync can't do PATH/PATHEXT
+  // lookup (and on win32 needs the .exe suffix), so validate via spawn.
+  const probe = spawnSync("rg", ["--version"], { timeout: 5000 });
+  return (_rgPathResolved = probe.status === 0 ? "rg" : null);
 }
 
 function runRgSearch(
@@ -787,7 +791,8 @@ function runRgSearch(
   if (!rgPath) {
     return {
       matches: [],
-      error: "rg (ripgrep) not found. Install it with: brew install ripgrep",
+      error:
+        "rg (ripgrep) not found. Install it: winget install BurntSushi.ripgrep.MSVC (Windows) / brew install ripgrep (macOS)",
     };
   }
 
