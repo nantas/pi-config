@@ -3,6 +3,23 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-10-12 — pi-ask (jwu fork)
+
+- **Version:** 0.3.0（fork-v* 独立版本线，上游 @eko24ive/pi-ask）
+- **Research Date:** 2026-10-12
+- **Resource Types:** extension（ask_user 工具 + ask-settings/answer/answer:again/ask:replay 命令）+ skill（ask-user）
+- **Decision:** global（替代 rwese/pi-question）
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/jwu/pi-ask
+- **Install Method:** pi-install
+- **Has Dependencies:** false（0 runtime / 4 peer 由 Pi 运行时满足）
+- **Reason:** 用户发起的 pi-question 替代评估：安全审查 CLEAN（唯一 exec 为用户自配通知命令，有超时+sanitize），零运行时依赖，冒烟测试加载成功。功能为 pi-question 严格超集：tabbed 多题、preview、@ 文件引用、option 级 notes、Review/Elaborate 流程、通知渠道（bell/OSC9/OSC777/command）、/answer 纯文本提取、分支感知 replay、中断恢复。作者 jwu 已有 pi-powerline/pi-subagents 在用。
+- **Notes:**
+  1. 替代同步修改：9 个 .pi/prompts/opsx-*.md 中 `**AskUserQuestion tool**` → `**ask_user tool**`（13 处）
+  2. 配置文件：~/.pi/agent/extensions/eko24ive-pi-ask.json（schemaVersion 6，自动创建），/ask-settings 命令可改
+  3. 无 pi-question:disabled 等价命令；skill 可通过 pi 配置禁用
+  4. 已移除：rwese/pi-question（全局 + manifest）
+
 ### 2026-10-05 — SoL-Pi (NVlabs)
 
 - **Version:** 0.1.0（commit e1a586a）
