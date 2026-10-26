@@ -11,8 +11,5 @@
     "architectThinking": "high",
     "builderThinking": "high",
     "childExtensions": []
-  },
-  "packages": [
-    "git:github.com/NVlabs/SoL-Pi"
-  ]
+  }
 }
