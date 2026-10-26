@@ -150,3 +150,40 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 |----------|---------------|
 | 仓库蓝图 | `pi-customization-blueprint`, `pi-phase2-delivery-plan` |
 | 项目源层 | `pi-project-source-layer` |
+
+## Just Agent 实验术语
+
+**工程入口遵从性（Harness Compliance）**：受限 Agent 在执行工程操作时，使用项目批准的 Just recipe，而不是自行构造底层命令；当现有 recipe 不足时，应停止执行并报告能力缺口。它不表示安全隔离或任务性能达标。
+
+**Approved Recipe（已批准 recipe）**：已进入实验可执行能力集、允许受限 Agent 调用的项目操作。
+
+**Recipe Proposal（recipe 提案）**：受限 Agent 为填补能力缺口而提交的候选 recipe；在人工批准并晋升前不可执行。
+
+**Forked Experiment Run（分叉实验运行）**：从主会话当前叶节点继承对话上下文后启动的受限 Agent 运行，适合围绕当前任务快速试验；其结果受主会话历史影响，不等同于可复现基准。
+
+**Run Trace（运行轨迹）**：由实验运行时生成的机器可读行为记录，覆盖专属 Agent 的全部工具调用，并记录精简参数、结果状态和时间；它是主 Agent 诊断实验行为的事实来源。
+
+**Run Report（运行报告）**：受限 Agent 对任务结果、能力缺口和 recipe 提案的结构化总结；它用于解释 Run Trace，但不替代运行时证据。
+
+**Restricted Implementation Agent（受限实施 Agent）**：可读取、检索和修改项目代码，并可调用已批准 recipe；不具备 Bash，并被要求不得直接修改正式 harness；违反该要求属于可观察的遵从性失败。
+
+**Experiment Bundle（实验包）**：一次实验运行产生的临时证据集合，包含 Run Trace 和候选 recipe 片段；它不属于正式项目能力或版本化交付物。
+
+**Experiment Skill（实验入口 Skill）**：将用户任务包装为实验契约，并强制主 Agent 通过 forked subagent 调用 Restricted Implementation Agent；委派失败时报告失败，不由主 Agent 回退执行。
+
+**Root-Cause Change Set（根因变更集）**：一次实验迭代中，由同一个已观察失败根因直接要求的少量相关改进；可同时涉及两到三项配置，但不得夹带无关优化。
+
+**Compliance Outcome（遵从性结果）**：描述受限 Agent 是否只通过 Approved Recipe 执行工程命令，并在能力不足时停止和报告。
+
+**Task Outcome（任务结果）**：描述用户任务是否完成、阻塞或失败。任务阻塞可以与遵从性通过同时成立。
+
+
+**Behavioral Boundary（行为边界）**：由 Agent system prompt 声明、但不由运行时阻止的规则；违规行为允许发生并被记录，用于衡量遵从性，不能解释为安全隔离。
+
+**Exploratory Run（探索性运行）**：以真实开发任务为输入、用于发现遵从失败和能力缺口的实验运行；不同运行之间不构成受控性能比较。
+
+**Experiment Control Plane（实验控制面）**：定义实验条件的 Just tool、正式 justfile、专属 Agent 和 Experiment Skill。MVP 将其作为 Behavioral Boundary 观察对象，而非运行时强制只读资源。
+
+**Observer（观察者）**：运行 Experiment Skill 的主 Agent；它在子 Agent 返回后分别评估 Compliance Outcome 与 Task Outcome，并提出等待人工确认的 Root-Cause Change Set，不自动修改实验控制面。
+
+**Project-only Experiment（项目专属实验）**：只在 pi-config 仓库中自动发现的 Agent 与 Skill 组合；MVP 不向其他项目分发，独立可用的 Just tool 可单独进入 catalog。

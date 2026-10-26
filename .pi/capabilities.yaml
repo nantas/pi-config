@@ -194,6 +194,9 @@ catalog:
     - name: wikilink-batch-replace
       source: wikilink-batch-replace
       description: "Batch-replace bare text references with Obsidian wikilinks, auto-escaping pipe separators in table rows"
+    - name: just-agent-lab
+      source: just-agent-lab
+      description: "Just Agent Lab `just` tool — approved-recipe-only Just execution for restricted agents, with experiment run tracing into .scratch/just-agent-runs"
 
   # Packages available for on-demand installation (settings-entry type)
   packages: []

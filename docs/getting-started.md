@@ -123,6 +123,7 @@ pi login <provider>
 | **扩展** | `add-provider` | 添加自定义模型供应商 |
 | **扩展** | `obsidian-tools` | Obsidian 集成工具 |
 | **扩展** | `wikilink-batch-replace` | 批量将裸文本引用替换为 Obsidian wikilink |
+| **扩展** | `just-agent-lab` | Just Agent Lab `just` 工具：受限 agent 仅经 Approved Recipe 执行 Just，并记录实验运行 trace |
 | **包** | （无） | `catalog.packages` 当前为空 |
 
 ---
