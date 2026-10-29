@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Creates structured implementation plans from approved requirements and context
-model: deepseek/deepseek-v4-flash
+model: kimi-coding/k3.1-pro
 thinking: high
 tools: read, ffgrep, fffind, ls, bash, write, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
 ---

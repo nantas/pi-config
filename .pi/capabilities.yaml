@@ -79,8 +79,8 @@ global:
       builderThinking: high
       childExtensions: []
     defaultThinkingLevel: high
-    defaultProvider: deepseek
-    defaultModel: deepseek-v4-flash
+    defaultProvider: kimi-coding
+    defaultModel: k3.1-pro
     # Restrict Ctrl+P (/model) switching scope. Exact IDs (no glob) → exact match.
     enabledModels:
       - zai-coding-cn/glm-5.3
@@ -88,9 +88,7 @@ global:
       - xai/grok-4.7
       - deepseek/deepseek-v4-flash
       - deepseek/deepseek-v4-pro
-      - kimi-coding/k3
-      - openai-codex/gpt-5.6-sol
-      - openlux/claude-opus-5
+      - kimi-coding/k3.1-pro
 
   # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
   # Manifest-declared providers are authoritative (replaced wholesale);

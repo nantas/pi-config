@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Code review agent — inspects diffs and files for correctness, style, and quality with evidence-backed findings
-model: deepseek/deepseek-v4-flash
+model: kimi-coding/k3.1-pro
 thinking: high
 tools: read, ffgrep, fffind, ls, bash, write, intercom, gitnexus_query, gitnexus_context, gitnexus_impact
 ---
