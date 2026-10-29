@@ -73,7 +73,7 @@ global:
       - git:github.com/nantas/fusion-harness
       - git:github.com/NVlabs/SoL-Pi
     fusionHarness:
-      architect: kimi-coding/k3
+      architect: kimi-coding/k3.1-pro
       builder: xai/grok-4.7
       architectThinking: high
       builderThinking: high
