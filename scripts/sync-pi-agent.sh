@@ -915,6 +915,7 @@ MANIFEST_PATH="${REPO_ROOT}/.pi/capabilities.yaml"
 if [[ -f "${MANIFEST_PATH}" ]]; then
   "$PY_BIN" <<'ENV_CHECK_PY'
 import os, sys, yaml
+import re
 
 manifest_path = os.environ.get("MANIFEST_PATH", "")
 try:
@@ -932,7 +933,6 @@ if not env_section:
 
 # --- Extract active capability IDs ---
 active_ids = set()
-import re
 
 def extract_cap_id(spec):
     if not isinstance(spec, str):
@@ -957,6 +957,50 @@ for skill in (global_section.get("skills") or []):
     active_ids.add(skill)
 for agent in (global_section.get("agents") or []):
     active_ids.add(agent)
+
+# --- Fallback: scan user shell configs for exported declarations ---
+# The sync script may run from a non-login subshell (e.g. an agent bash tool)
+# that does not source ~/.zshenv etc. Variables exported there are still
+# inherited by pi when launched from the user's login shell, so treat a
+# matching `export VAR=...` declaration as satisfied.
+home_dir = os.path.expanduser("~")
+shell_config_candidates = [
+    os.path.join(home_dir, ".zshenv"),
+    os.path.join(home_dir, ".zprofile"),
+    os.path.join(home_dir, ".zshrc"),
+    os.path.join(home_dir, ".bash_profile"),
+    os.path.join(home_dir, ".bashrc"),
+    os.path.join(home_dir, ".profile"),
+]
+
+def find_exported_in_shell_config(var_name):
+    """Return (declared_value, source_path) if var_name is exported in a
+    shell config file, else (None, None). Only `export VAR=` counts — bare
+    assignments are not inherited by child processes."""
+    pattern = re.compile(
+        r"^\s*export\s+" + re.escape(var_name) + r"\s*=\s*(.+?)\s*$",
+        re.MULTILINE,
+    )
+    for path in shell_config_candidates:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except OSError:
+            continue
+        m = pattern.search(content)
+        if m:
+            value = m.group(1).strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                value = value[1:-1]
+            return value, path
+    return None, None
+
+def expand_home_prefix(value):
+    """Expand $HOME and a leading ~ in a shell-config declared value."""
+    value = value.replace("$HOME", home_dir)
+    if value.startswith("~"):
+        value = home_dir + value[1:]
+    return value
 
 # --- Check each env capability ---
 errors = 0
@@ -991,6 +1035,25 @@ for cap_id, cap_conf in env_section.items():
                     print(f"  ⚠  WARNING: Could not create {parent}: {e}")
 
         if actual is None:
+            declared, declared_source = find_exported_in_shell_config(var_name)
+            if declared is not None:
+                # Exported in a shell config: pi launched from the user's login
+                # shell inherits it, even though this subshell lacks it.
+                if expected_value:
+                    expanded_declared = expand_home_prefix(declared)
+                    expanded_expected = expected_value.replace("$HOME", home_dir)
+                    if "$" not in expanded_declared and os.path.normcase(
+                        os.path.normpath(expanded_declared)
+                    ) != os.path.normcase(os.path.normpath(expanded_expected)):
+                        print(f"  ⚠  WARNING: {cap_id} — {var_name} mismatch (in {declared_source})")
+                        print(f"       Declared:  {declared}")
+                        print(f"       Expected:  {expected_value}")
+                        warnings += 1
+                        cap_ok = False
+                        continue
+                rel_source = declared_source.replace(home_dir, "~")
+                print(f"  ℹ  {var_name} not set in this subshell, but exported in {rel_source} — inherited by your login shell")
+                continue
             level = "ERROR" if required else "WARNING"
             icon = "✗" if required else "⚠"
             expand_hint = expected_value.replace("$HOME", "$HOME") if expected_value else ""
