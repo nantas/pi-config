@@ -64,7 +64,7 @@ removals, or scope changes of the following resource types MUST be accompanied b
 corresponding update to `.pi/capabilities.yaml`:
 
 - **Extensions** — Single-file `.ts` or directory with `package.json`
-- **Skills** — Directories under `.pi/skills/` containing `SKILL.md`
+- **Skills** — Directories under `.pi/skills/` containing `SKILL.md` (synced to `~/.pi/agent/skills/` via `global.skills`, or to the cross-harness shared layer `~/.agents/skills/` via `global.shared_skills`)
 - **Agents** — `.md` files under `.pi/agents/`
 - **Prompts** — `.md` files under `.pi/prompts/`
 - **Packages** — Entries in `global.settings.packages` in `.pi/capabilities.yaml`
@@ -86,6 +86,7 @@ corresponding update to `.pi/capabilities.yaml`:
 | Remove a package | Remove from `global.settings.packages` or `catalog.packages` |
 | Add/remove an agent | Update `global.agents` |
 | Add/remove a skill | Update `global.skills` or `catalog.skills` |
+| Add/remove a shared-layer skill (~/.agents/skills/) | Update `global.shared_skills` (additive sync; never cleans undeclared content in the shared dir) |
 | Add/remove a prompt | Append to / Remove from `global.prompts` |
 | Add env vars for a global capability | Add capability ID key to `global.env` with `variables` map |
 | Add env vars for a catalog capability | Add capability ID key to `catalog.env` with `variables` map |

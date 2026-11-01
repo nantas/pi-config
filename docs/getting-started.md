@@ -105,7 +105,8 @@ pi login <provider>
 |------|------|------|
 | **扩展** | 4 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree` |
 | **Agent** | 8 | `unity-worker`、`scout`、`worker`、`context-builder`、`oracle`、`planner`、`researcher`、`reviewer` |
-| **技能** | 4 | `install-from-pi-config`、`notion`、`agent-reach`、`worktrunk-isolation` |
+| **技能** | 4 | `install-from-pi-config`、`notion`、`x-reach`、`worktrunk-isolation` |
+| **共享层技能** | 1 | `agent-reach`（经 `global.shared_skills` 同步到 `~/.agents/skills/`，跨 harness 共用） |
 | **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
 | **模型配置** | 1 | `deepseek`（deepseek-v4-flash 走 Responses API，渲染到 `~/.pi/agent/models.json`） |
 | **外部包** | 12 | `pi-tab-status`（tab 状态图标）、`pi-subagents`（子代理系统）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化）、`pi-question`（交互提问）、`pi-webfetch`（网页抓取）、`pi-fff`（模糊文件查找）、`ponytail`（极简编码）、`pi-codex-image-gen`（图像生成）、`fusion-harness`（多模型编排）、`sol-pi`（NVIDIA 效率扩展） |

@@ -269,7 +269,7 @@ global:
 
 #### 环境变量配置（`global.env` / `catalog.env`）
 
-部分能力需要环境变量才能启用全部功能（如数据库路径、API key 等）。`capabilities.yaml` 通过 `global.env` 和 `catalog.env` 字段声明这些变量，**按能力 ID 分组**，与 `global.settings.packages`、`global.extensions`、`global.skills`、`global.agents` 中的能力条目对应。
+部分能力需要环境变量才能启用全部功能（如数据库路径、API key 等）。`capabilities.yaml` 通过 `global.env` 和 `catalog.env` 字段声明这些变量，**按能力 ID 分组**，与 `global.settings.packages`、`global.extensions`、`global.skills`、`global.shared_skills`、`global.agents` 中的能力条目对应。
 
 ```yaml
 # global.env 示例：声明全局能力 pi-fff 需要的环境变量
@@ -296,7 +296,7 @@ catalog:
 ```
 
 **字段结构**：
-- **Key**：能力 ID（与 packages/extensions/skills/agents 列表中的条目对应）
+- **Key**：能力 ID（与 packages/extensions/skills/shared_skills/agents 列表中的条目对应）
 - **`variables`**：环境变量映射，每个变量支持 `value`（期望值）、`description`（用途说明）、`required`（是否必需）
 - **`global.env`**：由 `sync-pi-agent.sh` 在全局同步时检查
 - **`catalog.env`**：由 `install-from-pi-config` 技能在 catalog 安装时检查
@@ -311,14 +311,6 @@ catalog:
 
 #### 全局技能（Global skills）
 
-##### `agent-reach`
-
-- **描述**: 互联网平台能力路由器。指导 Agent 通过上游 CLI/API 读取与搜索 15+ 平台（网页、YouTube、GitHub、Twitter、Reddit、B站、小红书等）；多后端路由，`agent-reach doctor` 体检。
-- **解决的问题**: 各平台接入方式分散、易失效，Agent 需反复选型/配置。本 skill 提供统一路由表与命令参考。
-- **源文件**: `.pi/skills/agent-reach/SKILL.md`
-- **依赖**: 运行时需要本机安装 Python CLI `agent-reach`（及可选上游工具）；skill 本身不安装 CLI。
-- **注意**: 触发面很广（调研/搜索/各平台 URL），可能与内置 `webfetch` / X 搜索等工具路由重叠，Agent 需按任务选择。
-
 ##### `worktrunk-isolation`
 
 - **描述**: 让 Agent 用社区工具 worktrunk（CLI `wt`）管理 git worktree，给多 session 并行作业做文件系统隔离，并强制人确认合入门禁。
@@ -327,7 +319,18 @@ catalog:
 - **依赖**: 运行时需要本机安装 `worktrunk`（`brew install worktrunk`）；preflight 缺失时给出安装指引，skill 本身不安装 CLI。
 - **范围**: 管隔离与门禁，不管多 agent 编排（不做任务板/端口分配/worklease）。
 
-#### 元技能（Meta-skills）
+#### 共享层技能（Shared skills → `~/.agents/skills/`）
+
+##### `agent-reach`
+
+- **描述**: 互联网平台能力路由器。指导 Agent 通过上游 CLI/API 读取与搜索 15+ 平台（网页、YouTube、GitHub、Twitter、Reddit、B站、小红书、雪球金融行情等）；多后端路由，`agent-reach doctor` 体检。
+- **解决的问题**: 各平台接入方式分散、易失效，Agent 需反复选型/配置。本 skill 提供统一路由表与命令参考。
+- **源文件**: `.pi/skills/agent-reach/SKILL.md`（含英文版 `SKILL_en.md`）
+- **安装位置**: `~/.agents/skills/agent-reach/`（经 `global.shared_skills` 同步，供 pi 与其他 harness 共用；同步只替换声明条目，不清理共享目录其他内容）
+- **依赖**: 运行时需要本机安装 Python CLI `agent-reach`（及可选上游工具）；skill 本身不安装 CLI。
+- **注意**: 触发面很广（调研/搜索/各平台 URL），可能与内置 `webfetch` / X 搜索等工具路由重叠，Agent 需按任务选择。
+
+#### 元技能（Meta-skills）（Meta-skills）
 
 ##### `pi-extension-dev`
 
@@ -475,7 +478,7 @@ openspec/
 | `.pi/settings.json` | 全局配置：provider、model、packages、subagent overrides |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
 | `.pi/agents/` | Agent 定义（当前无自定义 agent） |
-| `.pi/skills/` | 元技能（pi-extension-dev、pkg-research） |
+| `.pi/skills/` | 同步技能源（global.skills → `~/.pi/agent/skills/`；global.shared_skills → `~/.agents/skills/`） |
 | `.agents/skills/` | OpenSpec 10 步工作流技能 + 全局 Superpowers |
 | `openspec/manifest.json` | 能力清单（specs 映射） |
 | `openspec/specs/` | 能力规格说明 |

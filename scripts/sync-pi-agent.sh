@@ -321,6 +321,7 @@ const repoRoot = process.env.REPO_ROOT;
 
 const content = fs.readFileSync(manifestPath, "utf8");
 const lines = content.split("\n");
+const os = require("os");
 
 // Parse a YAML list at a given indentation level under a parent keyword
 function parseListUnder(lines, parentKeyword) {
@@ -488,7 +489,18 @@ function extractItems(sectionName, keyword) {
 const globalExts = extractItems("global", "extensions");
 const globalAgents = extractItems("global", "agents");
 const globalSkills = extractItems("global", "skills");
+const globalSharedSkills = extractItems("global", "shared_skills");
 const globalPrompts = extractItems("global", "prompts");
+
+// Reject duplicate declarations: a skill must live in exactly one of
+// global.skills (pi-only layer) or global.shared_skills (shared layer).
+for (const name of globalSharedSkills) {
+  if (globalSkills.includes(name)) {
+    console.error("ERROR: skill '" + name + "' is declared in both global.skills and global.shared_skills.");
+    console.error("       Remove it from one list; the two lists target different install roots.");
+    process.exit(1);
+  }
+}
 
 // --- SYNC EXTENSIONS ---
 console.log("\n--- Syncing global extensions ---");
@@ -587,6 +599,26 @@ for (const entry of existingSkills) {
     const fullPath = path.join(targetRoot, "skills", name);
     fs.rmSync(fullPath, { recursive: true, force: true });
     console.log("  Removed stale skill:", name);
+  }
+}
+
+// --- SYNC SHARED SKILLS (~/.agents/skills/, additive-only) ---
+// Cross-harness shared layer. Each declared skill is wholesale-replaced at
+// the target; undeclared content in the shared root is NEVER touched
+// (no stale cleanup here, unlike targetRoot/skills above).
+const agentsSkillsRoot = process.env.AGENTS_SKILLS_ROOT
+  || path.join(os.homedir(), ".agents", "skills");
+console.log("\n--- Syncing shared skills (-> " + agentsSkillsRoot + ") ---");
+for (const skillName of globalSharedSkills) {
+  const sourceDir = path.join(sourceRoot, "skills", skillName);
+  const targetDir = path.join(agentsSkillsRoot, skillName);
+  if (fs.existsSync(sourceDir)) {
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    fs.mkdirSync(agentsSkillsRoot, { recursive: true });
+    fs.cpSync(sourceDir, targetDir, { recursive: true, force: true });
+    console.log("  Synced shared skill:", skillName + "/");
+  } else {
+    console.log("  WARNING: Shared skill not found:", skillName);
   }
 }
 
@@ -769,6 +801,7 @@ export MANIFEST_PATH="${REPO_ROOT}/.pi/capabilities.yaml"
 export SOURCE_ROOT
 export TARGET_ROOT
 export REPO_ROOT
+export AGENTS_SKILLS_ROOT="${AGENTS_SKILLS_ROOT:-${HOME}/.agents/skills}"
 
 export TARGET_PATH="${TARGET_ROOT}/settings.json"
 
@@ -955,6 +988,8 @@ for ext in (global_section.get("extensions") or []):
     active_ids.add(ext)
 for skill in (global_section.get("skills") or []):
     active_ids.add(skill)
+for skill in (global_section.get("shared_skills") or []):
+    active_ids.add(skill)
 for agent in (global_section.get("agents") or []):
     active_ids.add(agent)
 
@@ -1107,6 +1142,7 @@ Managed by manifest (.pi/capabilities.yaml):
   extensions/     -> ~/.pi/agent/extensions/  (whitelist: global.extensions)
   agents/         -> ~/.pi/agent/agents/      (whitelist: global.agents)
   skills/         -> ~/.pi/agent/skills/      (whitelist: global.skills)
+  skills/         -> ~/.agents/skills/         (declared: global.shared_skills, additive-only)
   prompts/        -> ~/.pi/agent/prompts/     (whitelist: global.prompts)
   settings.json   -> ~/.pi/agent/settings.json (generated: global.settings from manifest + target merge)
   catalog/        -> ~/.pi/agent/catalog/pi-config.yaml

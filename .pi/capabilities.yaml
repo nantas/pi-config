@@ -32,9 +32,15 @@ global:
   skills:
     - install-from-pi-config
     - notion
-    - agent-reach
     - x-reach
     - worktrunk-isolation
+
+  # Skills synced to ~/.agents/skills/ (cross-harness shared layer).
+  # Additive-only: declared skills are wholesale-replaced at the target;
+  # the sync script never removes undeclared content in this shared dir.
+  # A skill must not appear in both `skills` and `shared_skills`.
+  shared_skills:
+    - agent-reach
 
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:
