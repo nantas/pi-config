@@ -311,6 +311,27 @@ catalog:
 
 #### 全局技能（Global skills）
 
+##### `install-from-pi-config`
+
+- **描述**: 跨仓库能力安装器。读取 `~/.pi/agent/catalog/pi-config.yaml` 里的 catalog，把 skill / extension / package 装进当前项目的 `.pi/` 目录。
+- **解决的问题**: 一个能力要复用到多个项目时全靠手工复制，容易版本漂移；本 skill 把「从 catalog 选能力并落地」收敛成一条命令。
+- **源文件**: `.pi/skills/install-from-pi-config/SKILL.md`
+- **范围**: 只管仓库内 `.pi/` 的能力安装；直接装 npm/git 包用 `pi install -l`。
+
+##### `notion`
+
+- **描述**: 通过 `ntn` CLI 读取、搜索、查询和编辑 Notion 页面与数据库。
+- **解决的问题**: Notion 内容不在文件系统里，Agent 无法直接检索或改写；本 skill 给出统一的读写入口与查询方式。
+- **源文件**: `.pi/skills/notion/SKILL.md`
+
+##### `x-reach`
+
+- **描述**: 专门用于 X/Twitter 的稳定检索通道，twscrape 账号池驱动（账号轮换抗限流 + SQLite 持久会话 + JSONL 输出）。
+- **解决的问题**: X 检索容易限流、账户容易被风控，单账号跑批量任务经常中断；本 skill 用账号池与持久会话把批量检索做成可复现流程。
+- **源文件**: `.pi/skills/x-reach/SKILL.md`
+- **依赖**: `twscrape` CLI；未初始化时先跑 `scripts/x-reach-init.sh`。
+- **范围**: 只读，不支持发帖/点赞/关注。
+
 ##### `worktrunk-isolation`
 
 - **描述**: 让 Agent 用社区工具 worktrunk（CLI `wt`）管理 git worktree，给多 session 并行作业做文件系统隔离，并强制人确认合入门禁。
