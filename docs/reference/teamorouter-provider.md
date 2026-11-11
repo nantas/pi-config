@@ -76,6 +76,20 @@ OpenAI 兼容 provider 关闭了 `store`、`developer` role 和 `strict`，并�
           }
         },
         {
+          "id": "claude-fable-5-2",
+          "name": "Claude Fable 5.2",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "compat": {
+            "forceAdaptiveThinking": true
+          }
+        },
+        {
           "id": "claude-fable-5-1",
           "name": "Claude Fable 5.1",
           "reasoning": true,
