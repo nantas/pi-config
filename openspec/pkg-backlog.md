@@ -3,6 +3,22 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-11-10 — fusion-harness 停用
+
+- **Version:** fork v0.2.6（无版本 pin）
+- **Research Date:** 2026-11-10
+- **Resource Types:** extension（多模型编排：/opinion、/fusion、/auto-validate、/fusion-housekeep）
+- **Decision:** removed-disabled（从 global 移除，保留恢复能力）
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/nantas/fusion-harness
+- **Install Method:** pi-install（历史安装，本次停用）
+- **Has Dependencies:** false
+- **Reason:** 当前工作流均未使用多模型编排（architect+builder 并行+融合），停用可减少包加载面。spec（`fusion-harness-integration`）、fork 克隆（`repo://fusion-harness`）、OpenSpec change（`fusion-output-scratch-confinement`）全部保留。恢复方式：在 `capabilities.yaml` `global.settings.packages` 加回 `git:github.com/nantas/fusion-harness`，并按需恢复 `fusionHarness` 配置块，再跑 sync。
+- **Notes:**
+  1. 同步移除 manifest `global.settings.fusionHarness`（architect/builder 模型配置）
+  2. sync 脚本保留 manifest 未声明的目标键，全局 `~/.pi/agent/settings.json` 残留 `fusionHarness` 键已手动清理
+  3. README/getting-started 能力清单同步更新（外部包 12 → 11）
+
 ### 2026-10-12 — pi-ask (jwu fork)
 
 - **Version:** 0.3.0（fork-v* 独立版本线，上游 @eko24ive/pi-ask）

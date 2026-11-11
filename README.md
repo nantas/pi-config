@@ -225,13 +225,6 @@ export POWERLINE_NERD_FONTS=1
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.env.pi-fff`
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
-#### `fusion-harness`
-
-- **来源**: `git:github.com/nantas/fusion-harness`（无版本 pin）
-- **描述**: 多模型编排扩展，提供 `/opinion`、`/fusion`、`/auto-validate`；`global.settings.fusionHarness` 配置 architect/builder 默认模型。
-- **解决的问题**: 单模型方案偏置时，用 architect+builder 并行产出再融合，形成可复用的多模型工作流。
-- **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.settings.fusionHarness`
-
 #### `sol-pi`
 
 - **来源**: `git:github.com/NVlabs/SoL-Pi`（无版本 pin；上游 dev 锁 Pi 0.85.1，peer `*`）

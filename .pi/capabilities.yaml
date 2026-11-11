@@ -76,14 +76,7 @@ global:
       - npm:@ff-labs/pi-fff
       - git:github.com/DietrichGebert/ponytail
       - npm:pi-codex-image-gen
-      - git:github.com/nantas/fusion-harness
       - git:github.com/NVlabs/SoL-Pi
-    fusionHarness:
-      architect: kimi-coding/k3.1-pro
-      builder: xai/grok-4.7
-      architectThinking: high
-      builderThinking: high
-      childExtensions: []
     defaultThinkingLevel: high
     defaultProvider: kimi-coding
     defaultModel: k3.1-pro
