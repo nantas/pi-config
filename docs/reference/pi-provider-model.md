@@ -87,6 +87,7 @@
 
 | 主题 | 链接 |
 |------|------|
+| TeamoRouter 本机 provider 模板 | [teamorouter-provider.md](teamorouter-provider.md) |
 | `models.json` 完整配置（含 `compat`、`thinkingLevelMap`、`modelOverrides` 等） | https://pi.dev/docs/latest/models |
 | Extension 方式注册自定义供应商（`pi.registerProvider()`、OAuth、自定义流） | https://pi.dev/docs/latest/custom-provider |
 | Pi 完整设置项文档（`settings.json` 所有字段） | https://pi.dev/docs/latest/settings |

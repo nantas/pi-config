@@ -74,7 +74,7 @@ pi login <provider>
 - `api` 可选值：`openai-completions`、`openai-responses`、`anthropic-messages`、`google-generative-ai`
 - 文件修改后无需重启，`/model` 自动重新加载
 
-更多配置参考：[Pi 供应商与模型配置指南](docs/reference/pi-provider-model.md)
+更多配置参考：[Pi 供应商与模型配置指南](docs/reference/pi-provider-model.md)。TeamoRouter 模板：[teamorouter-provider.md](docs/reference/teamorouter-provider.md)
 
 ---
 
@@ -137,7 +137,7 @@ pi login <provider>
    - 例如不需要 `pi-powerline` 的 Nerd Font 依赖 → 从 `capabilities.yaml` 中移除对应包
    - 例如不需要某些扩展 → 从 `capabilities.yaml` 的同步列表中排除
 3. **是否需要修改 `settings.json` 中的默认值？**
-   - 当前仓库预设：`defaultProvider: deepseek`、`defaultModel: deepseek-v4-flash`、`defaultThinkingLevel: high`
+   - 当前仓库预设：`defaultProvider: deepseek`、`defaultModel: deepseek-flash`、`defaultThinkingLevel: high`
    - `defaultProvider` / `defaultModel` / `defaultThinkingLevel`
    - `subagents.agentOverrides`
 
