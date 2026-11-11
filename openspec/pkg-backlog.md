@@ -3,6 +3,23 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-11-11 — pi-antigravity
+
+- **Version:** 0.12.0（无版本 pin）
+- **Research Date:** 2026-11-11
+- **Resource Types:** extensions（provider `antigravity` + google-search + generate-image）
+- **Decision:** global
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/Rahularya01/pi-antigravity
+- **Install Method:** pi-install
+- **Has Dependencies:** true（typebox、undici；peer pi-ai / pi-coding-agent >=0.80.0 由 Pi 1.5.2 满足）
+- **Reason:** 用 Google 账号 OAuth 接入 Antigravity 订阅额度，覆盖 Google AI Pro 上的 Gemini 4 Argon。安全审查 FLAGGED 但与声明用途一致：运行时只访问 *.googleapis.com，无命令执行/eval；base64 只是公开 OAuth client secret。用户确认继续并选择全局。
+- **Notes:**
+  1. 已发布 0.12.0 动态目录支持 Argon，不支持 Carbon；Carbon 另受 Google AI Pro 资格限制（仅 Ultra/Enterprise），且 #123/#124 未发布
+  2. `enabledModels` 增加 `antigravity/*`，否则动态发现的模型进不了 Ctrl+P 白名单
+  3. 已知问题：typebox 与 Pi 运行时重复模块警告（#116）；`gemini-4-argon-high` 的 RESOURCE_EXHAUSTED 可能被当成模型失效（#122）
+  4. 登录后跑 `/login antigravity` 与 `/antigravity.refresh`；token 写入 `~/.pi/agent/auth.json` 和 `antigravity-accounts.json`
+
 ### 2026-11-10 — fusion-harness 停用
 
 - **Version:** fork v0.2.6（无版本 pin）

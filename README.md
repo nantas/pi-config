@@ -233,6 +233,14 @@ export POWERLINE_NERD_FONTS=1
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.files`（配置文件 `.pi/managed/sol-pi.json` 同步到 `~/.pi/agent/sol-pi.json`）
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
+#### `pi-antigravity`
+
+- **来源**: `git:github.com/Rahularya01/pi-antigravity`
+- **描述**: 用 Google 账号 OAuth 接入 Antigravity 订阅额度。登录后动态发现 Gemini 模型（含 Gemini 4 Argon），并提供用量、账号切换和目录刷新。
+- **解决的问题**: AI Studio API key 不能使用 Google AI Pro 的 Antigravity 额度；个人版 Gemini CLI 的 Login with Google 已关闭。
+- **引用**: `.pi/capabilities.yaml` → `global.settings.packages`
+- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
+
 #### 模型提供方配置（`global.models`）
 
 - **描述**: 跨设备共享的自定义 provider 声明。`capabilities.yaml` 通过 `global.models` 段声明：**manifest 中声明的 provider 为权威（整体替换目标端同名 provider），未声明的 provider（如本机私有配置）从目标端原样保留**。`apiKey` 必须引用环境变量（如 `$DEEPSEEK_API_KEY`），禁止提交明文密钥。

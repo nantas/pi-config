@@ -77,10 +77,11 @@ global:
       - git:github.com/DietrichGebert/ponytail
       - npm:pi-codex-image-gen
       - git:github.com/NVlabs/SoL-Pi
+      - git:github.com/Rahularya01/pi-antigravity
     defaultThinkingLevel: high
     defaultProvider: kimi-coding
     defaultModel: k3.1-pro
-    # Restrict Ctrl+P (/model) switching scope. Exact IDs (no glob) → exact match.
+    # Restrict Ctrl+P (/model) switching scope. Exact IDs match exactly; antigravity/* covers its dynamic catalog.
     enabledModels:
       - zai-coding-cn/glm-5.3
       - zai-coding-cn/glm-5.3-flash
@@ -88,6 +89,7 @@ global:
       - deepseek/deepseek-v4-flash
       - deepseek/deepseek-v4-pro
       - kimi-coding/k3.1-pro
+      - antigravity/*
 
   # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
   # Manifest-declared providers are authoritative (replaced wholesale);
