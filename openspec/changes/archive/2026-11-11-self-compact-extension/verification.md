@@ -138,3 +138,46 @@ state-after-compaction, card answered → noop + done: messages=0 | head=-
 ### 复核结论（t14，peer review 第二轮）
 
 PASS。72/72 单元测试通过，`openspec validate self-compact-extension` 校验通过；4 项修复（投递后 `unlock` + `forceArmed`、state-after-compaction 恢复、`session_tree` 恢复派发、`parseSpec` 单位后缀）与本节记录均已核实无误。最终验收汇报与全局同步确认由 t14 向用户完成。
+
+### 上线后缺陷 1：`session_compact` 之后不再投递（已修复，commit 66a3267）
+
+现象：压缩完成后 agent 直接停住，卡片从未送达（会话 `2026-11-12T07-49-07-092Z_01a1cebb` 的 L232 之后无任何记录）。
+
+根因：Pi `agent-session.js` 的 `compact()` 先 emit `session_compact`，返回后才 `_clearManualCompactionState()`，因此事件回调内 `ctx.isIdle()` 恒为 `false`；原实现 `if (ctx.isIdle()) await deliverHandoff(ctx)` 被静默跳过，`ctx.compact()` 也没有 `onComplete`。
+
+修复：投递改为 `scheduleDelivery`（25ms 轮询 + epoch/alive 守卫，`!ctx.isIdle()` 时自重排），并同时挂 `ctx.compact({ onComplete })` 双保险；`session_compact` / `session_compact_failed` 只在本轮确有 handoff 在飞时改状态，用户后续手动 `/compact` 不会复活旧卡片。
+
+### 上线后缺陷 2：陈旧锁永久拦截工具（已修复，commit b435a91）
+
+现象：切到 1M 窗口模型后 usage 仅 9.3%（forced 应为 300k），`state.locked` 仍为 `true`、`phase: "pending"` 且无 handoff，`effectiveTier()` 恒返回 `forced`，所有非 `self_compact` 工具被拒。
+
+根因：`trackLevel()` 只有加锁分支，没有解锁分支。触发路径见会话 `2026-11-12T02-30-23-796Z_01a1cd97` 的 L426–435：3 秒内 8 次 `model_change`，L431 在 200k 窗口（forced 60k）下 91k 越线加锁，随后切回大窗口锁未释放。
+
+修复：新增 `state.ts: isStaleLock(state, level, compacting)` —— 已锁且未在压缩、且水位已不在 forced、且没有待交付 handoff 时判定为陈旧；`trackLevel()` 在重新武装 `forceArmed` 之前调用 `unlock(ctx)`。
+
+### 上线后缺陷 3：切换模型瞬间误测水位（已修复，commit b435a91）
+
+现象：快捷键循环 `enabledModels` 会连续触发 `model_select`，上一模型的 token 数被拿去和下一模型的窗口比，小窗口模型稍纵即逝也会加锁。
+
+修复：`model_select` 只丢弃缓存的阈值并置 `staleUsage`，`trackLevel()` 在 `staleUsage` 期间不评估水位、不动锁；`turn_start`（真实 user message）才解除。`recover()` 亦重置该标志。
+
+### 上线后缺陷 4：`compacting` 状态重复落盘（已修复，commit b435a91）
+
+同一轮 `startCompaction` 与 `session_before_compact` 各写一次 `phase: "compacting"`（会话 L445/446 相差 2ms）。改为 `session_before_compact` 仅在 `phase !== "compacting"` 时落盘，外部 `/compact` 仍能正确进入该阶段。
+
+### 真机复测（cycle 2，2026-11-12T09:35）
+
+会话 `2026-11-12T02-30-23-796Z_01a1cd97`，`/reload` 加载 b435a91 后手动触发 `/self-compact-now`：
+
+```text
+09:35:36.855  state   pending    cycle 2
+09:35:36.871  state   compacting cycle 2      ← 仅一条，去重生效
+09:36:25.928  compaction  tokensBefore 102891
+09:36:25.931  state   ready      cycle 2
+09:36:25.933  state   done       cycle 2
+09:36:25.939  custom_message self-compact-handoff
+                compaction → handoff gap = 0.011s
+09:36:33.768  assistant 继续工作（无需重启会话）
+```
+
+对照上线前的同一路径：218 秒延迟且必须靠跨进程 `session_start` 恢复才送达。故「进程内投递」缺陷在真机确认修复；陈旧锁与切模型两项由单元测试 + 运行时模拟覆盖（连刷 6 个模型不加锁、128k 下 94% 正常 forced、切窗口后真实消息触发释放）。
