@@ -2,10 +2,8 @@
 
 ## Purpose
 
-Provide agent-driven context compaction and structured handoff resumption for long-horizon tasks using three-tier percentage watermarks (`10%` notice / `20%` recommend / `30%` forced, 90% hard cap), TypeSafe Jev System One semantic boundary gating and dynamic cut-point selection, a six-field structured handoff contract, crash recovery, and coexistence with `SoL-Pi` observation reduction and `pi-powerline`.
-
+Provide agent-driven context compaction and structured handoff resumption for long-horizon tasks using three-tier percentage watermarks whose values come from configuration (never from this specification), TypeSafe Jev System One semantic boundary gating and dynamic cut-point selection, a six-field structured handoff contract, crash recovery, and coexistence with `SoL-Pi` observation reduction and `pi-powerline`.
 ## Requirements
-
 ### Requirement: Extension Self-Deduplication and Coexistence with SoL-Pi
 
 The system SHALL prevent duplicate registration of `self-compact` when loaded from both global (`~/.pi/agent/extensions/self-compact/`) and project-local (`.pi/extensions/self-compact/`) paths, and SHALL decouple `SoL-Pi`'s online compaction from `self-compact`'s session compaction lifecycle.
@@ -24,16 +22,18 @@ The system SHALL prevent duplicate registration of `self-compact` when loaded fr
 
 ### Requirement: Three-Tier Percentage Watermark and Configuration Precedence
 
-The system SHALL compute three monotonically increasing context watermarks (`soft` / Notice, `warning` / Recommend, and `forced` / Hard Cutoff) against the active model's `contextWindow`, supporting both percentage strings (default) and token count strings across a layered configuration hierarchy.
+The system SHALL compute three monotonically increasing context watermarks (`soft` / Notice, `warning` / Recommend, and `forced` / Hard Cutoff) against the active model's `contextWindow`, supporting both percentage strings and token count strings across a layered configuration hierarchy. The concrete values SHALL come exclusively from configuration; this specification defines how they are read, parsed, clamped and validated, never what they are.
 
-#### Scenario: Default percentage watermarks on a 1M context window
-- **WHEN** no CLI flags or project overrides are provided and the active model has `contextWindow = 1,000,000`
-- **THEN** the extension SHALL load defaults from `.pi/managed/self-compact.json` (`softAt: "10%"`, `at: "20%"`, `buffer: "10%"`)
-- **THEN** it SHALL resolve `soft = 100,000` tokens (`10%`), `warning = 200,000` tokens (`20%`), and `forced = 300,000` tokens (`30%`)
+#### Scenario: Watermarks resolve from configuration, not from this specification
+- **WHEN** no CLI flags or project overrides are provided and the active model has `contextWindow = W`
+- **THEN** the extension SHALL read `softAt`, `at`, `buffer` and `hardCeilingPercent` from `.pi/managed/self-compact.json` and treat them as the default tier specification
+- **THEN** a percentage spec `P%` SHALL resolve to `Math.floor(W * P / 100)` tokens, and a bare token spec SHALL resolve to its literal value unchanged
+- **THEN** `forced` SHALL resolve to `Math.min(at + buffer, hardCap)` where `hardCap = Math.floor(W * hardCeilingPercent / 100)`
+- **THEN** the resolved watermark values SHALL be reported by `view_context` and the status bar, and SHALL NOT be asserted as literals in this specification
 
 #### Scenario: Hard ceiling clamp and ordering validation
-- **WHEN** `at + buffer` exceeds `90%` of `contextWindow`
-- **THEN** `forced` SHALL be clamped to `Math.floor(contextWindow * 0.90)`
+- **WHEN** `at + buffer` exceeds the configured `hardCeilingPercent` of `contextWindow`
+- **THEN** `forced` SHALL be clamped to `Math.floor(contextWindow * hardCeilingPercent / 100)`
 - **WHEN** `soft > warning` or `warning >= forced`
 - **THEN** threshold calculation SHALL throw a descriptive configuration error
 
@@ -78,7 +78,7 @@ The system SHALL evaluate whether the agent is at a natural task boundary on `tu
 
 ### Requirement: Three-Tier Enforcement and Forced Tool Lock
 
-The system SHALL enforce a hard tool execution lock once context usage reaches or exceeds `forced` (default `30%`) and compaction material exists.
+The system SHALL enforce a hard tool execution lock once context usage reaches or exceeds the configured `forced` watermark and compaction material exists.
 
 #### Scenario: Forced threshold blocks non-compaction tools
 - **WHEN** `usedTokens >= forced` and `hasCompactionMaterial` is `true` (or a `self_compact` handoff is already locked/pending)
@@ -88,8 +88,6 @@ The system SHALL enforce a hard tool execution lock once context usage reaches o
 #### Scenario: Parallel tool call batch mixed with self_compact is rejected
 - **WHEN** the agent emits a single assistant message containing `self_compact` alongside any other tool call (e.g., `bash` or `edit`)
 - **THEN** the `tool_call` hook SHALL block every tool call in that assistant message (including `self_compact`) and require `self_compact` to be called alone in the next turn
-
----
 
 ### Requirement: Dual Tool Contract (`view_context` and `self_compact`)
 
@@ -182,3 +180,4 @@ The system SHALL register `self-compact` and its managed configuration in `.pi/c
 - **THEN** `global.extensions` SHALL include `self-compact`
 - **THEN** `global.files` SHALL include `self-compact.json: managed/self-compact.json`
 - **THEN** `global.env` SHALL include a `self-compact` entry declaring `TYPESAFE_API_KEY` (`required: false`, with fallback note for `OPENROUTER_API_KEY`)
+

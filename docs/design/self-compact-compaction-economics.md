@@ -158,6 +158,6 @@ cacheWrite        0
 
 前两项改动扩展代码（`handoff.ts` / `index.ts` 的 schema 与 `note` 处理），第三项改 `customInstructions`，均需单测与真机复测。
 
-## 7. 已知漂移
+## 7. 相关 spec 已同步
 
-`openspec/specs/self-compact/spec.md` 仍写着默认值 `softAt: "10%"` / `at: "20%"` / `buffer: "10%"` 与对应 token 数（第 5、31–32 行）。水位调整后该表述与实际配置不一致，需要通过 OpenSpec 工作流更新，而非手工改主 spec。
+`openspec/specs/self-compact/spec.md` 原先在 Purpose 段与两个 Requirement 里硬编码了 `softAt: "10%"` / `at: "20%"` / `buffer: "10%"` 及对应 token 数，与本配置落地后的实际取值直接矛盾。该问题已通过 OpenSpec change `2026-11-12-self-compact-watermark-config-agnostic` 修正：spec 现在只约束「如何读取、如何解析、如何夹取、如何校验」，所有具体数值归配置所有。
