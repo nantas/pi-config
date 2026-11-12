@@ -11,6 +11,7 @@
 
 import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
+import { Container, Text } from "@earendil-works/pi-tui";
 import {
   SettingsManager,
   findCutPoint,
@@ -908,29 +909,25 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   }
 
   // ----------------------------------------------------------- renderers
-
-  pi.registerMessageRenderer(HANDOFF_TYPE, (message, options, theme) => {
-    const details = message.details as { cycle?: number; card?: string } | undefined;
-    const card = details?.card ?? (typeof message.content === "string" ? message.content : "");
-    return {
-      render: () => [
-        theme.fg("success", theme.bold(`self-compact · handoff · cycle ${details?.cycle ?? "?"}`)),
-        theme.fg("text", card),
-      ],
-    } as never;
-  });
+  //
+  // A message/entry renderer must return a TUI `Component` — `render(width)` plus `invalidate()`.
+  // Returning a hand-rolled `{ render: () => string[] }` made the layout reserve the wrong height
+  // (the multi-line card counted as a single row) and skip invalidation, which left stale
+  // fragments of the card on screen above the editor. The handoff card now uses Pi's default
+  // rendering, which draws the card as Markdown in a labelled box.
 
   pi.registerEntryRenderer(PHASE_ENTRY_TYPE, (entry, _options, theme) => {
     const data = entry.data as { level?: CompactTier; text?: string } | undefined;
-    return { render: () => [theme.fg("dim", data?.text ?? "self-compact")] } as never;
+    return new Text(theme.fg("dim", data?.text ?? "self-compact"), 0, 0) as never;
   });
 
   pi.registerEntryRenderer(INFO_ENTRY_TYPE, (entry, _options, theme) => {
     const lines = (entry.data as { lines?: string[] } | undefined)?.lines ?? [];
     const [title, ...rest] = lines;
-    return {
-      render: () => [theme.fg("accent", theme.bold(title ?? "self-compact")), ...rest.map((line) => theme.fg("text", line))],
-    } as never;
+    const box = new Container();
+    box.addChild(new Text(theme.fg("accent", theme.bold(title ?? "self-compact")), 0, 0));
+    for (const line of rest) box.addChild(new Text(theme.fg("text", line), 0, 0));
+    return box as never;
   });
 
   function note(ctx: ExtensionContext, text: string, kind: "info" | "warning" | "error") {
