@@ -101,7 +101,7 @@ cat .pi/settings.json
 
 #### `self-compact`
 
-- **描述**: 让长会话 agent 自己管理上下文窗口。三档纯百分比水位线（`softAt 10%` / `at 20%` / `buffer 10%` → forced 30%，硬上限 90%）只负责提醒；真正压缩由 agent 在自然边界调用 `self_compact`，写出由 `goal / done / in_progress / decisions / preserved_refs / next_action` 六个字段组成的 Handoff 卡片，卡片替代原上下文，agent 从自己的笔记继续。`view_context` 提供上下文水位与边界检查。边界判定交给 TypeSafe System One（Jev）的四问模型，`mid_operation > 0.6` 时保持沉默，并把切割点写进 Pi 的压缩 prompt；Jev 不可用或超时时降级为纯百分比判定。
+- **描述**: 让长会话 agent 自己管理上下文窗口。三档纯百分比水位线（`softAt 70%` / `at 75%` / `buffer 5%` → forced 80%，硬上限 90%）只负责提醒；真正压缩由 agent 在自然边界调用 `self_compact`，写出由 `goal / done / in_progress / decisions / preserved_refs / next_action` 六个字段组成的 Handoff 卡片，卡片替代原上下文，agent 从自己的笔记继续。`view_context` 提供上下文水位与边界检查。边界判定交给 TypeSafe System One（Jev）的四问模型，`mid_operation > 0.6` 时保持沉默，并把切割点写进 Pi 的压缩 prompt；Jev 不可用或超时时降级为纯百分比判定。
 - **解决的问题**: 固定阈值触发的自动压缩会在操作中途切断 agent，用摘要模型猜测丢失了什么；由 agent 自己在边界写交接卡，保留的是它自己认定必须留下的信息。
 - **源文件**: `.pi/extensions/self-compact/`（`index.ts` + `thresholds.ts` / `boundary-gate.ts` / `jev-client.ts` / `handoff.ts` / `state.ts` / `context-bar.ts`）
 - **配置**: 优先级 CLI flags（`--self-compact-soft` / `-at` / `-buffer` / `-prompt`）> `<cwd>/.pi/self-compact.json` > `~/.pi/agent/self-compact.json` > `.pi/managed/self-compact.json` > 内置默认
