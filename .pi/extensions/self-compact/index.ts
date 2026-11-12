@@ -64,6 +64,7 @@ import {
   handoffInFlight,
   hasCompactionMaterial,
   initialState,
+  isStaleLock,
   recoverState,
   shouldBlockTools,
   toStateEntry,
@@ -92,6 +93,9 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
     retryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
     config: undefined as SelfCompactConfig | undefined,
     thresholds: undefined as ResolvedThresholds | undefined,
+    // Set while the model is being switched: the last usage snapshot still belongs to the previous
+    // model, so any watermark read now would compare old tokens against a new window.
+    staleUsage: false,
     usage: { usedTokens: 0, cachedTokens: 0, window: 0, percent: 0 } as UsageSnapshot,
     level: "idle" as UsageLevel,
     decision: undefined as BoundaryDecision | undefined,
@@ -183,6 +187,10 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
       windowFallback: ctx.model?.contextWindow,
     });
     R.usage = usage;
+    if (R.staleUsage) {
+      // Deferred measurement: keep the previous tier and lock untouched until a real turn runs.
+      return { material: false, state: extractCompactState(entries as never, { toolsThisTurn: R.toolsThisTurn }) };
+    }
     if (!R.thresholds || R.thresholds.contextWindow !== usage.window) resolveThresholds(ctx);
     const t = R.thresholds;
     const watermark = t ? checkThresholds(usage.usedTokens, t) : "idle";
@@ -191,6 +199,8 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
     // A newer, higher crossing invalidates the old boundary read.
     if (R.level !== previous) R.decision = undefined;
     const material = hasCompactionMaterial(entries as never, keepRecentTokens(ctx), { findCutPoint });
+    // A lock only holds while usage is actually at the forced tier or a handoff is still owed.
+    if (isStaleLock(R.state, R.level, R.compacting)) unlock(ctx);
     // Re-arm only after usage actually falls back below the forced tier.
     if (R.level !== "forced") R.forceArmed = true;
     if (R.level === "forced" && R.forceArmed && material && !handoffInFlight(R.state)) lock(ctx);
@@ -629,6 +639,7 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
     R.compacting = false;
     R.delivering = false;
     R.level = "idle";
+    R.staleUsage = false;
     R.retryPending = undefined;
     R.toolsThisTurn = [];
     R.noticedLevel = "idle";
@@ -675,12 +686,19 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   });
 
   pi.on("model_select", async (_event, ctx) => {
+    // Cycling `enabledModels` with the model shortcut fires this several times a second. The usage
+    // numbers still describe the previous model, so measuring here reads an old percentage against
+    // a new window and can lock the session on a phantom crossing. Drop the cached watermarks and
+    // wait for a real user message (`turn_start`) before measuring again.
+    R.thresholds = undefined;
+    R.staleUsage = true;
     resolveThresholds(ctx);
-    trackLevel(ctx);
   });
 
   pi.on("turn_start", async () => {
     R.toolsThisTurn = [];
+    // A real prompt is the first trustworthy measurement point after a model switch.
+    R.staleUsage = false;
   });
 
   /**
@@ -762,7 +780,8 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
       R.level = maxLevel(R.level, "forced");
       return { cancel: true };
     }
-    if (handoffInFlight(R.state)) {
+    if (handoffInFlight(R.state) && R.state.phase !== "compacting") {
+      // `startCompaction` already persisted this phase; only an external /compact lands here.
       R.state = { ...R.state, phase: "compacting", locked: true };
       save(ctx);
     }

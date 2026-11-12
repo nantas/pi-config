@@ -136,6 +136,17 @@ export function shouldBlockTools(state: PersistedState, level: string, hasMateri
   return state.locked || (level === "forced" && hasMaterial);
 }
 
+/**
+ * A lock is only valid while usage is at the forced tier or a handoff is still owed. Anything else
+ * is stale — most often a lock taken under a smaller context window before a model switch — and
+ * would block every tool forever with no card left to deliver.
+ */
+export function isStaleLock(state: PersistedState, level: string, compacting: boolean): boolean {
+  if (!state.locked || compacting) return false;
+  if (level === "forced") return false;
+  return !handoffInFlight(state);
+}
+
 export type RecoveryAction = "none" | "deliver" | "resume" | "retry" | "abandon" | "unlock";
 
 export interface RecoveryResult {

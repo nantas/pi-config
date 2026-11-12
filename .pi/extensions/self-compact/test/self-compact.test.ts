@@ -45,6 +45,7 @@ import {
   handoffInFlight,
   hasCompactionMaterial,
   initialState,
+  isStaleLock,
   recoverState,
   shouldBlockTools,
   unlocked,
@@ -676,6 +677,27 @@ describe("delivery transition", () => {
 
   it("never blocks tools for forced usage when nothing is compactable", () => {
     assert.equal(shouldBlockTools(initialState(), "forced", false), false);
+  });
+
+  // Regression: a lock taken under a smaller context window (or before a model switch) survived,
+  // because the level never reached forced again and no handoff existed to finish the cycle. Every
+  // tool stayed blocked at a low percentage, with no card left to deliver.
+  it("releases a stale lock once usage falls back below the forced tier", () => {
+    const stale = { ...initialState(), phase: "pending" as const, locked: true };
+    assert.equal(isStaleLock(stale, "notice", false), true);
+    assert.equal(isStaleLock(stale, "idle", false), true);
+    assert.equal(shouldBlockTools(stale, "idle", true), true, "a stale lock still blocks until released");
+    const released = unlocked(stale);
+    assert.equal(isStaleLock(released, "idle", false), false);
+    assert.equal(shouldBlockTools(released, "idle", true), false);
+  });
+
+  it("keeps a lock that is still doing work", () => {
+    const forced = { ...initialState(), phase: "pending" as const, locked: true };
+    assert.equal(isStaleLock(forced, "forced", false), false, "at the forced tier the lock is live");
+    assert.equal(isStaleLock(forced, "idle", true), false, "never release mid-compaction");
+    assert.equal(isStaleLock({ ...forced, handoff }, "idle", false), false, "an owed card keeps the lock");
+    assert.equal(isStaleLock(initialState(), "idle", false), false);
   });
 
   it("blocks ordinary tools while a handoff is in flight even below the forced tier", () => {
