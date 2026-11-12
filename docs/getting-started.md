@@ -103,7 +103,7 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 4 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree` |
+| **扩展** | 5 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree`、`self-compact` |
 | **Agent** | 8 | `unity-worker`、`scout`、`worker`、`context-builder`、`oracle`、`planner`、`researcher`、`reviewer` |
 | **技能** | 4 | `install-from-pi-config`、`notion`、`x-reach`、`worktrunk-isolation` |
 | **共享层技能** | 1 | `agent-reach`（经 `global.shared_skills` 同步到 `~/.agents/skills/`，跨 harness 共用） |
@@ -144,6 +144,10 @@ pi login <provider>
 4. **环境变量（与 `pi-fff` 包相关）**
    - `pi-fff` 需要 `FFF_FRECENCY_DB`、`FFF_HISTORY_DB`（LMDB 数据库路径）、`PI_FFF_MODE=tools-only`
    - **关键**：`PI_FFF_MODE=tools-only` 禁用 `FffEditor`（@-mention 自动补全），专门规避与 `pi-powerline` 的 `setEditorComponent` 冲突；若移除 `pi-powerline`，可放开 `FffEditor`
+
+5. **环境变量（与 `self-compact` 扩展相关，可选）**
+   - `TYPESAFE_API_KEY`（优先）或 `OPENROUTER_API_KEY`：启用 Jev System One 边界判定与切割点选择
+   - 两者都未设置时，扩展仍工作，只是降级为纯百分比水位线判定（可能打断进行中的操作）
 
 如需调整，请修改 `.pi/capabilities.yaml` 或 `.pi/settings.json`，然后继续下一步。
 

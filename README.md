@@ -99,6 +99,15 @@ cat .pi/settings.json
 - **解决的问题**: 长 session 中难以追踪工具调用频率和模式，本扩展提供直观的工具使用统计。
 - **源文件**: `.pi/extensions/tool-counter-widget.ts`
 
+#### `self-compact`
+
+- **描述**: 让长会话 agent 自己管理上下文窗口。三档纯百分比水位线（`softAt 10%` / `at 20%` / `buffer 10%` → forced 30%，硬上限 90%）只负责提醒；真正压缩由 agent 在自然边界调用 `self_compact`，写出由 `goal / done / in_progress / decisions / preserved_refs / next_action` 六个字段组成的 Handoff 卡片，卡片替代原上下文，agent 从自己的笔记继续。`view_context` 提供上下文水位与边界检查。边界判定交给 TypeSafe System One（Jev）的四问模型，`mid_operation > 0.6` 时保持沉默，并把切割点写进 Pi 的压缩 prompt；Jev 不可用或超时时降级为纯百分比判定。
+- **解决的问题**: 固定阈值触发的自动压缩会在操作中途切断 agent，用摘要模型猜测丢失了什么；由 agent 自己在边界写交接卡，保留的是它自己认定必须留下的信息。
+- **源文件**: `.pi/extensions/self-compact/`（`index.ts` + `thresholds.ts` / `boundary-gate.ts` / `jev-client.ts` / `handoff.ts` / `state.ts` / `context-bar.ts`）
+- **配置**: 优先级 CLI flags（`--self-compact-soft` / `-at` / `-buffer` / `-prompt`）> `<cwd>/.pi/self-compact.json` > `~/.pi/agent/self-compact.json` > `.pi/managed/self-compact.json` > 内置默认
+- **环境变量**: `TYPESAFE_API_KEY`（优先）或 `OPENROUTER_API_KEY`，二者皆无时只做百分比判定
+- **OpenSpec Spec**: `openspec/changes/self-compact-extension/specs/self-compact/spec.md`
+
 #### `add-provider`
 
 - **描述**: 提供 `/add-provider` 命令，交互式添加自定义模型供应商到 `models.json`，支持输入 base URL、API key、模型列表等。

@@ -68,6 +68,9 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 **代码检索**：
 使用 fff（`ffgrep`/`fffind`）做 frecency 排序的文本搜索，替代 LSP 级别的代码智能。
 
+**上下文压缩与交接**：
+由 SoL-Pi 负责大工具输出句柄化与长日志缩减，自压缩扩展结合 Jev 语义门控管理任务边界压缩与结构化交接续跑。
+
 ---
 
 ## OpenSpec 索引
@@ -103,6 +106,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | / 技能过滤 | `slash-skill-filter` |
 | 添加供应商 | 见 extensions `add-provider.ts` |
 | Wikilink 批量替换 | `wikilink-batch-replace` |
+| 自压缩、交接卡片、Jev 边界门控 | `self-compact` |
 | X 检索、Twitter 检索、twscrape | `x-reach-skill` |
 | Fusion harness 多模型编排 | `fusion-harness-integration`, `capability-manifest` |
 

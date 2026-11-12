@@ -1,0 +1,13 @@
+{
+  "softAt": "10%",
+  "at": "20%",
+  "buffer": "10%",
+  "hardCeilingPercent": 90,
+  "jev": {
+    "enabled": true,
+    "provider": "auto",
+    "timeoutMs": 5000,
+    "cutPointTimeoutMs": 8000,
+    "minCutPointConfidence": 0.5
+  }
+}

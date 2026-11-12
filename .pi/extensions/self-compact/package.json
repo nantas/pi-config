@@ -1,0 +1,12 @@
+{
+  "name": "self-compact",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-compact extension: watermark gating plus an agent-authored six-field handoff that replaces live context",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
