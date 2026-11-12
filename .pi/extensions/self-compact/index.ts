@@ -86,8 +86,10 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   globals[GUARD] = true;
 
   const R = {
-    alive: false,
+    alive: true,
     epoch: 0,
+    deliveryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+    retryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
     config: undefined as SelfCompactConfig | undefined,
     thresholds: undefined as ResolvedThresholds | undefined,
     usage: { usedTokens: 0, cachedTokens: 0, window: 0, percent: 0 } as UsageSnapshot,
@@ -308,6 +310,37 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
     return renderTemplate(SUMMARY_INSTRUCTIONS, { cutPoint: R.cutPoint?.instructions ?? "" }) + extra;
   }
 
+  function clearTimers() {
+    if (R.deliveryTimer) {
+      clearTimeout(R.deliveryTimer);
+      R.deliveryTimer = undefined;
+    }
+    if (R.retryTimer) {
+      clearTimeout(R.retryTimer);
+      R.retryTimer = undefined;
+    }
+  }
+
+  function scheduleDelivery(fn: () => void, delayMs = 25) {
+    if (R.deliveryTimer || !R.alive) return;
+    const epoch = R.epoch;
+    R.deliveryTimer = setTimeout(() => {
+      R.deliveryTimer = undefined;
+      if (R.alive && R.epoch === epoch) fn();
+    }, delayMs);
+  }
+
+  function scheduleRetry(ctx: ExtensionContext, delayMs = 2_000) {
+    if (R.retryTimer || !R.alive) return;
+    const epoch = R.epoch;
+    R.retryTimer = setTimeout(() => {
+      R.retryTimer = undefined;
+      if (R.alive && R.epoch === epoch && R.state.phase === "pending" && ctx.isIdle()) {
+        startCompaction(ctx, `auto-retry ${(R.state.handoff?.attempts ?? 0) + 1}`);
+      }
+    }, delayMs);
+  }
+
   function startCompaction(ctx: ExtensionContext, reason: string) {
     if (R.compacting) return;
     const handoff = R.state.handoff;
@@ -328,6 +361,10 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
     try {
       ctx.compact({
         customInstructions: customInstructions(),
+        onComplete: () => {
+          R.compacting = false;
+          void deliverHandoff(ctx);
+        },
         onError: (error) => {
           // Counting happens in session_compact_failed, which always fires; keep this to logging so
           // one failure never consumes two retries.
@@ -348,8 +385,21 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
 
   async function deliverHandoff(ctx: ExtensionContext) {
     const handoff = R.state.handoff;
-    if (!handoff || R.delivering) return;
+    if (!R.alive || !handoff || R.delivering) return;
     if (R.state.phase !== "ready") return;
+    if (!ctx.isIdle()) {
+      // Inside `session_compact`, Pi's `AgentSession.compact()` has not called
+      // `_clearManualCompactionState()` yet, so `ctx.isIdle()` is `false` and `compaction_end`
+      // has not finished updating the TUI. Defer delivery until `ctx.isIdle()` turns true.
+      scheduleDelivery(() => {
+        void deliverHandoff(ctx);
+      });
+      return;
+    }
+    if (R.deliveryTimer) {
+      clearTimeout(R.deliveryTimer);
+      R.deliveryTimer = undefined;
+    }
     R.delivering = true;
     try {
       pi.sendMessage(
@@ -370,7 +420,18 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   /** After an interruption the card is already in the transcript; wake the agent with a one-liner. */
   async function resumeHandoff(ctx: ExtensionContext) {
     const handoff = R.state.handoff;
-    if (!handoff || R.delivering) return;
+    if (!R.alive || !handoff || R.delivering) return;
+    if (R.state.phase !== "ready") return;
+    if (!ctx.isIdle()) {
+      scheduleDelivery(() => {
+        void resumeHandoff(ctx);
+      });
+      return;
+    }
+    if (R.deliveryTimer) {
+      clearTimeout(R.deliveryTimer);
+      R.deliveryTimer = undefined;
+    }
     R.delivering = true;
     try {
       pi.sendMessage(
@@ -562,6 +623,7 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   // -------------------------------------------------------------- events
 
   const recover = (ctx: ExtensionContext, reason: string) => {
+    clearTimers();
     R.alive = true;
     R.epoch += 1;
     R.compacting = false;
@@ -606,8 +668,10 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
+    clearTimers();
     R.alive = false;
     R.epoch += 1;
+    delete globals[GUARD];
   });
 
   pi.on("model_select", async (_event, ctx) => {
@@ -679,8 +743,7 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
 
   pi.on("agent_settled", async (_event, ctx) => {
     if (!R.alive) return;
-    const tracked = trackLevel(ctx);
-    if (!tracked.material && R.state.phase === "pending") return;
+    trackLevel(ctx);
     if (!ctx.isIdle()) return;
     if (R.state.phase === "pending" || R.state.phase === "compacting") {
       startCompaction(ctx, R.state.phase === "pending" ? "agent idle" : "resuming compaction");
@@ -699,7 +762,7 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
       R.level = maxLevel(R.level, "forced");
       return { cancel: true };
     }
-    if (R.state.handoff) {
+    if (handoffInFlight(R.state)) {
       R.state = { ...R.state, phase: "compacting", locked: true };
       save(ctx);
     }
@@ -708,16 +771,19 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
 
   pi.on("session_compact", async (event, ctx) => {
     R.compacting = false;
-    if (R.state.handoff) {
+    if (handoffInFlight(R.state)) {
       R.state = { ...R.state, phase: "ready", locked: true };
       save(ctx);
+      await deliverHandoff(ctx);
+    } else if (R.state.locked) {
+      unlock(ctx);
     }
-    if (ctx.isIdle()) await deliverHandoff(ctx);
     void event;
   });
 
   pi.on("session_compact_failed", async (event, ctx) => {
     R.compacting = false;
+    if (!handoffInFlight(R.state)) return;
     const attempts = (R.state.handoff?.attempts ?? 0) + 1;
     const exhausted = attempts >= MAX_RETRIES;
     R.state = {
@@ -737,6 +803,9 @@ export default function selfCompactExtension(pi: ExtensionAPI) {
         : `self-compact: compaction failed (${R.state.error}). Retry ${attempts}/${MAX_RETRIES}.`,
       "error",
     );
+    if (!exhausted && !event.aborted) {
+      scheduleRetry(ctx, 2_000 * attempts);
+    }
   });
 
   function forcedValues() {
