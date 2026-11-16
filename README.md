@@ -249,6 +249,7 @@ export POWERLINE_NERD_FONTS=1
 - **解决的问题**: AI Studio API key 不能使用 Google AI Pro 的 Antigravity 额度；个人版 Gemini CLI 的 Login with Google 已关闭。
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages`
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
+- **本地临时补丁（2026-11-16，待上游合并后回退）**: 上游 0.14.0 在消费端把 Pi 默认 system prompt 放进 `systemInstruction` 会被后端以裸 `429 RESOURCE_EXHAUSTED` 拒绝，并被误报为“模型不可用/配额耗尽”（上游 issue #152、#148 均 OPEN，PR #153 未合）。已把 PR #153 打到本地 clone `~/.pi/agent/git/github.com/Rahularya01/pi-antigravity`：`relocateSystemPrompt()` 将 prompt 前插到第一条 user turn 的 `[Operating instructions]` 块，systemInstruction 只留一行短句；实测 `gemini-4-hydrogen`、`gemini-3.8-flash` 在默认 prompt 下恢复 200。代价：system prompt 优先级下降；可用 `ANTIGRAVITY_PROMPT_GUARD=off` 关闭。回退：`git checkout -- package.json tsconfig.json src/stream/stream.ts && rm scripts/test-prompt-guard.ts`（该包 `main` 直指 `src/index.ts`，无构建步骤）。
 
 #### 模型提供方配置（`global.models`）
 
