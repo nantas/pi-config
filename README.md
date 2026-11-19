@@ -242,15 +242,6 @@ export POWERLINE_NERD_FONTS=1
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.files`（配置文件 `.pi/managed/sol-pi.json` 同步到 `~/.pi/agent/sol-pi.json`）
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
-#### `pi-antigravity`
-
-- **来源**: `git:github.com/Rahularya01/pi-antigravity`
-- **描述**: 用 Google 账号 OAuth 接入 Antigravity 订阅额度。登录后动态发现 Gemini 模型（含 Gemini 4 Argon），并提供用量、账号切换和目录刷新。
-- **解决的问题**: AI Studio API key 不能使用 Google AI Pro 的 Antigravity 额度；个人版 Gemini CLI 的 Login with Google 已关闭。
-- **引用**: `.pi/capabilities.yaml` → `global.settings.packages`
-- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
-- **本地临时补丁（2026-11-16，待上游合并后回退）**: 上游 0.14.0 在消费端把 Pi 默认 system prompt 放进 `systemInstruction` 会被后端以裸 `429 RESOURCE_EXHAUSTED` 拒绝，并被误报为“模型不可用/配额耗尽”（上游 issue #152、#148 均 OPEN，PR #153 未合）。已把 PR #153 打到本地 clone `~/.pi/agent/git/github.com/Rahularya01/pi-antigravity`：`relocateSystemPrompt()` 将 prompt 前插到第一条 user turn 的 `[Operating instructions]` 块，systemInstruction 只留一行短句；实测 `gemini-4-hydrogen`、`gemini-3.8-flash` 在默认 prompt 下恢复 200。代价：system prompt 优先级下降；可用 `ANTIGRAVITY_PROMPT_GUARD=off` 关闭。重贴（clone 被重置或换机后）：`git fetch origin pull/153/head:pr153 && git checkout pr153 -- package.json tsconfig.json src/stream/stream.ts scripts/`（得到未暂存的工作区改动，不提交）。回退：`git checkout -- package.json tsconfig.json src/stream/stream.ts scripts/ && rm scripts/test-prompt-guard.ts`（PR #153 还附带修正 3 个既有测试脚本 `scripts/test-enterprise-and-capacity.ts`、`test-stream-header-deadline.ts`、`test-stream-recovery.ts`；本地留有 `pr153` 分支供对比）（该包 `main` 直指 `src/index.ts`，无构建步骤）。
-
 #### 模型提供方配置（`global.models`）
 
 - **描述**: 跨设备共享的自定义 provider 声明。`capabilities.yaml` 通过 `global.models` 段声明：**manifest 中声明的 provider 为权威（整体替换目标端同名 provider），未声明的 provider（如本机私有配置）从目标端原样保留**。`apiKey` 必须引用环境变量（如 `$DEEPSEEK_API_KEY`），禁止提交明文密钥。

@@ -80,23 +80,28 @@ global:
       - git:github.com/DietrichGebert/ponytail
       - npm:pi-codex-image-gen
       - git:github.com/NVlabs/SoL-Pi
-      - git:github.com/Rahularya01/pi-antigravity
     defaultThinkingLevel: high
-    defaultProvider: deepseek
-    defaultModel: deepseek-flash
+    defaultProvider: magpie
+    defaultModel: deepseek/deepseek-flash
     # Restrict Ctrl+P (/model) switching scope. Exact IDs match exactly.
-    # teamorouter* providers are local-only in ~/.pi/agent/models.json; sync preserves them.
+    # teamorouter* and magpie providers are local-only in ~/.pi/agent/models.json; sync preserves them.
     enabledModels:
       - zai-coding-cn/glm-5.3
       - xai/grok-4.7
       - deepseek/deepseek-flash
       - kimi-coding/k3.1-pro
-      - antigravity/gemini-4-argon
-      - antigravity/gemini-4-hydrogen
       - teamorouter-claude/claude-opus-5-5
       - teamorouter-claude/claude-sonnet-5-5
       - teamorouter-claude/claude-fable-5-2
       - teamorouter/gpt-6-astra
+      - deepseek/deepseek-v4-pro
+      - magpie/deepseek/deepseek-flash
+      - magpie/remote-srv2171655/claude/claude-opus-5-5
+      - magpie/remote-srv2171655/claude/claude-sonnet-5-5
+      - magpie/remote-srv2171655/claude/claude-haiku-5-5
+      - magpie/teamorouter-claude/claude-fable-5-2
+      - magpie/grok/grok-4.7
+      - magpie/agy-cli/gemini-4-argon
 
   # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
   # Manifest-declared providers are authoritative (replaced wholesale);

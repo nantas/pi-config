@@ -3,6 +3,22 @@
 This file records packages that have been researched but not added to the global Pi configuration.
 Entries are ordered newest first.
 
+### 2026-11-19 — pi-antigravity 移除
+
+- **Version:** 0.14.0（无版本 pin，本地含 PR #153 补丁）
+- **Research Date:** 2026-11-19
+- **Resource Types:** extensions（provider `antigravity` + google-search + generate-image）
+- **Decision:** removed（从 global 移除，不再使用）
+- **Source Type:** git-package
+- **Source Repo:** https://github.com/Rahularya01/pi-antigravity
+- **Install Method:** pi-install（历史安装，本次移除）
+- **Has Dependencies:** true
+- **Reason:** 已改用本地 `magpie/agy-cli` 供应商调用 Gemini 模型，不再需要通过 `pi-antigravity` OAuth 接入，也不再需要本地 PR #153 `relocateSystemPrompt()` 临时补丁。
+- **Notes:**
+  1. 从 `.pi/capabilities.yaml` 移除 `git:github.com/Rahularya01/pi-antigravity` 及 `antigravity/*` allowlist 条目，并将当前 `magpie`/`agy-cli` 模型配置纳入 manifest
+  2. 移除 README.md 中的 `pi-antigravity` 条目与 PR #153 本地补丁记录；更新 `docs/getting-started.md`（外部包 12 → 11）
+  3. 同步全局后清理 `~/.pi/agent/git/github.com/Rahularya01/pi-antigravity` 本地克隆（含补丁文件）及 `settings.json` 中 `extensionChangelogVersions` 的 `pi-antigravity` 残留键
+
 ### 2026-11-11 — pi-antigravity
 
 - **Version:** 0.12.0（无版本 pin）
