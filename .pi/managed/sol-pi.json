@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "actionFusion": true,
-  "observationPack": true,
-  "evidencePreservingReducer": true,
+  "actionFusion": false,
+  "observationPack": false,
+  "evidencePreservingReducer": false,
   "evidencePreservingReducerProvider": "zai-coding-cn",
   "evidencePreservingReducerModel": "glm-5.3",
   "onlineContextCompact": false,
