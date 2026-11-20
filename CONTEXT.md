@@ -108,7 +108,6 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | Wikilink 批量替换 | `wikilink-batch-replace` |
 | 自压缩、交接卡片、Jev 边界门控 | `self-compact` |
 | X 检索、Twitter 检索、twscrape | `x-reach-skill` |
-| Fusion harness 多模型编排 | `fusion-harness-integration`, `capability-manifest` |
 
 ### 包管理
 

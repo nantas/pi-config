@@ -51,6 +51,7 @@ Entries are ordered newest first.
   1. 同步移除 manifest `global.settings.fusionHarness`（architect/builder 模型配置）
   2. sync 脚本保留 manifest 未声明的目标键，全局 `~/.pi/agent/settings.json` 残留 `fusionHarness` 键已手动清理
   3. README/getting-started 能力清单同步更新（外部包 12 → 11）
+  4. 2026-11-20 全清（change `retire-fusion-harness`）：删除仓库与本机 `fusionHarness` 配置块、`~/.pi/agent/git/github.com/nantas/fusion-harness`（8.3M）与 `.scratch/fusion-harness` 产物；移除 `fusion-harness-integration` 与 `capability-manifest` 中的 fusion 专属 requirement；`forks/manifest.yaml` 条目标 `archived`；`CONTEXT.md` 索引移除。恢复仍按 Reason 中的步骤执行。
 
 ### 2026-10-12 — pi-ask (jwu fork)
 

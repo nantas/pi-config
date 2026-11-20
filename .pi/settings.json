@@ -4,12 +4,5 @@
   "lastChangelogVersion": "0.78.0",
   "hideThinkingBlock": false,
   "powerline": true,
-  "breadcrumb": "inner",
-  "fusionHarness": {
-    "architect": "kimi-coding/k3.1-pro",
-    "builder": "xai/grok-4.7",
-    "architectThinking": "high",
-    "builderThinking": "high",
-    "childExtensions": []
-  }
+  "breadcrumb": "inner"
 }
