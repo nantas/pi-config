@@ -270,6 +270,8 @@ with open(manifest_path, "r", encoding="utf-8") as f:
     manifest = yaml.safe_load(f)
 
 manifest_models = (manifest.get("global") or {}).get("models") or {}
+if not manifest_models:
+    raise SystemExit(0)
 
 result = {"providers": {}}
 
@@ -297,6 +299,7 @@ with open(tmp_path, "w", encoding="utf-8") as f:
     json.dump(result, f, indent=2)
     f.write("\n")
 os.replace(tmp_path, target_path)
+print("  Synced models.json (generated from manifest global.models)")
 PYEOF
 }
 
@@ -816,13 +819,10 @@ echo "  Synced settings.json (generated from manifest)"
 
 # 2b. Sync models.json with manifest filtering
 #     (manifest global.models providers authoritative, unlisted providers preserved)
-echo ""
-echo "--- Syncing models.json ---"
 (
   export TARGET_PATH="${TARGET_PATH%settings.json}models.json"
   render_models_file "${TARGET_PATH}"
 )
-echo "  Synced models.json (generated from manifest global.models)"
 
 # 2c. Sync managed config files (global.files, wholesale replace)
 echo ""

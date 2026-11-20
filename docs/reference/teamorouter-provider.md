@@ -16,7 +16,7 @@ OpenAI 兼容 provider 关闭了 `store`、`developer` role 和 `strict`，并�
 
 1. 在启动 Pi 的 shell 里设置 `TEAMOROUTER_API_KEY`。变量缺失时，Pi 把这些模型当成未鉴权，Ctrl+P 里不会出现。
 2. 把下面的两个 provider 合并进 `~/.pi/agent/models.json` 的 `providers`。不要覆盖已有的 `deepseek` 等 provider。
-3. 要在 Ctrl+P 里出现，把 `provider/id` 写进 `.pi/capabilities.yaml` 的 `global.settings.enabledModels`，再运行 `scripts/sync-pi-agent.sh`。只改本机 `settings.json` 会被下次同步覆盖。白名单以 `capabilities.yaml` 为准，本模板不代表当前启用范围。
+3. 如果本机 `~/.pi/agent/settings.json` 已设置切换范围，可在其中添加所需的 `provider/id`。使用 Magpie 时，可在 Magpie 内管理 Pi 的模型可见范围。
 4. 新开一个 Pi。`/model` 会重新读取 `models.json`，但 `enabledModels` 要重启才生效。
 
 模型 ID 来自 [TeamoRouter OpenCode 安装文档](https://teamorouter.com/docs/install-opencode) 的聊天目录，不含图像模型。目录会变，以带 key 的 `GET https://api.teamorouter.com/v1/models` 为准。

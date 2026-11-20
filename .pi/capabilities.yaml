@@ -20,15 +20,9 @@ global:
 
   # Agents synced to ~/.pi/agent/agents/
   agents:
-    - unity-worker
-    - scout
     - worker
-    - context-builder
-    - oracle
-    - planner
     - researcher
     - reviewer
-    - image-reader
 
   # Skills synced to ~/.pi/agent/skills/
   skills:
@@ -81,79 +75,6 @@ global:
       - npm:pi-codex-image-gen
       - git:github.com/NVlabs/SoL-Pi
     defaultThinkingLevel: high
-    defaultProvider: magpie
-    defaultModel: deepseek/deepseek-flash
-    # Restrict Ctrl+P (/model) switching scope. Exact IDs match exactly.
-    # teamorouter* and magpie providers are local-only in ~/.pi/agent/models.json; sync preserves them.
-    enabledModels:
-      - zai-coding-cn/glm-5.3
-      - xai/grok-4.7
-      - deepseek/deepseek-flash
-      - kimi-coding/k3.1-pro
-      - teamorouter-claude/claude-opus-5-5
-      - teamorouter-claude/claude-sonnet-5-5
-      - teamorouter-claude/claude-fable-5-2
-      - teamorouter/gpt-6-astra
-      - deepseek/deepseek-v4-pro
-      - magpie/deepseek/deepseek-flash
-      - magpie/remote-srv2171655/claude/claude-opus-5-5
-      - magpie/remote-srv2171655/claude/claude-sonnet-5-5
-      - magpie/remote-srv2171655/claude/claude-haiku-5-5
-      - magpie/teamorouter-claude/claude-fable-5-2
-      - magpie/grok/grok-4.7
-      - magpie/agy-cli/gemini-4-argon
-
-  # Models written to ~/.pi/agent/models.json by sync-pi-agent.sh
-  # Manifest-declared providers are authoritative (replaced wholesale);
-  # providers NOT declared here (e.g. user-local providers) are preserved from the target.
-  # apiKey MUST reference an environment variable - never commit plaintext keys.
-  models:
-    deepseek:
-      apiKey: "$DEEPSEEK_API_KEY"
-      models:
-        - id: deepseek-v4-flash
-          name: DeepSeek V4 Flash
-          api: openai-responses
-          baseUrl: https://api.deepseek.com
-          reasoning: true
-          input:
-            - text
-          contextWindow: 1048576
-          maxTokens: 384000
-          cost:
-            input: 0.14
-            output: 0.28
-            cacheRead: 0.0028
-            cacheWrite: 0
-          thinkingLevelMap:
-            minimal: null
-            low: low
-            medium: null
-            high: high
-            xhigh: null
-            max: max
-
-        - id: deepseek-v4-pro
-          name: DeepSeek V4 Pro
-          api: openai-responses
-          baseUrl: https://api.deepseek.com
-          reasoning: true
-          input:
-            - text
-          contextWindow: 1048576
-          maxTokens: 384000
-          cost:
-            input: 0.435
-            output: 0.87
-            cacheRead: 0.003625
-            cacheWrite: 0
-          thinkingLevelMap:
-            minimal: null
-            low: low
-            medium: null
-            high: high
-            xhigh: null
-            max: max
 
   # Environment variables declared per-capability (global scope)
   # Each key is a capability ID matching an entry in packages/extensions/skills/agents

@@ -12,7 +12,7 @@
 
 ```typescript
 subagent({
-  agent: "scout",      // 必填：agent 名称
+  agent: "worker",     // 必填：agent 名称
   task: "探索任务描述",  // 必填：委派给 agent 的任务
   cwd: "/path/to/dir"  // 可选：工作目录
 })
@@ -34,9 +34,9 @@ subagent({
 
 | 场景 | 触发条件 | 委派动作 |
 |------|---------|----------|
-| **代码探索** | 需要追踪跨文件调用链、搜索代码模式、分析多处代码结构 | `scout` |
-| **MCP/gitnexus 重操作** | 调用 `gitnexus_query/context/impact`、Xcode、浏览器等返回大量数据的工具 | `scout` |
-| **Git 溯源调研** | 需要用 `git log/blame/diff/bisect` 追溯功能变更史或 bug 引入点 | `scout` |
+| **代码探索** | 需要追踪跨文件调用链、搜索代码模式、分析多处代码结构 | `worker`（task 内声明只读） |
+| **MCP/gitnexus 重操作** | 调用 `gitnexus_query/context/impact`、Xcode、浏览器等返回大量数据的工具 | `worker`（task 内声明只读） |
+| **Git 溯源调研** | 需要用 `git log/blame/diff/bisect` 追溯功能变更史或 bug 引入点 | `worker`（task 内声明只读） |
 | **外部资料调研** | 需要搜索外部文档、API 文档、生态信息 | `researcher` |
 | **编辑后审查** | 实施完成、验证通过后 | `reviewer` × N（多次调用） |
 
@@ -46,13 +46,13 @@ subagent({
 |-------------|-------------------|
 | 用 `lsp definition` 查一个符号定义 | ❌ 轻量操作，直接做 |
 | 用 `grep` 搜一个简单模式 | ❌ 轻量操作，直接做 |
-| 追踪一条 3+ 步的调用链 | ✅ delegate to `scout` |
-| 跨 3+ 文件分析代码模式 | ✅ delegate to `scout` |
-| 同时搜索代码 + 查文档 | ✅ 依次 delegate to `scout` + `researcher` |
-| 调用 `gitnexus_query` + `context` + `impact` 组合 | ✅ delegate to `scout` |
-| 在大型仓库中搜索多个不相关模式 | ✅ delegate to `scout`（一次任务覆盖多方向） |
-| 用 `git log` 追溯某功能的提交历史 | ✅ delegate to `scout` |
-| 用 `git diff` / `git bisect` 找 bug 引入点 | ✅ delegate to `scout` |
+| 追踪一条 3+ 步的调用链 | ✅ delegate to `worker`（只读） |
+| 跨 3+ 文件分析代码模式 | ✅ delegate to `worker`（只读） |
+| 同时搜索代码 + 查文档 | ✅ 依次 delegate to `worker`（只读）+ `researcher` |
+| 调用 `gitnexus_query` + `context` + `impact` 组合 | ✅ delegate to `worker`（只读） |
+| 在大型仓库中搜索多个不相关模式 | ✅ delegate to `worker`（一次任务覆盖多方向，只读） |
+| 用 `git log` 追溯某功能的提交历史 | ✅ delegate to `worker`（只读） |
+| 用 `git diff` / `git bisect` 找 bug 引入点 | ✅ delegate to `worker`（只读） |
 
 **判断原则**：如果操作需要 3+ 步工具调用才能得出一个结论，就应该 delegate。
 
@@ -63,8 +63,8 @@ MCP 工具返回的数据通常很大，会快速膨胀主 session context。
 | 场景 | 操作 |
 |------|------|
 | 单次小结果 `gitnexus_query` | 可以直接做 |
-| `gitnexus_context` + `gitnexus_impact` 组合 | delegate to `scout` |
-| 多个独立的 gitnexus 查询 | delegate to `scout`（一次任务包含多查询） |
+| `gitnexus_context` + `gitnexus_impact` 组合 | delegate to `worker`（只读） |
+| 多个独立的 gitnexus 查询 | delegate to `worker`（一次任务包含多查询，只读） |
 
 ---
 
@@ -72,17 +72,14 @@ MCP 工具返回的数据通常很大，会快速膨胀主 session context。
 
 | 任务类型 | Agent | 模型 | Thinking | Tools |
 |---------|-------|------|----------|-------|
-| 代码库侦察 | `scout` | glm-5.1 | minimal | read, grep, find, ls, bash, write, intercom, gitnexus_* |
-| 外部资料调研 | `researcher` | kimi-for-coding | high | read, write, web_search, fetch_content, intercom, gitnexus_query |
-| 编辑后审查 | `reviewer` | kimi-for-coding | high | 全量（无白名单限制） |
-| 实施执行 | `worker` | glm-5.1 | low | read, grep, find, ls, bash, edit, write, contact_supervisor, gitnexus_* |
-| 实施计划制定 | `planner` | deepseek-v4-flash | high | 全量 |
-| 上下文构建 | `context-builder` | deepseek-v4-flash | high | read, grep, find, ls, bash, write, web_search, intercom, gitnexus_* |
-| 方向审阅 | `oracle` | deepseek-v4-flash | medium | 全量 |
+| 外部资料调研 | `researcher` | `magpie/group/workhorse` | high | read, write, web_search, fetch_content, intercom, gitnexus_query |
+| 编辑后审查 | `reviewer` | `magpie/group/grunt` | high | 全量（无白名单限制） |
+| 实施执行 | `worker` | `magpie/group/grunt` | low | read, grep, find, ls, bash, edit, write, contact_supervisor, gitnexus_* |
 
-> `scout` 没有 `edit` 工具，对于只读探索是优势——不会误改代码。
-> `worker` 有完整的编辑工具 + `contact_supervisor`，实施时可按需向上级请求决策。
+> 模型是 Magpie 路由分组，分组内的实际模型由 Magpie 配置决定。
+> `worker` 有完整编辑工具：用它做只读探索时，task 里必须写明"只读，不要修改任何文件"。
 > "全量"表示该 agent 不设 tools 白名单，可使用 pi 默认的完整工具集。
+> `worker` 有完整的编辑工具 + `contact_supervisor`，实施时可按需向上级请求决策。
 
 ---
 
@@ -95,13 +92,10 @@ MCP 工具返回的数据通常很大，会快速膨胀主 session context。
 主 agent 依次调用，将前一步结果作为后一步的 task 描述输入：
 
 ```
-步骤 1: subagent({ agent: "scout", task: "探索 auth 模块..." })
+步骤 1: subagent({ agent: "worker", task: "只读探索 auth 模块，输出关键文件+行号，不要修改文件" })
 → 主 agent 读取结果，提取关键信息
 
-步骤 2: subagent({ agent: "planner", task: "基于以下探索结果制定计划：<粘贴关键发现>..." })
-→ 主 agent 读取计划，确认后委派实施
-
-步骤 3: subagent({ agent: "worker", task: "实施以下计划：<粘贴计划摘要>..." })
+步骤 2: subagent({ agent: "worker", task: "按以下结论实施：<粘贴关键发现与改动范围>..." })
 ```
 
 ### 4.2 独立任务（伪并行）
@@ -109,8 +103,8 @@ MCP 工具返回的数据通常很大，会快速膨胀主 session context。
 独立任务可在同一个 turn 中发起多次 `subagent()` 调用：
 
 ```
-subagent({ agent: "scout", task: "探索方向 A：auth 模块结构..." })
-subagent({ agent: "scout", task: "探索方向 B：数据库查询模式..." })
+subagent({ agent: "worker", task: "只读探索方向 A：auth 模块结构..." })
+subagent({ agent: "worker", task: "只读探索方向 B：数据库查询模式..." })
 subagent({ agent: "researcher", task: "调研 OAuth 2.1 最新规范..." })
 ```
 
@@ -137,10 +131,10 @@ subagent 完成后，主 agent **自动综合**结果到回复中：
 ## 探索结果综合
 
 ### 方向 A: auth 模块结构
-- scout 发现：...（关键文件行号引用）
+- worker 发现：...（关键文件行号引用）
 
 ### 方向 B: OAuth 流程
-- scout 通过 gitnexus 追踪到：...（调用链）
+- worker 通过 gitnexus 追踪到：...（调用链）
 
 ### 综合判断
 - 基于以上信息，建议...
@@ -163,14 +157,12 @@ subagent 完成后，主 agent **自动综合**结果到回复中：
 ```
 用户请求
   │
-  ├── 需要代码探索/Git 溯源/MCP？ → scout
+  ├── 需要代码探索/Git 溯源/MCP？ → worker（只读 task）
   ├── 需要外部调研？ → researcher
   │
   ├── 综合结果 → 回复用户
   │
-  ├── 需要实施？
-  │   ├── planner 制定计划（可选）
-  │   └── worker 实施
+  ├── 需要实施？ → worker（主 agent 自行定计划）
   │
   └── 实施完成 → reviewer × N
        → 综合审查反馈
@@ -184,7 +176,7 @@ subagent 完成后，主 agent **自动综合**结果到回复中：
 用户提问
   │
   ├── 简单问题（< 3 步） → 直接做
-  ├── 复杂问题 → scout + 可选 researcher
+  ├── 复杂问题 → worker（只读）+ 可选 researcher
   │
   └── 综合 → 回复
 ```
@@ -225,9 +217,9 @@ Output: <期望的格式>
 
 ### 必须 delegate
 
-- **涉及 3+ 跨文件的分析** → scout
-- **调用返回大量数据的 MCP/gitnexus 工具** → scout
-- **Git 多步溯源（log + blame + diff 组合）** → scout
+- **涉及 3+ 跨文件的分析** → worker（只读）
+- **调用返回大量数据的 MCP/gitnexus 工具** → worker（只读）
+- **Git 多步溯源（log + blame + diff 组合）** → worker（只读）
 - **外部资料调研** → researcher
 - **实施完成后** → reviewer
 

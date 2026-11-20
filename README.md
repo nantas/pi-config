@@ -8,7 +8,7 @@
 
 > 在开始之前，请确保你已经[安装并可以运行 Pi](https://pi.dev/docs/latest/installation)。
 
-如果你是第一次使用本仓库，请阅读 [docs/getting-started.md](docs/getting-started.md)，按照七个步骤完成 Pi 环境配置和全局同步：安装 Pi CLI → 配置模型供应商 → 配置 enabledModels → 查看能力清单 → 确认同步范围 → 执行全局同步 → 验证环境。
+如果你是第一次使用本仓库，请阅读 [docs/getting-started.md](docs/getting-started.md)，按照六个步骤完成 Pi 环境配置和全局同步：安装 Pi CLI → 配置模型供应商 → 查看能力清单 → 确认同步范围 → 执行全局同步 → 验证环境。
 
 ---
 
@@ -242,32 +242,9 @@ export POWERLINE_NERD_FONTS=1
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.files`（配置文件 `.pi/managed/sol-pi.json` 同步到 `~/.pi/agent/sol-pi.json`）
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
-#### 模型提供方配置（`global.models`）
+#### 模型配置
 
-- **描述**: 跨设备共享的自定义 provider 声明。`capabilities.yaml` 通过 `global.models` 段声明：**manifest 中声明的 provider 为权威（整体替换目标端同名 provider），未声明的 provider（如本机私有配置）从目标端原样保留**。`apiKey` 必须引用环境变量（如 `$DEEPSEEK_API_KEY`），禁止提交明文密钥。
-- **解决的问题**: `~/.pi/agent/models.json` 中的 provider 配置原本不在 sync 管理范围，跨设备共享只能手工复制，无法版本化与审计。
-- **源文件**: `.pi/capabilities.yaml` → 由 `scripts/sync-pi-agent.sh` 的 `render_models_file()` 渲染（复用 settings.json 同款 merge-preserve + atomic-write 模式）
-- **OpenSpec Spec**: `openspec/changes/models-manifest-governance/specs/models-manifest-governance/spec.md`
-
-```yaml
-# global.models 示例：deepseek-v4-flash 走 Responses API
-# 由 sync-pi-agent.sh 渲染到 ~/.pi/agent/models.json
-# （provider 声明语法与 pi models.json 的 provider schema 一致）
-global:
-  models:
-    deepseek:
-      apiKey: "$DEEPSEEK_API_KEY"   # ← 仅允许 env 引用
-      models:
-        - id: deepseek-v4-flash
-          name: DeepSeek V4 Flash
-          api: openai-responses
-          baseUrl: https://api.deepseek.com
-          reasoning: true
-          input: [text]
-          contextWindow: 1048576
-          maxTokens: 384000
-          thinkingLevelMap: { minimal: null, low: low, medium: null, high: high, xhigh: null, max: max }
-```
+在 Magpie 中管理 Pi 的默认模型和切换范围。当前仓库未声明共享供应商，全局同步会跳过 `~/.pi/agent/models.json`，并保留 Magpie 写入本机 `settings.json` 的模型设置。
 
 #### 环境变量配置（`global.env` / `catalog.env`）
 
@@ -305,7 +282,13 @@ catalog:
 
 **校验行为**：sync 脚本会检测孤立 env 块（能力 ID 无匹配），并在缺失/不匹配时给出修复命令。不自动修改 shell 配置文件。
 
-当前仓库无自定义 agent 定义。使用 Pi 内置 agent（scout、planner、worker、reviewer、oracle 等）。
+当前仓库定义 3 个 agent（`.pi/agents/`），模型走 Magpie 路由分组：
+
+| Agent | 模型 | 用途 |
+|-------|------|------|
+| `worker` | `magpie/group/grunt` | 实施执行 |
+| `reviewer` | `magpie/group/grunt` | 实施后审查 |
+| `researcher` | `magpie/group/workhorse` | 外部资料调研 |
 
 ---
 
@@ -377,28 +360,19 @@ OpenSpec 定义了完整的变更管理工作流（探索 → 提案 → 规格 
 
 ---
 
-### Subagent 模型覆盖
+### Subagent 模型
 
-Pi 内置多个 subagent（如 `context-builder`、`oracle`、`planner` 等），可通过 `.pi/settings.json` 中的 `subagents.agentOverrides` 字段为不同 subagent 指定不同模型。
+Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段，不通过 `settings.json` 的 `subagents.agentOverrides` 配置（当前 subagent 扩展不支持该键）。
 
-例如，为 `oracle` 和 `planner` 分配更强的模型以确保决策质量，为 `worker` 和 `scout` 分配更快/更便宜的模型以节约成本：
+本仓库的 agent 统一使用 Magpie 路由分组，不在 agent 文件里写死具体模型：
 
-```json
-{
-  "subagents": {
-    "agentOverrides": {
-      "oracle": {
-        "model": "provider/model-name"
-      },
-      "planner": {
-        "model": "provider/model-name"
-      }
-    }
-  }
-}
-```
+| Agent | model |
+|-------|-------|
+| `worker` | `magpie/group/grunt` |
+| `reviewer` | `magpie/group/grunt` |
+| `researcher` | `magpie/group/workhorse` |
 
-未被覆盖的 subagent 会使用 `defaultModel` 指定的模型。也可通过 `defaultProvider` 统一切换 API 提供商。
+分组内的实际模型由 Magpie 的 `magpie/group/<id>` 定义决定，换模型只需改分组，不用改 agent 文件。
 
 ---
 
@@ -500,7 +474,7 @@ openspec/
 |---|---|
 | `.pi/settings.json` | 全局配置：provider、model、packages、subagent overrides |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
-| `.pi/agents/` | Agent 定义（当前无自定义 agent） |
+| `.pi/agents/` | Agent 定义（worker / researcher / reviewer） |
 | `.pi/skills/` | 同步技能源（global.skills → `~/.pi/agent/skills/`；global.shared_skills → `~/.agents/skills/`） |
 | `.agents/skills/` | OpenSpec 10 步工作流技能 + 全局 Superpowers |
 | `openspec/manifest.json` | 能力清单（specs 映射） |

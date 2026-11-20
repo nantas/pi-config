@@ -1,6 +1,6 @@
 # 新手上路
 
-> 本指南面向首次使用 pi-config 的初学者。请按照以下七个步骤完成基础配置。
+> 本指南面向首次使用 pi-config 的初学者。请按照以下六个步骤完成基础配置。
 
 pi-config 是一个集中式 Pi 编码代理配置仓库。在开始前，请确保你的环境中已安装 Pi CLI。
 
@@ -32,7 +32,7 @@ pi --version
 
 ## 第一步：配置模型供应商
 
-Pi 需要至少一个 LLM 供应商才能正常工作。有两种配置方式：
+使用 Magpie 时，在 Magpie 中为 Pi 选择模型并设置可见范围。Pi 的 `/model` 和 Ctrl+P 会使用本机配置。也可以独立配置 Pi 的模型供应商。
 
 ### A. 内置供应商 Login（推荐新手）
 
@@ -74,41 +74,23 @@ pi login <provider>
 - `api` 可选值：`openai-completions`、`openai-responses`、`anthropic-messages`、`google-generative-ai`
 - 文件修改后无需重启，`/model` 自动重新加载
 
-更多配置参考：[Pi 供应商与模型配置指南](docs/reference/pi-provider-model.md)。TeamoRouter 模板：[teamorouter-provider.md](docs/reference/teamorouter-provider.md)
+更多配置参考：[Pi 供应商与模型配置指南](reference/pi-provider-model.md)。TeamoRouter 模板：[teamorouter-provider.md](reference/teamorouter-provider.md)
 
 ---
 
-## 第二步：配置常用模型范围（enabledModels）
+## 第二步：查看本仓库的能力清单
 
-在 `~/.pi/agent/settings.json` 中设置 `enabledModels`，限制 Ctrl+P 切换时可用的模型列表：
-
-```json
-{
-  "enabledModels": ["claude-*", "gpt-4o", "gemini-2*"]
-}
-```
-
-- 支持 glob 模式（如 `github-copilot/*`、`\*sonnet\*`）
-- 与 `--models` CLI 标志格式一致
-- 修改后立即生效，无需重启
-- 作用域内的模型会记住上次选中的模型，跨会话保持
-
----
-
-## 第三步：查看本仓库的能力清单
-
-在确认全局同步前，先了解本仓库包含哪些能力。以下清单来自 [`.pi/capabilities.yaml`](.pi/capabilities.yaml)（以该文件为准）：
+在确认全局同步前，先了解本仓库包含哪些能力。以下清单来自 [`.pi/capabilities.yaml`](../.pi/capabilities.yaml)（以该文件为准）：
 
 ### 全局同步能力（同步到 `~/.pi/agent/`）
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
 | **扩展** | 5 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree`、`self-compact` |
-| **Agent** | 8 | `unity-worker`、`scout`、`worker`、`context-builder`、`oracle`、`planner`、`researcher`、`reviewer` |
+| **Agent** | 3 | `worker`（`magpie/group/grunt`）、`reviewer`（`magpie/group/grunt`）、`researcher`（`magpie/group/workhorse`） |
 | **技能** | 4 | `install-from-pi-config`、`notion`、`x-reach`、`worktrunk-isolation` |
 | **共享层技能** | 1 | `agent-reach`（经 `global.shared_skills` 同步到 `~/.agents/skills/`，跨 harness 共用） |
 | **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
-| **模型配置** | 1 | `deepseek`（deepseek-v4-flash 走 Responses API，渲染到 `~/.pi/agent/models.json`） |
 | **外部包** | 11 | `pi-tab-status`（tab 状态图标）、`pi-subagents`（子代理系统）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化）、`pi-question`（交互提问）、`pi-webfetch`（网页抓取）、`pi-fff`（模糊文件查找）、`ponytail`（极简编码）、`pi-codex-image-gen`（图像生成）、`sol-pi`（NVIDIA 效率扩展） |
 
 ### 按需安装能力（Catalog）
@@ -128,7 +110,7 @@ pi login <provider>
 
 ---
 
-## 第四步：确认同步范围
+## 第三步：确认同步范围
 
 运行同步脚本前，请确认以下内容：
 
@@ -137,9 +119,7 @@ pi login <provider>
    - 例如不需要 `pi-powerline` 的 Nerd Font 依赖 → 从 `capabilities.yaml` 中移除对应包
    - 例如不需要某些扩展 → 从 `capabilities.yaml` 的同步列表中排除
 3. **是否需要修改 `settings.json` 中的默认值？**
-   - 当前仓库预设：`defaultProvider: deepseek`、`defaultModel: deepseek-flash`、`defaultThinkingLevel: high`
-   - `defaultProvider` / `defaultModel` / `defaultThinkingLevel`
-   - `subagents.agentOverrides`
+   - 仓库预设 `defaultThinkingLevel: high`。默认供应商和模型由本机配置决定。
 
 4. **环境变量（与 `pi-fff` 包相关）**
    - `pi-fff` 需要 `FFF_FRECENCY_DB`、`FFF_HISTORY_DB`（LMDB 数据库路径）、`PI_FFF_MODE=tools-only`
@@ -153,14 +133,14 @@ pi login <provider>
 
 ---
 
-## 第五步：执行全局同步
+## 第四步：执行全局同步
 
 ```bash
 ./scripts/sync-pi-agent.sh
 ```
 
 同步内容（基于 `capabilities.yaml`）：
-- `.pi/settings.json` → `~/.pi/agent/settings.json`
+- `.pi/capabilities.yaml` 的 `global.settings` → `~/.pi/agent/settings.json`，本机的模型设置随未托管键一起保留
 - `.pi/extensions/` → `~/.pi/agent/extensions/`
 - `.pi/agents/` → `~/.pi/agent/agents/`
 - `.pi/skills/` → `~/.pi/agent/skills/`
@@ -170,7 +150,7 @@ pi login <provider>
 
 ---
 
-## 第六步：验证 Pi 环境
+## 第五步：验证 Pi 环境
 
 启动 Pi，验证以下功能正常：
 
@@ -180,58 +160,25 @@ pi
 
 验证清单：
 - [ ] `/model` 能列出预期的模型
-- [ ] Ctrl+P 能在 `enabledModels` 范围内切换模型
+- [ ] Ctrl+P 能在预期的模型范围内切换
 - [ ] `$skill-name` 能触发技能补全（如同步了 `dollar-skill-invoke`）
 - [ ] `/login` 能查看已配置的供应商
 
 ---
 
-## 补充：配置 Subagent 模型重载
+## 补充：配置 Subagent 模型
 
-Pi 内置的 subagent 系统（`/agents` 列表中的内置 agent）会读取 `settings.json` 中的 `subagents.agentOverrides` 来决定每个 agent 使用的模型。如果你使用自定义供应商而非 Anthropic/OpenAI 默认供应商，**必须**为每个 agent 显式指定模型，否则子 agent 会回退到默认模型（通常是 `anthropic/claude-*`），导致 "no api key found" 错误。
+Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段。当前 subagent 扩展不支持 `settings.json` 的 `subagents.agentOverrides`，写在那里不生效。
 
-在 `~/.pi/agent/settings.json`（或本仓库 `.pi/settings.json`，同步后生效）中添加：
+本仓库的 agent 使用 Magpie 路由分组，由 Magpie 决定分组里用哪个具体模型：
 
-```json
-{
-  "subagents": {
-    "agentOverrides": {
-      "context-builder": {
-        "model": "your-provider/your-model",
-        "thinking": "high"
-      },
-      "oracle": {
-        "model": "your-provider/your-model",
-        "thinking": "medium"
-      },
-      "planner": {
-        "model": "your-provider/your-model",
-        "thinking": "high"
-      },
-      "scout": {
-        "model": "your-provider/your-model",
-        "thinking": "minimal"
-      },
-      "researcher": {
-        "model": "your-provider/your-model",
-        "thinking": "high"
-      },
-      "reviewer": {
-        "model": "your-provider/your-model",
-        "thinking": "high"
-      },
-      "worker": {
-        "model": "your-provider/your-model",
-        "thinking": "low"
-      }
-    }
-  }
-}
-```
+| Agent | model |
+|-------|-------|
+| `worker` | `magpie/group/grunt` |
+| `reviewer` | `magpie/group/grunt` |
+| `researcher` | `magpie/group/workhorse` |
 
-将 `your-provider/your-model` 替换为你在第一步配置的供应商和模型（如 `deepseek/deepseek-v4-flash`、`kimi-coding/k2p6`）。可用的 agent 名称可通过 `/agents` 命令查看。
-
-> **注意**：第三方 subagent 扩展（如 pi-interactive-subagents）可能不读取此配置，而是在 agent 定义文件中硬编码模型。使用前需确认该扩展是否支持 `agentOverrides`。
+不经 Magpie 时，把 `model` 换成 `provider/model` 形式（如 `anthropic/claude-sonnet-4-6`），并确保该 provider 已在 `models.json` 或登录凭据中可用。
 
 ---
 

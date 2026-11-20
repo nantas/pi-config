@@ -90,14 +90,8 @@ tools: read, grep, find, ls
 
 | Agent | systemPrompt | 用途 |
 |-------|--------------|------|
-| `context-builder` | append | 构建需求/代码库上下文交接文档 |
-| `image-reader` | replace-all | 视觉子代理，读图并返回结构化文本描述 |
-| `oracle` | append | 方向审查与建议（advisory） |
-| `planner` | append | 从已批准需求生成实施计划 |
 | `researcher` | append | Web 调研，官方文档/规范/一手来源 |
 | `reviewer` | append | 代码审查，按严重度输出证据化发现 |
-| `scout` | append | 快速代码侦察与上下文交接 |
-| `unity-worker` | replace-all | Unity 项目实现代理（Unity MCP + GitNexus） |
 | `worker` | append | 执行已批准计划的目标代码修改 |
 
 ## 7. 已知限制（v2.2.1）
