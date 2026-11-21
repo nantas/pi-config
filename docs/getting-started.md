@@ -86,13 +86,13 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 5 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`browse-session-tree`、`self-compact` |
+| **扩展** | 4 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`bash-search-guard` |
 | **Agent** | 3 | `worker`（`magpie/group/grunt`）、`reviewer`（`magpie/group/grunt`）、`researcher`（`magpie/group/workhorse`） |
 | **技能** | 4 | `install-from-pi-config`、`notion`、`x-reach`、`worktrunk-isolation` |
 | **共享层技能** | 1 | `agent-reach`（经 `global.shared_skills` 同步到 `~/.agents/skills/`，跨 harness 共用） |
 | **hc 模板** | 3 | `peer`、`grunt`、`workhorse`（经 `global.hc_templates` 同步到 `~/.config/herdr-core/templates/`，只增不删） |
 | **Prompts** | 10 | `opsx-apply`、`opsx-archive`、`opsx-bulk-archive`、`opsx-continue`、`opsx-explore`、`opsx-ff`、`opsx-new`、`opsx-propose`、`opsx-sync`、`opsx-verify` |
-| **外部包** | 11 | `pi-tab-status`（tab 状态图标）、`pi-subagents`（子代理系统）、`pi-powerline`（powerline 状态栏）、`pi-terminal-signals`（终端信号）、`pi-tool-display`（工具调用可视化）、`pi-question`（交互提问）、`pi-webfetch`（网页抓取）、`pi-fff`（模糊文件查找）、`ponytail`（极简编码）、`pi-codex-image-gen`（图像生成）、`sol-pi`（NVIDIA 效率扩展） |
+| **外部包** | 6 | `pi-subagents`（子代理系统）、`pi-powerline`（powerline 状态栏）、`pi-tool-display`（工具调用可视化）、`pi-ask`（交互提问）、`pi-webfetch`（网页抓取）、`pi-fff`（模糊文件查找） |
 
 ### 按需安装能力（Catalog）
 
@@ -104,7 +104,6 @@ pi login <provider>
 | **技能** | `pi-extension-dev` | Pi 扩展开发完整生命周期指导 |
 | **技能** | `pkg-research` | 第三方 Pi 包研究评估工作流 |
 | **技能** | `pkg-fork-dev` | Fork 并修改已有第三方 Pi 包的完整生命周期 |
-| **扩展** | `add-provider` | 添加自定义模型供应商 |
 | **扩展** | `obsidian-tools` | Obsidian 集成工具 |
 | **扩展** | `wikilink-batch-replace` | 批量将裸文本引用替换为 Obsidian wikilink |
 | **包** | （无） | `catalog.packages` 当前为空 |
@@ -123,12 +122,8 @@ pi login <provider>
    - 仓库预设 `defaultThinkingLevel: high`。默认供应商和模型由本机配置决定。
 
 4. **环境变量（与 `pi-fff` 包相关）**
-   - `pi-fff` 需要 `FFF_FRECENCY_DB`、`FFF_HISTORY_DB`（LMDB 数据库路径）、`PI_FFF_MODE=tools-only`
-   - **关键**：`PI_FFF_MODE=tools-only` 禁用 `FffEditor`（@-mention 自动补全），专门规避与 `pi-powerline` 的 `setEditorComponent` 冲突；若移除 `pi-powerline`，可放开 `FffEditor`
-
-5. **环境变量（与 `self-compact` 扩展相关，可选）**
-   - `TYPESAFE_API_KEY`（优先）或 `OPENROUTER_API_KEY`：启用 Jev System One 边界判定与切割点选择
-   - 两者都未设置时，扩展仍工作，只是降级为纯百分比水位线判定（可能打断进行中的操作）
+   - `pi-fff` 需要 `FFF_FRECENCY_DB`、`FFF_HISTORY_DB`（LMDB 数据库路径）与 `PI_FFF_MODE=override`
+   - **说明**：`PI_FFF_MODE=override` 与 `pi-powerline` 共存机制见 `capabilities.yaml` 的 `global.env.pi-fff`
 
 如需调整，请修改 `.pi/capabilities.yaml` 或 `.pi/settings.json`，然后继续下一步。
 

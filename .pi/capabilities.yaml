@@ -6,17 +6,12 @@ global:
   # AGENTS.md is always synced to ~/.pi/agent/
   agent_md: true
 
-  # mcp.json is synced to ~/.pi/agent/mcp.json
-  mcp_config: true
-
   # Extensions synced to ~/.pi/agent/extensions/ (single-file .ts, or a directory
   # containing package.json with "pi": { "extensions": [...] })
   extensions:
     - dollar-skill-invoke
     - tool-counter-widget
     - init-command
-    - browse-session-tree
-    - self-compact
     - bash-search-guard
 
   # Extensions managed by external tools — sync ignores them entirely:
@@ -72,25 +67,18 @@ global:
   # Keys listed here are authoritative — keys NOT listed are preserved from target.
   # Managed config files: target filename -> repo-relative source under .pi/
   # Manifest-declared files are authoritative (wholesale replace on sync).
-  files:
-    sol-pi.json: managed/sol-pi.json
-    self-compact.json: managed/self-compact.json
+  files: {}
   settings:
     # Purge adapter-era "-builtin:mcp" from target on every sync (pi-mcp-adapter
     # uninstall does not restore it; empty list = built-in MCP enabled).
     extensions: []
     packages:
-      - npm:@tmustier/pi-tab-status
       - npm:@johnnywu/pi-subagents
       - git:github.com/jwu/pi-powerline
-      - git:github.com/lucasmeijer/pi-terminal-signals
       - git:github.com/nantas/pi-tool-display
       - git:github.com/jwu/pi-ask
       - git:github.com/jwu/pi-webfetch
       - npm:@ff-labs/pi-fff
-      - git:github.com/DietrichGebert/ponytail
-      - npm:pi-codex-image-gen
-      - git:github.com/NVlabs/SoL-Pi
     defaultThinkingLevel: high
 
   # Environment variables declared per-capability (global scope)
@@ -111,16 +99,6 @@ global:
           value: override
           description: "Override built-in grep/find so fff engine is the sole search path (root-cause fix for grep/ffgrep tool competition). Safe since pi-fff v0.10+: migrated to addAutocompleteProvider, no longer touches setEditorComponent — coexists with pi-powerline editor."
           required: true
-
-    self-compact:
-      description: "self-compact extension — TypeSafe System One boundary gating (either key enables it; without a key the extension degrades to watermark-only gating)"
-      variables:
-        TYPESAFE_API_KEY:
-          description: "TypeSafe API key for Jev System One boundary/cut-point decisions (preferred provider)"
-          required: false
-        OPENROUTER_API_KEY:
-          description: "OpenRouter API key, used for Jev when TYPESAFE_API_KEY is absent"
-          required: false
 
 catalog:
   # Skills available for on-demand installation by other repositories
@@ -143,9 +121,6 @@ catalog:
 
   # Extensions available for on-demand installation
   extensions:
-    - name: add-provider
-      source: add-provider
-      description: "Add custom model providers to Pi agent configuration"
     - name: obsidian-tools
       source: obsidian-tools
       description: "Obsidian integration tools for Pi agent"

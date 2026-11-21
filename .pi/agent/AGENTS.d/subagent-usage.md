@@ -32,18 +32,19 @@
 
 ## 2. API 概览
 
-`@johnnywu/pi-subagents@1.5.0` 提供的 subagent tool：
+`@johnnywu/pi-subagents@2.3.1` 提供的 subagent tool：
 
 ```typescript
 subagent({
   agent: "worker",     // 必填：agent 名称
   task: "任务描述",      // 必填：一次性任务
-  cwd: "/path/to/dir"  // 可选：工作目录
+  cwd: "/path/to/dir", // 可选：工作目录
+  session: "none"       // 可选："none"（默认，全新子 session）或 "fork"（从当前会话分叉，任务依赖当前对话历史时用）
 })
 ```
 
 **能力边界**：
-- ✅ 保留：单 agent 执行、agent 配置（model/thinking/tools/frontmatter）
+- ✅ 保留：单 agent 执行、agent 配置（model/thinking/tools/frontmatter）、session 分叉
 - ❌ 没有：`chain`、`tasks`、`async`、`action`、`output`、`context`、`concurrency`
 - ❌ 没有：slash commands（`/run`、`/agents`、`/chain`）
 
@@ -56,7 +57,7 @@ subagent({
 | 场景 | 触发条件 | 委派动作 |
 |------|---------|----------|
 | **代码探索** | 追踪跨文件调用链、跨 3+ 文件找模式，只要结论 | `worker`（task 内声明只读） |
-| **重数据工具** | `gitnexus_query/context/impact` 等返回大量数据的组合调用 | `worker`（task 内声明只读） |
+| **重数据工具** | 返回大量数据的只读工具组合调用 | `worker`（task 内声明只读） |
 | **Git 溯源** | `git log/blame/diff/bisect` 追功能变更史或 bug 引入点 | `worker`（task 内声明只读） |
 | **外部资料调研** | 搜外部文档、API 规范、生态信息 | `researcher` |
 | **静态审查** | 实施完成后要一份独立的审查报告 | `reviewer`（可多次调用取不同角度） |
@@ -76,13 +77,13 @@ subagent({
 
 | 任务类型 | Agent | 模型 | Thinking | Tools |
 |---------|-------|------|----------|-------|
-| 外部资料调研 | `researcher` | `magpie/group/workhorse` | high | read, write, web_search, fetch_content, intercom, gitnexus_query |
-| 审查报告 | `reviewer` | `magpie/group/grunt` | high | 全量（无白名单） |
-| 一次性执行/检索 | `worker` | `magpie/group/grunt` | low | read, grep, find, ls, bash, edit, write, contact_supervisor, gitnexus_* |
+| 外部资料调研 | `researcher` | `magpie/group/workhorse` | medium | read, grep, find, ls, bash, write, webfetch |
+| 审查报告 | `reviewer` | `magpie/group/grunt` | low | read, grep, find, ls, bash, write |
+| 一次性执行/检索 | `worker` | `magpie/group/grunt` | low | read, grep, find, ls, bash, edit, write |
 
-> 模型是 Magpie 路由分组，分组内实际模型由 Magpie 配置决定。
+> 模型是 Magpie 路由分组，分组内实际模型由 Magpie 配置决定；thinking 级别与 `~/.pi/agent/models.json` 中各分组的 thinkingLevelMap 对齐。
+> 三个角色均启用 `systemPrompt: replace` 与 `maxDepth: 0`：替换 Pi 默认提示词、保留项目与全局 `AGENTS.md` 及运行时工具块，并从配置层禁止嵌套子代理。
 > `worker` 具备完整编辑工具；用它做只读探索时，task 里必须写明「只读，不要修改任何文件」。
-> 「全量」表示不设 tools 白名单，使用 pi 默认完整工具集。
 
 ---
 
@@ -153,7 +154,7 @@ subagent 返回后，主 agent 负责综合：
 一次性 task 用紧凑契约风格（Goal / Context / Validation / Output）：
 
 ```
-Goal: 用 gitnexus 查 UserService.findByEmail 的调用链，输出关键文件 + 行号
+Goal: 查 UserService.findByEmail 的调用链，输出关键文件 + 行号
 Context: 只读，不要修改任何文件
 Validation: 每个结论附带文件路径与行号
 Output: 列表，按调用层级排序
@@ -173,7 +174,7 @@ Output: 列表，按调用层级排序
 ### 必须 `subagent()`
 
 - 涉及 3+ 跨文件分析且只要结论 → `worker`（只读）
-- 返回大量数据的 MCP/gitnexus 组合调用 → `worker`（只读）
+- 返回大量数据的只读工具组合调用 → `worker`（只读）
 - 多步 Git 溯源（log + blame + diff）→ `worker`（只读）
 - 外部资料调研 → `researcher`
 - 一次性审查报告 → `reviewer`

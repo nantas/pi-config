@@ -63,13 +63,13 @@ TypeScript 单文件（`.ts`）或带 `package.json` 的目录，通过 Pi Exten
 Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做中文分词，fff-node 做 SIMD 模式匹配。
 
 **会话浏览**：
-历史 Pi 会话的索引、检索和树状浏览能力。
+历史 Pi 会话的索引、检索和树状浏览能力（已从全局同步能力中移除，规格见 openspec 归档）。
 
 **代码检索**：
 使用 fff（`ffgrep`/`fffind`）做 frecency 排序的文本搜索，替代 LSP 级别的代码智能。
 
-**上下文压缩与交接**：
-由 SoL-Pi 负责大工具输出句柄化与长日志缩减，自压缩扩展结合 Jev 语义门控管理任务边界压缩与结构化交接续跑。
+**上下文压缩**：
+使用 Pi 原生上下文压缩机制管理长会话（原 `SoL-Pi` 与 `self-compact` 扩展已从全局同步能力中移除）。
 
 ---
 
@@ -98,15 +98,15 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 | 扩展自去重 | `extension-dedup-mechanism`, `extension-dedup-standard`, `extension-self-dedup` |
 | $ 技能调用、$ 展开 | `dollar-skill-invoke`, `dollar-skill-autocomplete`, `dollar-skill-invoke-context`（注：后缀变体见 archive） |
 | /init 命令 | `init-command` |
-| 会话浏览、会话树 | `session-retrieval-tools`, `browse-session-tree` |
+| 会话浏览、会话树 | `session-retrieval-tools`, `browse-session-tree`（已移除，见 archive） |
 | Obsidian 工具 | `obsidian-tools`, `obsidian-tools-extension`, `obsidian-cli-tool`, `obsidian-vault-resolver` |
 | Obsidian 搜索 | `obsidian-search-skill`, `obsidian-search-tool`, `obsidian-search-config` |
 | Notion CLI、ntn 命令 | `notion` |
 | HTML 导出 | `html-export-support` |
 | / 技能过滤 | `slash-skill-filter` |
-| 添加供应商 | 见 extensions `add-provider.ts` |
+| 添加供应商 | 手动编辑 `~/.pi/agent/models.json`（原 `add-provider` 扩展已移除）；参考 `docs/reference/pi-provider-model.md` |
 | Wikilink 批量替换 | `wikilink-batch-replace` |
-| 自压缩、交接卡片、Jev 边界门控 | `self-compact` |
+| 自压缩、交接卡片、Jev 边界门控 | `self-compact`（已从全局同步移除，仓内保留源码与规格） |
 | X 检索、Twitter 检索、twscrape | `x-reach-skill` |
 
 ### 包管理

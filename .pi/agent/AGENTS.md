@@ -1,197 +1,39 @@
 # Global Agent Guidance
 
-该文件通过 `scripts/sync-pi-agent.sh` 同步到 `~/.pi/agent/AGENTS.md`，对所有 Pi session 生效。
-如需更新，先修改此文件并提交到版本管理，再运行同步脚本。
+## 沟通与默认决策
 
----
+- 默认中文回复，简洁直接，引用文件带路径。
+- 范围、边界、实现取舍这类可逆决定，直接选最保守最小的方案执行，并在回复末尾用一行说明“选了 X，理由 Y；如需调整请说明”。
+- 仅在动作不可撤销（删数据、强推共享分支、部署或全局同步、对外发消息）且无法从上下文推断时才提问。
 
-## Core Rules
+## 需求与交付纪律
 
-- 代码检索与路径定位一律使用 Pi 工具 `grep`/`find`，禁止通过 `bash` 执行 `grep`/`rg`/`find` 扫描仓库
-- 默认语言：中文
-- 保持输出简洁
-- 展示文件路径时清晰标注
+- 完整交付目标状态：未经用户明确要求，不拆 MVP、Phase、Stage 或分期路线图。任务过大需分批执行时，只放进对话进度，不写入 spec 或规划文档。
+- 用户提出新需求或调整时，直接并入目标状态并更新文档，不以既有范围或阶段框架为由推迟。
+- 交付物通过陌生人测试：README、API 文档、注释、提交信息与 PR 描述必须自解释，删去内部编号和“如前所述”后依然完整。
 
-## 不引入用户未声明的产品框架
+## 工程底线
 
-### 禁止擅自分期
-- 用户没有明确说"分期 / MVP / 原型先行 / 先做一期"时，禁止在输出和文档中
-  引入 MVP、Phase、Stage、S1/S2、L1/L2、roadmap、分期交付等概念。
-- 需求明确且单次可完成 → 直接完整实现。不存在"先做最小版本"的默认选项。
-- 确实判断任务大到单次无法完成时：用 todo/任务清单拆分执行顺序，
-  拆分的单位是"可独立验证的功能块"，用中性描述（第一批/后续），
-  且这个拆分只在对话和 todo 里存在，不写入 spec/规划文档。
-  是否采纳分期由用户决定，用户说分期才分期。
+- 用最小完整改动解决整个问题，同步更新受影响的调用方、测试与配置。优先删减，不加未要求的抽象层、开关或冗余封装。
+- 复用优先级：现有代码库模式 > 标准库或平台能力 > 已装依赖 > 最少自写代码。不为几行逻辑引入新依赖。
+- 修缺陷先查全部调用方，在根因处一次性修复。保留信任边界校验与防数据丢失的错误处理。
+- 改动必须亲眼验证：运行真实测试、核对 diff 与命令输出，未亲眼看到的结果不写为已通过。
 
-### 文档描述目标状态，不描述过程
-- spec/规划文档记录：要做什么、为什么这么定。不记录：先做哪个、
-  哪部分算"本期"。
-- 执行顺序、实现先后是 agent 的内部事务，出现在 todo/进度汇报中，
-  不进入任何持久文档。
+## 角色分工与委派
 
-### 用户的新需求 = 修改目标状态，不是与旧框架谈判
-- 已有文档里若存在阶段/范围框架，用户提出新需求或调整时：
-  默认该修改直接并入目标状态，更新文档即可。
-- 禁止以"这属于哪个阶段/超出某阶段范围"为由推迟或拒绝执行。
-  阶段框架只在用户主动引用它时才有效。
-- 合同条款以用户当下的陈述为准，文档只是 agent 的记录。
+- **Lead 判定**：`HC_TERMINAL_ID` 已设、`hc get` 的 `parent` 为空，且首条消息不以 `<hc from=...>` 或 `peer:` 开头时，你是 lead，负责收敛目标、规划设计、委派协调与验收汇总。
+- **反递归护栏**：若 `parent` 非空或首条消息以 `<hc from=...>` / `peer:` 开头，你是被委派终端，只在指派范围内工作，禁止再启动 `hc` 或 `subagent()`。
+- **三路分流**（按文件数可判定的硬边界）：
+  - 自己做（仅限 ≤1 个文件）：意图澄清、规划与核心设计/spec 文档、1 到 2 步只读确认、单点修复、验收汇总。
+  - `hc` worker（执行默认，≥2 个文件一律走这里）：任何触及 2 个及以上文件的改动——代码、配置、文档都算——以及构建测试循环、需要留住上下文按验收反馈继续改、长任务或并行任务。禁止以“每次改动很小”“只是文档/配置”“开 worker 太费时”为由绕过委派。
+  - `subagent()`（一次性屏障）：结果交回即结束的跨文件检索、静态审查、外部调研，或无 `hc` 环境时的降级。
+- 委派 `/xxx-yyy` 提示模板时，读取完整正文（`~/.pi/agent/prompts/<name>.md` 优先于 `.pi/prompts/<name>.md`）原样传入，只允许在前后补上下文。
+- 同一仓库并行写文件时使用 `$worktrunk-isolation` 隔离 worktree。
 
-## 决策与写作规范
+## 按需加载参考
 
-### 默认决策，不外包判断
-- 范围、边界、取舍类问题：默认采用最保守/最小的选项，执行时在输出末尾
-  用一行说明"选了 X，理由是 Y；如需 Z 说一声"。
-- 只有同时满足"不可撤销 + 无法从上下文推断"才提问。
-  可逆的决定（改文件、写代码、起名字）永远先做了再说。
+仅在命中对应分支时用 `read` 加载，不提前读：
 
-### 过程代号 ≠ 交付物语言
-- D1-D10、L1-L3、Phase 2 这类规划编号只允许出现在：规划文档、内部推理、
-  与规划者的对话中。
-- 任何面向用户/后续 agent 的文档（README、API 文档、注释、commit message、
-  PR 描述）必须自解释：假设读者从未见过规划文档。
-  要引用决策就写决策内容本身，不写代号。
-
-### 写作前过一遍"陌生人测试"
-- 交付文档写完后自检：删掉所有"as discussed / 如前所述 / D3 / 第二阶段"
-  之类的回指后，文档是否仍然完整？不完整就补全内容，不是补全代号。
-
-## Tool Call Guidelines
-
-### Edit Tool
-
-**调用前 3 项自检（逐项确认后再发请求）：**
-
-1. ✅ **`path` 是顶层字段**，不在 `edits[]` 内部
-2. ✅ **每条 `oldText` / `newText` ≤ 200 字符**，超过则换 bash + sed
-3. ✅ **单次 ≤ 4 条 edits**，超过则拆分为多次调用
-
-- **Avoid overlap**: 多个 `edits[]` 的 `oldText` 不能在原始文件中重叠
-- **Prefer sed for bulk**: 简单文本替换（如 `[ ]` → `[x]`）直接用 `sed -i ''` 而非 edit
-
-### Bash Tool
-
-- **批量文本编辑用 `bash` + `sed`**，不要对同一文件发多次 `edit` 调用
-  (例：替换全文 `[ ]` → `[x]`、跨文件重命名)。
-- 小范围精确改动（≤200 字符、单点）仍用 `edit` 工具。
-- **禁止在 bash 里用 `grep`/`rg`/`find` 做代码检索和路径定位** —— 改用 Pi 工具 `grep`/`find`（pi-fff override 模式）。
-  它们有 frecency 排序、git 感知、path/exclude 约束，比 bash `rg`/`grep` 快且噪声小。
-- 合法例外（仅限**非搜索命令的管道下游过滤**，如 `ps aux | grep node`、`git log | grep feat`）：
-  - `grep`/`rg` 只允许出现在管道分隔符 `|` 之后，为上游非搜索命令的输出做过滤
-  - 严禁以任何形式将 `grep`/`rg`/`find` 作为命令或管道起点（包括 `grep -rn ... | head`、`find . | grep ...`）
-  - 确认 Pi `grep`/`find` 工具不可用时才降级 bash
-- 读取文件内容用 `read` 工具（支持 offset/limit/图片），不要用 `cat`/`head`。
-- 临时文件用 `mktemp -d` 创建，用完后清理。
-
-### Error Recovery
-
-- 工具调用失败后，**不要立即用相同参数重试**。
-- 先读错误信息确认根因：missing field / type mismatch / content overlap。
-- 根据根因选择：拆分参数、换方案、或修复参数后再试。
-
-### Web Search Tool
-
-若已配置 `web-search-prime` MCP 服务器，可用其工具（Pi 原生命名 `mcp__web_search_prime__web_search_prime`）进行 web 搜索；未配置时改用 `$agent-reach` 技能。
-
-**使用原则**：
-- 搜索已知技术或开源项目信息时，优先用 Pi `grep`/`find`/`gitnexus` 搜索本地代码和索引，仅在本地无法覆盖时才用 web search。
-- Pi 框架自身的源码和文档问题，应通过 `$cross-repo-research` 在本地仓库查找，不用 web search。
-- 构造搜索词时提取核心实体和关键词，避免自然语言长句。
-- 需要限定来源可信度时，用 `search_domain_filter` 过滤。
-- 需要时效性时，用 `search_recency_filter` 缩小范围。
-
-## 图片格式与图表输出规范（按需加载）
-
-涉及图片格式兼容性（provider 白名单、格式转码）或 mermaid 图表宽度纪律时，
-先阅读 [AGENTS.d/media-and-diagrams.md](./AGENTS.d/media-and-diagrams.md)。
-
-## 代码检索与文件定位（fff override）
-
-当前运行时 `PI_FFF_MODE=override`：pi-fff 以内置工具名 **`grep` / `find`** 注册（fff 引擎），**不会**再出现 `ffgrep` / `fffind`。
-看到工具列表里的 `grep`/`find` 就是 fff，直接用；不要找 `ffgrep`/`fffind`，也不要用 bash `rg`/`grep`/`find` 检索仓库。
-
-**`grep` 和 `find` 是代码检索与路径定位的默认工具。**
-
-### 决策表
-
-| 任务 | 工具 |
-|------|------|
-| 搜索代码内容（函数、变量、字符串） | `grep` |
-| 定位文件或路径 | `find` |
-| 列出未知目录结构 | `ls` |
-| 读取已知文件 | `read` |
-| 搜索注释/字符串/文档 | `grep` |
-| 搜索非代码文件（配置、markdown） | `grep` + `path` 约束 |
-
-### grep 使用原则
-
-- **Query 风格**：1-2 个核心关键词（bare identifier 最精确），不用自然语言长句
-- **path 约束**：已知目标在 `src/` 下就传 `path: 'src/'`，支持目录前缀、裸文件名、glob（如 `*.ts`、`src/**/*.cc`）
-- **exclude 噪声**：`exclude: 'test/, *.min.js, vendor/'` 排除无关目录和文件
-- **及时读取**：top match 出来后直接 `read`，不要超过 2 次 grep 仍未读文件
-
-### find 使用原则
-
-- **模糊查询**：1-2 个关键词即可（frecency 排名自动优先最近访问的文件）
-- **path 约束**：同 grep，支持目录前缀、裸文件名、glob
-- **精确文件名**：已知完整文件名时用 `path: '**/profile.h'` 精确定位
-
-### 反模式
-
-- **找不存在的工具名**：不要调用 `ffgrep` / `fffind`（override 下未注册），用列表里的 `grep` / `find`
-- **全量扫描 / 链式缩小 / glob 全量再过滤**：都应改为带 path 约束的精确查询，命中后直接 `read`
-
-### 编辑工作流（发现 → 修改）
-
-`grep`/`find` 只负责**检索**，代码编辑回退到基础工具：
-
-| 编辑场景 | 工具 |
-|----------|------|
-| 小范围精确替换（≤200 字符） | `edit` tool |
-| 大范围替换 / 多文件 | `bash` + `sed` |
-| 跨文件重命名 | `bash` + `sed`，完成后 `grep` 验证所有引用已更新 |
-| 批量 checkbox 替换 | `bash` + `sed -i ''` |
-
-## 角色分工与任务委派
-
-### 谁是 lead
-
-`HC_TERMINAL_ID` 已设置，且自己不是被委派的子终端（`hc get` 的 `parent` 为空，且第一封信
-不是 `<hc from=...>` / `peer:`）→ 你是 lead。
-
-lead 的职责：把人给的需求收敛成明确目标、规划与设计、拆分协调、验收与汇总。
-具体执行默认交给常驻 hc agent，而不是自己从头一步步做。
-
-### 反递归护栏
-
-已在被委派的子终端里（`parent` 非空，或第一封信是 `<hc from=...>` / `peer:` 任务）
-→ 只在被指派范围内工作，**不得再开 hc agent**，除非上级或用户明确要求。
-
-### 三种委派方式
-
-| 方式 | 适用 |
-|------|------|
-| **lead 自己做** | 意图澄清、规划/设计、OpenSpec 与文档、1-2 步只读确认、单文件小改、验收汇总 |
-| **hc agent（执行默认）** | 需要后续讨论、或要按验收反馈反复改的任务（上下文必须保留到被接受）；多文件改动、构建/测试循环、长任务、并行工作。放进当前 herdr.space 的一个专用 tab，每个 agent 一个 pane，用 `grunt`/`workhorse` 模板 |
-| **`subagent()`** | 只需**一次性结果**的任务：一次性检索、固定脚本/流程执行、单次外部调研。不需要后续沟通、不需要迭代修改才用它；不在 hc 环境时作为降级手段 |
-
-### 通用规则
-
-1. Task 写清范围、读写边界、验证方式、交付形态，并给 agent 一个明确的 name。
-2. 同一仓并行写文件时用 `$worktrunk-isolation`，不要让两个 worker 改同一份工作区。
-3. 收到汇报先读真实文件/diff/测试结果再汇总，不凭汇报文字断言通过。
-4. 委派 `/xxx-yyy` 工作流时，必须读取完整 prompt 正文作为 task
-   （查找顺序：`~/.pi/agent/prompts/<name>.md` → `.pi/prompts/<name>.md`），不得摘要改写；
-   可在正文前后追加补充上下文，但不得修改正文。
-
-> hc 模板选择、专用 tab / 多 pane 启动、等待与清理：见 [AGENTS.d/hc-delegation.md](./AGENTS.d/hc-delegation.md)。
-> `subagent()` 的 API、agent 选择矩阵与 task 写法：见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
-
-## README 维护
-
-当变更涉及仓库能力的增删（扩展、包、Agent、技能）时，必须按 [docs/reference/readme-governance.md](../../docs/reference/readme-governance.md) 评估并更新 README.md 和 `docs/getting-started.md` 的能力描述，保持与 `capabilities.yaml` 一致。
-
-## Pi 供应商与模型配置
-
-当用户需要设置自定义供应商、添加模型或配置 `enabledModels` 时，先阅读 [docs/reference/pi-provider-model.md](../../docs/reference/pi-provider-model.md)：
-- 通过 `~/.pi/agent/models.json` 添加自定义供应商/模型（Ollama、代理网关等）
-- 通过 `~/.pi/agent/settings.json` 中的 `enabledModels` 控制模型轮询范围
+- 准备启动、等待、验收或清理 `hc` worker：读取 [AGENTS.d/hc-delegation.md](./AGENTS.d/hc-delegation.md)。
+- 准备调用 `subagent()` 做一次性探索、调研或审查：读取 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
+- 需要把图片送入视觉输入（`read` / `webfetch`）或绘制 mermaid 图表：读取 [AGENTS.d/media-and-diagrams.md](./AGENTS.d/media-and-diagrams.md)。

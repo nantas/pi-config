@@ -75,7 +75,7 @@ Entries are ordered newest first.
 - **Version:** 0.1.0（commit e1a586a）
 - **Research Date:** 2026-10-05
 - **Resource Types:** extensions（单入口 → 4 机制：Action Fusion / ObservationPack / Evidence-Preserving Reducer / Online Context Compact）
-- **Decision:** global
+- **Decision:** global（2026-11-21 移除：全部特性已关闭，从全局同步与托管配置移除）
 - **Source Type:** git-package
 - **Source Repo:** https://github.com/NVlabs/SoL-Pi
 - **Install Method:** pi-install
@@ -129,7 +129,7 @@ Entries are ordered newest first.
 - **Version:** 4.8.4
 - **Research Date:** 2026-06-29
 - **Resource Types:** extension (ponytail 命令/mode 注入) + skills (ponytail, ponytail-review, ponytail-audit, ponytail-debt, ponytail-gain, ponytail-help)
-- **Decision:** global
+- **Decision:** global（2026-11-21 移除：常驻注入与 poteto-mode 及全局 AGENTS.md 重叠冲突，核心极简工程原则已并入 `.pi/agent/AGENTS.md`）
 - **Source Type:** git-package
 - **Source Repo:** https://github.com/DietrichGebert/ponytail
 - **Install Method:** pi-install
@@ -286,7 +286,7 @@ at the top of this file using the following format:
 - **Version:** 0.1.0
 - **Research Date:** 2026-05-04
 - **Resource Types:** extensions (terminal OSC signals)
-- **Decision:** global
+- **Decision:** global（2026-11-21 移除：Herdr 依赖 Pi 1.6.0 内置 OSC 7501，Pi 亦原生支持 OSC 9;4，无需额外发送 OSC 133）
 - **Source Type:** git-package
 - **Source Repo:** https://github.com/lucasmeijer/pi-terminal-signals
 - **Install Method:** pi-install
@@ -357,8 +357,8 @@ at the top of this file using the following format:
 - **Version:** 0.1.3
 - **Research Date:** 2026-04-30
 - **Resource Types:** extensions (tab status indicator)
-- **Decision:** global
-- **Reason:** 多个 terminal tab 同时运行 pi 时，tab 标题显示 agent 执行状态（:new / :running... / :✅ / :🚧 / :🛑），方便区分各 tab 进度
+- **Decision:** global（2026-11-21 移除：不再使用）
+- **Reason:** 多个 terminal tab 同时运行 pi 时，tab 标题显示 agent 执行状态（:new / :running... / :✅ / :🚧 / :🛑），方便区分各 tab 进度。后确认已废弃，从 `global.settings.packages` 移除。
 - **Notes:** 源仓库 github.com/tmustier/pi-extensions/tree/main/tab-status。纯 TypeScript 135 行，0 依赖，安全审查通过。状态图标硬编码，暂不支持配置。
 
 ### 2026-04-30 — extension-dedup-standard
@@ -485,7 +485,7 @@ at the top of this file using the following format:
 - **Version:** 0.1.12
 - **Research Date:** 2026-07-23
 - **Resource Types:** extension + skill
-- **Decision:** global
+- **Decision:** global（2026-11-21 移除：生图统一由外部扩展 magpie 的 magpie-images 提供）
 - **Source Type:** npm-package
 - **Source Repo:** https://pi.dev/packages/pi-codex-image-gen (npm:pi-codex-image-gen)
 - **Install Method:** pi-install

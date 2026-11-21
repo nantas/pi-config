@@ -82,12 +82,6 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/dollar-skill-invoke.ts`
 - **OpenSpec Spec**: `openspec/specs/dollar-skill-invoke/spec.md` / `openspec/specs/dollar-skill-autocomplete/spec.md` / `openspec/specs/slash-skill-filter/spec.md`
 
-#### `subagent` (prompt)
-
-- **描述**: 多 agent 编排 prompt，提供 `/subagent` 入口，引导主 agent 使用原生 `subagent` 工具完成 single/parallel/chain/async 工作流。
-- **解决的问题**: 替代已移除的 `dispatch` 扩展，提供轻量编排指引，覆盖常用 delegation 模式和错误恢复。
-- **源文件**: `.pi/prompts/subagent.md`
-
 #### `init-command`
 
 - **描述**: 提供 `/init` 命令，交互式初始化当前项目的 `.pi/` 目录配置，包括 AGENTS.md、settings.json 等基础文件。
@@ -99,21 +93,6 @@ cat .pi/settings.json
 - **描述**: 在 Pi 界面中显示当前会话的工具调用计数 widget，实时追踪工具使用情况。
 - **解决的问题**: 长 session 中难以追踪工具调用频率和模式，本扩展提供直观的工具使用统计。
 - **源文件**: `.pi/extensions/tool-counter-widget.ts`
-
-#### `self-compact`
-
-- **描述**: 让长会话 agent 自己管理上下文窗口。三档纯百分比水位线（`softAt 70%` / `at 75%` / `buffer 5%` → forced 80%，硬上限 90%）只负责提醒；真正压缩由 agent 在自然边界调用 `self_compact`，写出由 `goal / done / in_progress / decisions / preserved_refs / next_action` 六个字段组成的 Handoff 卡片，卡片替代原上下文，agent 从自己的笔记继续。`view_context` 提供上下文水位与边界检查。边界判定交给 TypeSafe System One（Jev）的四问模型，`mid_operation > 0.6` 时保持沉默，并把切割点写进 Pi 的压缩 prompt；Jev 不可用或超时时降级为纯百分比判定。
-- **解决的问题**: 固定阈值触发的自动压缩会在操作中途切断 agent，用摘要模型猜测丢失了什么；由 agent 自己在边界写交接卡，保留的是它自己认定必须留下的信息。
-- **源文件**: `.pi/extensions/self-compact/`（`index.ts` + `thresholds.ts` / `boundary-gate.ts` / `jev-client.ts` / `handoff.ts` / `state.ts` / `context-bar.ts`）
-- **配置**: 优先级 CLI flags（`--self-compact-soft` / `-at` / `-buffer` / `-prompt`）> `<cwd>/.pi/self-compact.json` > `~/.pi/agent/self-compact.json` > `.pi/managed/self-compact.json` > 内置默认
-- **环境变量**: `TYPESAFE_API_KEY`（优先）或 `OPENROUTER_API_KEY`，二者皆无时只做百分比判定
-- **OpenSpec Spec**: `openspec/changes/self-compact-extension/specs/self-compact/spec.md`
-
-#### `add-provider`
-
-- **描述**: 提供 `/add-provider` 命令，交互式添加自定义模型供应商到 `models.json`，支持输入 base URL、API key、模型列表等。
-- **解决的问题**: 手动编辑 `models.json` 配置自定义供应商容易出错。本扩展通过交互式向导引导完成供应商配置。
-- **源文件**: `.pi/extensions/add-provider.ts`
 
 #### `bash-search-guard`
 
@@ -128,32 +107,18 @@ cat .pi/settings.json
 
 定义在 `.pi/settings.json` 的 `packages` 数组中，通过 Pi 的包管理机制加载。
 
-#### `@eko24ive/pi-ask`
+#### `pi-ask`
 
-- **来源**: `npm:@eko24ive/pi-ask`
-- **描述**: 提供 `ask` 工具，允许 agent 在运行时向用户发起结构化多选/确认问题。
-- **解决的问题**: 当 agent 需要用户决策时（如选择实现方案），无需中断对话，可通过 `ask` 工具发起即时交互。
-- **引用**: `.pi/settings.json` → `packages`
-
-#### `pi-terminal-signals`
-
-- **来源**: `git:github.com/lucasmeijer/pi-terminal-signals`
-- **描述**: 捕获终端信号（如 SIGINT），在 Pi 中提供更优雅的中断处理。
-- **解决的问题**: 默认终端信号处理可能导致 Pi 状态不一致，本包提供可靠的中断信号捕获。
+- **来源**: `git:github.com/jwu/pi-ask`
+- **描述**: 提供 `ask_user` 工具，允许 agent 在运行时向用户发起结构化多选/确认问题。
+- **解决的问题**: 当 agent 需要用户决策时（如选择实现方案），无需中断对话，可通过 `ask_user` 工具发起即时交互。
 - **引用**: `.pi/settings.json` → `packages`
 
 #### `pi-tool-display`
 
-- **来源**: `git:github.com/MasuRii/pi-tool-display`
+- **来源**: `git:github.com/nantas/pi-tool-display`
 - **描述**: 在 Pi 界面中显示工具调用详情的可视化扩展。
 - **解决的问题**: 工具调用的输入输出在默认界面中不易查看，本扩展提供更直观的工具执行展示。
-- **引用**: `.pi/settings.json` → `packages`
-
-#### `pi-tab-status`
-
-- **来源**: `npm:@tmustier/pi-tab-status`
-- **描述**: 在多个终端 tab 运行 Pi 时，tab 标题显示 agent 执行状态图标（`:new` / `:running...` / `:✅` / `:🚧` / `:🛑`），方便区分各 tab 进度。
-- **解决的问题**: 同时管理多个 Pi 会话时难以区分各 tab 状态的痛点。本包通过终端转义序列动态更新 tab 标题。
 - **引用**: `.pi/settings.json` → `packages`
 
 #### `pi-powerline`
@@ -240,14 +205,6 @@ export POWERLINE_NERD_FONTS=1
 - **描述**: 高性能模糊文件搜索 Pi 扩展（基于 fff-core），支持跨会话 frecency 学习和查询历史持久化。通过 `FFF_FRECENCY_DB` 和 `FFF_HISTORY_DB` 环境变量配置 LMDB 数据库路径。
 - **解决的问题**: Pi 内置文件搜索无使用频次记忆，高频访问文件的搜索排名无法随使用优化。pi-fff 通过 frecency 算法自动学习用户偏好，提升搜索精度。
 - **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.env.pi-fff`
-- **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
-
-#### `sol-pi`
-
-- **来源**: `git:github.com/NVlabs/SoL-Pi`（无版本 pin；上游 dev 锁 Pi 0.85.1，peer `*`）
-- **描述**: NVIDIA 出品的效率扩展（SoL-Pi），4 个 opt-in 机制：Action Fusion（编辑+验证命令同调用合并）、ObservationPack（大观测句柄化+分页召回 `obs_recall`）、Evidence-Preserving Reducer（长日志证据保留压缩）、Online Context Compact（在线上下文压缩）。默认全关；配置 `.pi/sol-pi.json` 或 `~/.pi/agent/sol-pi.json`。
-- **解决的问题**: 长任务中重复模型轮次、上下文重放、超大工具观测与长日志读取造成的 token 浪费。
-- **引用**: `.pi/capabilities.yaml` → `global.settings.packages` + `global.files`（配置文件 `.pi/managed/sol-pi.json` 同步到 `~/.pi/agent/sol-pi.json`）
 - **OpenSpec 决策记录**: `openspec/pkg-backlog.md`
 
 #### 模型配置
@@ -403,17 +360,13 @@ Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段，�
   "defaultProvider": "your-provider",
   "defaultModel": "provider/model-name",
   "defaultThinkingLevel": "high",
-  "packages": [...],
-  "subagents": {
-    "agentOverrides": { ... }
-  }
+  "packages": [...]
 }
 ```
 
 - **`defaultProvider`** / **`defaultModel`**: 切换默认 API 提供商和模型
 - **`defaultThinkingLevel`**: 控制深度思考级别（`off` / `low` / `medium` / `high`）
-- **`packages`**: 添加或移除外部 Pi 包（包管理见 `pkg-research` 工作流）
-- **`subagents.agentOverrides`**: 为不同 subagent 分配不同模型（见上方 Subagent 模型覆盖节）
+- **`packages`**: 添加或移除外部 Pi 包（包管理见 `pkg-research` 工作流；agent 模型写在 `.pi/agents/<name>.md` 的 `model:` 字段，不通过 settings.json 覆盖）
 
 #### `scripts/sync-pi-agent.sh` 同步机制
 
@@ -474,7 +427,7 @@ openspec/
 
 | 类别 | 数量 | 归档示例 |
 |---|---|---|
-| 自定义扩展 | 3 | `dollar-skill-invoke`、`init-command`、`browse-session-tree` |
+| 自定义扩展 | 3 | `dollar-skill-invoke`、`init-command`、`bash-search-guard` |
 | 外部包管理 | 4 | `pkg-research-workflow`、`fix-global-subagent-package-delivery`、`phase2-pi-mcp-baseline`、`add-pi-subagent-baseline` |
 | 治理与同步 | 3 | `govern-pi-config-closeout-sync`、`global-agent-md-tool-guide`、`fix-subagent-model-override` |
 | 技能与蓝图 | 3 | `pi-extension-dev-skill`、`define-pi-customization-blueprint`、`establish-pi-config-hub-baseline` |
@@ -488,7 +441,7 @@ openspec/
 
 | 路径 | 说明 |
 |---|---|
-| `.pi/settings.json` | 全局配置：provider、model、packages、subagent overrides |
+| `.pi/settings.json` | 全局配置：provider、model、packages |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
 | `.pi/agents/` | Agent 定义（worker / researcher / reviewer） |
 | `.pi/herdr-templates/` | hc 终端模板（global.hc_templates → `~/.config/herdr-core/templates/`，只增不删） |
