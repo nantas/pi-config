@@ -1676,5 +1676,26 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
   };
 }
 
-/** Default export used by Pi's extension loader. */
-export default createHcDelegationExtension();
+const GLOBAL_DEDUP_KEY = "__pi_ext_hc_delegation_loaded";
+
+const defaultExtension = createHcDelegationExtension();
+
+/**
+ * Default export used by Pi's extension loader.
+ *
+ * Deduplicates across project-local (`.pi/extensions/`) and global
+ * (`~/.pi/agent/extensions/`) auto-discovery in the same load cycle, and clears
+ * the flag on `session_shutdown` so `/reload`, `/new`, `/resume`, and `/fork`
+ * re-register cleanly (see docs/reference/pi-extension-session-shutdown-dedup.md).
+ */
+export default function hcDelegation(pi: ExtensionAPI): void {
+  const store = globalThis as Record<string, unknown>;
+  if (store[GLOBAL_DEDUP_KEY]) return;
+  store[GLOBAL_DEDUP_KEY] = true;
+
+  pi.on("session_shutdown", () => {
+    delete store[GLOBAL_DEDUP_KEY];
+  });
+
+  defaultExtension(pi);
+}
