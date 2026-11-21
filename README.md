@@ -114,6 +114,13 @@ cat .pi/settings.json
 - **解决的问题**: 手动编辑 `models.json` 配置自定义供应商容易出错。本扩展通过交互式向导引导完成供应商配置。
 - **源文件**: `.pi/extensions/add-provider.ts`
 
+#### `bash-search-guard`
+
+- **描述**: 全局运行时护栏，拦截 agent 通过 bash 执行 `grep`/`egrep`/`fgrep`/`rg`/`find` 做仓库搜索的命令（作为命令或管道起点），引导改用 Pi 内置 `grep`/`find` 工具；同时改写 bash 工具的 system prompt 描述并追加强约束 guideline。管道下游过滤（如 `ps aux | grep node`、`git log | grep feat`）和非递归 `-q` 存在性检查、`find -delete` 等运维操作保持放行。仅在 `getActiveTools()` 包含对应工具时生效。
+- **解决的问题**: 尽管全局 AGENTS.md 已规定禁用 bash 检索仓库，agent 仍频繁用 `grep -rn`/`find . -name` 全仓扫描；本扩展在运行时层面强制拦截并给出正确工具引导。
+- **源文件**: `.pi/extensions/bash-search-guard.ts`
+- **测试**: `tests/bash-search-guard.test.ts`（`node --test tests/bash-search-guard.test.ts`，零外部依赖）
+
 ---
 
 ### 外部 Pi 包

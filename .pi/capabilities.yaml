@@ -17,6 +17,7 @@ global:
     - init-command
     - browse-session-tree
     - self-compact
+    - bash-search-guard
 
   # Agents synced to ~/.pi/agent/agents/
   agents:
