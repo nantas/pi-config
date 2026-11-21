@@ -142,7 +142,7 @@ pi login <provider>
 
 同步内容（基于 `capabilities.yaml`）：
 - `.pi/capabilities.yaml` 的 `global.settings` → `~/.pi/agent/settings.json`，本机的模型设置随未托管键一起保留
-- `.pi/extensions/` → `~/.pi/agent/extensions/`
+- `.pi/extensions/` → `~/.pi/agent/extensions/`（`global.external_extensions` 声明的扩展由外部工具管理，同步完全忽略：不复制、不覆盖、不清理）
 - `.pi/agents/` → `~/.pi/agent/agents/`
 - `.pi/skills/` → `~/.pi/agent/skills/`
 - `.pi/prompts/` → `~/.pi/agent/prompts/`

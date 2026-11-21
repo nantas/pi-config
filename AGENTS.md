@@ -64,6 +64,7 @@ removals, or scope changes of the following resource types MUST be accompanied b
 corresponding update to `.pi/capabilities.yaml`:
 
 - **Extensions** — Single-file `.ts` or directory with `package.json`
+- **External extensions** — Entries in `global.external_extensions`; managed by external tools, sync ignores them entirely (no copy, no overwrite, no stale cleanup). Bare names matching `<name>.ts` or `<name>/`, or exact filenames. Must not also appear in `global.extensions`.
 - **Skills** — Directories under `.pi/skills/` containing `SKILL.md` (synced to `~/.pi/agent/skills/` via `global.skills`, or to the cross-harness shared layer `~/.agents/skills/` via `global.shared_skills`)
 - **Agents** — `.md` files under `.pi/agents/`
 - **Prompts** — `.md` files under `.pi/prompts/`
@@ -80,6 +81,7 @@ corresponding update to `.pi/capabilities.yaml`:
 | Add new extension (global scope) | Append to `global.extensions` |
 | Add new extension (optional scope) | Append to `catalog.extensions` |
 | Remove an extension | Remove from `global.extensions` or `catalog.extensions` |
+| Declare an externally-managed extension | Add to `global.external_extensions` (sync ignores it; never copied or removed) |
 | Add package to global config | Append to `global.settings.packages` |
 | Add settings key to global config | Add key-value to `global.settings` |
 | Remove a settings key from global | Remove key from `global.settings` |

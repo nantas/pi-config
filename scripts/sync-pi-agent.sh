@@ -490,6 +490,7 @@ function extractItems(sectionName, keyword) {
 
 // Get global items for each type
 const globalExts = extractItems("global", "extensions");
+const globalExternalExts = extractItems("global", "external_extensions");
 const globalAgents = extractItems("global", "agents");
 const globalSkills = extractItems("global", "skills");
 const globalSharedSkills = extractItems("global", "shared_skills");
@@ -502,6 +503,19 @@ for (const name of globalSharedSkills) {
   if (globalSkills.includes(name)) {
     console.error("ERROR: skill '" + name + "' is declared in both global.skills and global.shared_skills.");
     console.error("       Remove it from one list; the two lists target different install roots.");
+    process.exit(1);
+  }
+}
+
+// Reject duplicate declarations: an extension must not appear in both
+// global.extensions (sync-managed) and global.external_extensions
+// (externally managed; sync ignores it entirely).
+for (const name of globalExternalExts) {
+  const base = name.endsWith(".ts") ? name.slice(0, -3) : name;
+  const extBase = (e) => e.endsWith(".ts") ? e.slice(0, -3) : e;
+  if (globalExts.some((e) => extBase(e) === base)) {
+    console.error("ERROR: extension '" + name + "' is declared in both global.extensions and global.external_extensions.");
+    console.error("       Remove it from one list; external_extensions entries are managed by external tools.");
     process.exit(1);
   }
 }
@@ -539,6 +553,11 @@ for (const entry of existingExts) {
   if (name === ".gitkeep") continue;
   // Strip .ts extension for comparison
   const baseName = name.endsWith(".ts") ? name.slice(0, -3) : name;
+  // Externally managed extensions are never removed
+  if (globalExternalExts.includes(name) || globalExternalExts.includes(baseName)) {
+    console.log("  Preserved external extension:", name);
+    continue;
+  }
   if (!globalExts.includes(baseName)) {
     const fullPath = path.join(targetRoot, "extensions", name);
     fs.rmSync(fullPath, { recursive: true, force: true });
@@ -1161,6 +1180,8 @@ Sync Complete
 ========================================
 Managed by manifest (.pi/capabilities.yaml):
   extensions/     -> ~/.pi/agent/extensions/  (whitelist: global.extensions)
+                     external_extensions: externally managed, sync ignores
+                     (never copies, overwrites, or removes)
   agents/         -> ~/.pi/agent/agents/      (whitelist: global.agents)
   skills/         -> ~/.pi/agent/skills/      (whitelist: global.skills)
   skills/         -> ~/.agents/skills/         (declared: global.shared_skills, additive-only)

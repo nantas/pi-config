@@ -19,6 +19,13 @@ global:
     - self-compact
     - bash-search-guard
 
+  # Extensions managed by external tools — sync ignores them entirely:
+  # never copied from the repo, never overwritten, never removed during
+  # stale cleanup. Entries are bare names matching <name>.ts or <name>/
+  # in the target extensions dir (or exact filenames).
+  external_extensions:
+    - magpie
+
   # Agents synced to ~/.pi/agent/agents/
   agents:
     - worker
