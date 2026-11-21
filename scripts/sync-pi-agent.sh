@@ -493,6 +493,7 @@ const globalExts = extractItems("global", "extensions");
 const globalAgents = extractItems("global", "agents");
 const globalSkills = extractItems("global", "skills");
 const globalSharedSkills = extractItems("global", "shared_skills");
+const globalHcTemplates = extractItems("global", "hc_templates");
 const globalPrompts = extractItems("global", "prompts");
 
 // Reject duplicate declarations: a skill must live in exactly one of
@@ -622,6 +623,25 @@ for (const skillName of globalSharedSkills) {
     console.log("  Synced shared skill:", skillName + "/");
   } else {
     console.log("  WARNING: Shared skill not found:", skillName);
+  }
+}
+
+// --- SYNC HC TEMPLATES (~/.config/herdr-core/templates/, additive-only) ---
+// hc terminal templates used by `hc run <template> "<task>"`. Declared
+// templates are replaced at the target; undeclared templates on this machine
+// are NEVER touched (no stale cleanup here).
+const hcTemplatesRoot = process.env.HERDR_TEMPLATES_ROOT
+  || path.join(os.homedir(), ".config", "herdr-core", "templates");
+console.log("\n--- Syncing hc templates (-> " + hcTemplatesRoot + ") ---");
+for (const templateName of globalHcTemplates) {
+  const sourceFile = path.join(sourceRoot, "herdr-templates", templateName + ".md");
+  const targetFile = path.join(hcTemplatesRoot, templateName + ".md");
+  if (fs.existsSync(sourceFile)) {
+    fs.mkdirSync(hcTemplatesRoot, { recursive: true });
+    fs.cpSync(sourceFile, targetFile, { force: true });
+    console.log("  Synced hc template:", templateName + ".md");
+  } else {
+    console.log("  WARNING: Hc template not found:", templateName);
   }
 }
 
@@ -805,6 +825,7 @@ export SOURCE_ROOT
 export TARGET_ROOT
 export REPO_ROOT
 export AGENTS_SKILLS_ROOT="${AGENTS_SKILLS_ROOT:-${HOME}/.agents/skills}"
+export HERDR_TEMPLATES_ROOT="${HERDR_TEMPLATES_ROOT:-${HOME}/.config/herdr-core/templates}"
 
 export TARGET_PATH="${TARGET_ROOT}/settings.json"
 
@@ -1143,6 +1164,7 @@ Managed by manifest (.pi/capabilities.yaml):
   agents/         -> ~/.pi/agent/agents/      (whitelist: global.agents)
   skills/         -> ~/.pi/agent/skills/      (whitelist: global.skills)
   skills/         -> ~/.agents/skills/         (declared: global.shared_skills, additive-only)
+  templates/      -> ~/.config/herdr-core/templates/ (declared: global.hc_templates, additive-only)
   prompts/        -> ~/.pi/agent/prompts/     (whitelist: global.prompts)
   settings.json   -> ~/.pi/agent/settings.json (generated: global.settings from manifest + target merge)
   catalog/        -> ~/.pi/agent/catalog/pi-config.yaml

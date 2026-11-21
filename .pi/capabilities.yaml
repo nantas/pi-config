@@ -39,6 +39,15 @@ global:
   shared_skills:
     - agent-reach
 
+  # hc (herdr-core) terminal templates synced to
+  # ~/.config/herdr-core/templates/.
+  # Additive-only: declared templates are replaced at the target; undeclared
+  # templates on the target machine are never removed.
+  hc_templates:
+    - peer
+    - grunt
+    - workhorse
+
   # Prompts synced to ~/.pi/agent/prompts/
   prompts:
     - opsx-apply

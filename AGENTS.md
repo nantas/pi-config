@@ -71,6 +71,7 @@ corresponding update to `.pi/capabilities.yaml`:
 - **Settings** — All keys under `global.settings` in `.pi/capabilities.yaml` are authoritative for `~/.pi/agent/settings.json`; keys not listed are preserved from the target file
 - **Managed files** — Entries in `global.files` map a target filename under `~/.pi/agent/` to a repo-relative source under `.pi/` (e.g. `sol-pi.json: managed/sol-pi.json`); manifest-declared files are replaced wholesale on sync. Adding/removing a managed file MUST update `global.files`.
 - **Env** — Entries in `global.env` and `catalog.env` declare environment variables required by capabilities, keyed by capability ID. `sync-pi-agent.sh` validates `global.env` during sync; `catalog.env` is checked by `install-from-pi-config` during catalog installation.
+- **hc templates** — `.md` files under `.pi/herdr-templates/` (hc terminal templates launched via `hc run <template> "<task>"`), listed in `global.hc_templates` and synced additively to `~/.config/herdr-core/templates/`
 
 ### Workflow Guidance
 
@@ -87,6 +88,7 @@ corresponding update to `.pi/capabilities.yaml`:
 | Add/remove an agent | Update `global.agents` |
 | Add/remove a skill | Update `global.skills` or `catalog.skills` |
 | Add/remove a shared-layer skill (~/.agents/skills/) | Update `global.shared_skills` (additive sync; never cleans undeclared content in the shared dir) |
+| Add/remove an hc template (~/.config/herdr-core/templates/) | Update `global.hc_templates` and add/remove the source under `.pi/herdr-templates/` (additive sync; never deletes undeclared templates) |
 | Add/remove a prompt | Append to / Remove from `global.prompts` |
 | Add env vars for a global capability | Add capability ID key to `global.env` with `variables` map |
 | Add env vars for a catalog capability | Add capability ID key to `catalog.env` with `variables` map |

@@ -1,106 +1,110 @@
-# Subagent 自动委派指南
+# subagent() 一次性委派指南
 
-> 本文档定义 agent **何时**以及**如何**自主使用 `subagent()` 工具进行任务委派。
+> 本文档定义 `subagent()` 工具的**唯一边界**：只用于拿一次性结果，以及不在 hc 环境时的降级。
+> 角色分工总则在 [AGENTS.md](./AGENTS.md) 的「角色分工与任务委派」；
+> 需要保留上下文、需要按验收反馈继续改的执行工作走 hc worker，见 [hc-delegation.md](./hc-delegation.md)。
 > Agent 定义位于 `.pi/agents/*.md`（项目级）和 `~/.pi/agent/agents/*.md`（全局）。
-> 可用 agent 列表在 pi session 启动时自动发现并注入到 system prompt。
 
 ---
 
-## 1. 新版 API 概览
+## 1. 适用范围（先读这一节）
 
-`@johnnywu/pi-subagents@1.5.0` 提供简化的 subagent tool：
+`subagent()` 的价值是 **token 屏障**：一次问答式调用，主 agent 只留摘要。
+它**不是**实施通道——子 agent 的上下文在返回时就消失了，无法继续追问、无法按验收意见续改。
+
+| 任务形态 | 用 `subagent()`？ |
+|----------|------------------|
+| 一次性检索/探索，产出结论摘要 | ✅ |
+| 按固定脚本/流程跑一遍并回报结果 | ✅ |
+| 单次外部资料调研，产出报告 | ✅ |
+| 只需静态判断的审查报告（不需要后续修复协作） | ✅ |
+| 当前不在 hc 环境（无 `hc` CLI）下的执行类工作 | ✅ 降级 |
+| 多文件实现改动 | ❌ hc worker（`grunt`/`workhorse`） |
+| 需要构建/测试循环、反复试错 | ❌ hc worker |
+| 可能要根据验收反馈继续改 | ❌ hc worker（上下文要留住） |
+| 长任务、并行任务 | ❌ hc worker |
+| 1-2 步精确检索、已知文件路径 | ❌ 主 agent 直接做 |
+
+判断标准一句话：**结果交回来就结束、后面不需要再和它对话** → `subagent()`；
+**要它继续改、要留上下文到验收通过** → hc worker。
+
+---
+
+## 2. API 概览
+
+`@johnnywu/pi-subagents@1.5.0` 提供的 subagent tool：
 
 ```typescript
 subagent({
   agent: "worker",     // 必填：agent 名称
-  task: "探索任务描述",  // 必填：委派给 agent 的任务
+  task: "任务描述",      // 必填：一次性任务
   cwd: "/path/to/dir"  // 可选：工作目录
 })
 ```
 
-**与旧版的差异**：
+**能力边界**：
 - ✅ 保留：单 agent 执行、agent 配置（model/thinking/tools/frontmatter）
-- ❌ 移除：`chain`（链式管道）、`tasks`（并行）、`async`（后台）、`action`（管理操作）、`output`、`context`、`concurrency`
-- ❌ 移除：slash commands（`/run`、`/agents`、`/chain` 等）
-- ❌ 移除：内置 agents 和内置 skill（需自行定义 `.md` 文件）
+- ❌ 没有：`chain`、`tasks`、`async`、`action`、`output`、`context`、`concurrency`
+- ❌ 没有：slash commands（`/run`、`/agents`、`/chain`）
 
-如需并行执行，主 agent 在一个 turn 中发起多次 `subagent()` 调用。
+需要并行时，主 agent 在同一个 turn 里发起多次 `subagent()` 调用（运行时逐个执行）。
 
 ---
 
-## 2. 自动触发规则
-
-以下场景中 agent **必须自动**使用 subagent 委派，不得在主 session 中自行执行：
+## 3. 触发场景（一次性结果）
 
 | 场景 | 触发条件 | 委派动作 |
 |------|---------|----------|
-| **代码探索** | 需要追踪跨文件调用链、搜索代码模式、分析多处代码结构 | `worker`（task 内声明只读） |
-| **MCP/gitnexus 重操作** | 调用 `gitnexus_query/context/impact`、Xcode、浏览器等返回大量数据的工具 | `worker`（task 内声明只读） |
-| **Git 溯源调研** | 需要用 `git log/blame/diff/bisect` 追溯功能变更史或 bug 引入点 | `worker`（task 内声明只读） |
-| **外部资料调研** | 需要搜索外部文档、API 文档、生态信息 | `researcher` |
-| **编辑后审查** | 实施完成、验证通过后 | `reviewer` × N（多次调用） |
+| **代码探索** | 追踪跨文件调用链、跨 3+ 文件找模式，只要结论 | `worker`（task 内声明只读） |
+| **重数据工具** | `gitnexus_query/context/impact` 等返回大量数据的组合调用 | `worker`（task 内声明只读） |
+| **Git 溯源** | `git log/blame/diff/bisect` 追功能变更史或 bug 引入点 | `worker`（task 内声明只读） |
+| **外部资料调研** | 搜外部文档、API 规范、生态信息 | `researcher` |
+| **静态审查** | 实施完成后要一份独立的审查报告 | `reviewer`（可多次调用取不同角度） |
 
-### 2.1 代码探索 — 自动触发判断
+不需要委派：
 
-| 如果你打算… | 应该 delegate 吗？ |
-|-------------|-------------------|
-| 用 `lsp definition` 查一个符号定义 | ❌ 轻量操作，直接做 |
-| 用 `grep` 搜一个简单模式 | ❌ 轻量操作，直接做 |
-| 追踪一条 3+ 步的调用链 | ✅ delegate to `worker`（只读） |
-| 跨 3+ 文件分析代码模式 | ✅ delegate to `worker`（只读） |
-| 同时搜索代码 + 查文档 | ✅ 依次 delegate to `worker`（只读）+ `researcher` |
-| 调用 `gitnexus_query` + `context` + `impact` 组合 | ✅ delegate to `worker`（只读） |
-| 在大型仓库中搜索多个不相关模式 | ✅ delegate to `worker`（一次任务覆盖多方向，只读） |
-| 用 `git log` 追溯某功能的提交历史 | ✅ delegate to `worker`（只读） |
-| 用 `git diff` / `git bisect` 找 bug 引入点 | ✅ delegate to `worker`（只读） |
-
-**判断原则**：如果操作需要 3+ 步工具调用才能得出一个结论，就应该 delegate。
-
-### 2.2 MCP/gitnexus 重操作
-
-MCP 工具返回的数据通常很大，会快速膨胀主 session context。
-
-| 场景 | 操作 |
-|------|------|
-| 单次小结果 `gitnexus_query` | 可以直接做 |
-| `gitnexus_context` + `gitnexus_impact` 组合 | delegate to `worker`（只读） |
-| 多个独立的 gitnexus 查询 | delegate to `worker`（一次任务包含多查询，只读） |
+| 你打算做的事 | 为什么自己做 |
+|-------------|-------------|
+| 单次 `grep` / `find` / `lsp definition` | 轻量，一次调用就有结果 |
+| 读一个已知路径的文件 | 直接 `read` |
+| 1-2 步就能确认的事实 | 委派开销大于收益 |
+| 需要完整原始数据才能判断的决策 | 摘要会丢信息 |
 
 ---
 
-## 3. Agent 选择矩阵
+## 4. Agent 选择矩阵
 
 | 任务类型 | Agent | 模型 | Thinking | Tools |
 |---------|-------|------|----------|-------|
 | 外部资料调研 | `researcher` | `magpie/group/workhorse` | high | read, write, web_search, fetch_content, intercom, gitnexus_query |
-| 编辑后审查 | `reviewer` | `magpie/group/grunt` | high | 全量（无白名单限制） |
-| 实施执行 | `worker` | `magpie/group/grunt` | low | read, grep, find, ls, bash, edit, write, contact_supervisor, gitnexus_* |
+| 审查报告 | `reviewer` | `magpie/group/grunt` | high | 全量（无白名单） |
+| 一次性执行/检索 | `worker` | `magpie/group/grunt` | low | read, grep, find, ls, bash, edit, write, contact_supervisor, gitnexus_* |
 
-> 模型是 Magpie 路由分组，分组内的实际模型由 Magpie 配置决定。
-> `worker` 有完整编辑工具：用它做只读探索时，task 里必须写明"只读，不要修改任何文件"。
-> "全量"表示该 agent 不设 tools 白名单，可使用 pi 默认的完整工具集。
-> `worker` 有完整的编辑工具 + `contact_supervisor`，实施时可按需向上级请求决策。
+> 模型是 Magpie 路由分组，分组内实际模型由 Magpie 配置决定。
+> `worker` 具备完整编辑工具；用它做只读探索时，task 里必须写明「只读，不要修改任何文件」。
+> 「全量」表示不设 tools 白名单，使用 pi 默认完整工具集。
 
 ---
 
-## 4. 多任务编排
+## 5. 多任务编排
 
-新版不支持 `tasks: []` 并行或 `chain: []` 链式。编排策略：
+### 5.1 串行依赖
 
-### 4.1 串行依赖任务
-
-主 agent 依次调用，将前一步结果作为后一步的 task 描述输入：
+把前一步结果作为后一步的 task 输入：
 
 ```
 步骤 1: subagent({ agent: "worker", task: "只读探索 auth 模块，输出关键文件+行号，不要修改文件" })
-→ 主 agent 读取结果，提取关键信息
+→ 主 agent 提取结论
 
-步骤 2: subagent({ agent: "worker", task: "按以下结论实施：<粘贴关键发现与改动范围>..." })
+步骤 2: subagent({ agent: "worker", task: "基于以下结论检查 X：<粘贴关键发现>" })
 ```
 
-### 4.2 独立任务（伪并行）
+链式改成两步一次性调用后，如果第二步会演变成「反复改到通过」，
+就不要再堆 `subagent()`，按 [hc-delegation.md](./hc-delegation.md) 开一个 hc worker。
 
-独立任务可在同一个 turn 中发起多次 `subagent()` 调用：
+### 5.2 独立任务（伪并行）
+
+同一 turn 内发起多次调用：
 
 ```
 subagent({ agent: "worker", task: "只读探索方向 A：auth 模块结构..." })
@@ -108,132 +112,83 @@ subagent({ agent: "worker", task: "只读探索方向 B：数据库查询模式.
 subagent({ agent: "researcher", task: "调研 OAuth 2.1 最新规范..." })
 ```
 
-pi 运行时会依次执行（非真正并行）。如需真正并行，等待未来版本支持。
+运行时依次执行（非真正并行）。需要真正并行的实施工作 → hc 多 worker。
 
-### 4.3 实施后审查
+### 5.3 审查
 
 ```
-subagent({ agent: "reviewer", task: "审查当前 diff 的正确性和回归风险。直接检查变更文件，返回文件/行号级别的发现。" })
+subagent({ agent: "reviewer", task: "审查当前 diff 的正确性和回归风险。直接检查变更文件，返回文件/行号级别发现。" })
 subagent({ agent: "reviewer", task: "审查当前 diff 的测试覆盖和可维护性。直接检查变更文件。" })
 ```
 
-主 agent 综合审查结果后，决定是否需要 `worker` 修复。
+审查返回的是报告。需要按报告继续修 → hc worker（或主 agent 自己改小改动），
+不要靠一串新的 `subagent()` 调用来「接力修改」。
 
 ---
 
-## 5. 结果综合规则
+## 6. 结果综合
 
-subagent 完成后，主 agent **自动综合**结果到回复中：
-
-### 5.1 综合格式
+subagent 返回后，主 agent 负责综合：
 
 ```
-## 探索结果综合
+## 结果综合
 
 ### 方向 A: auth 模块结构
 - worker 发现：...（关键文件行号引用）
 
 ### 方向 B: OAuth 流程
-- worker 通过 gitnexus 追踪到：...（调用链）
+- 追踪到：...（调用链 / commit hash）
 
-### 综合判断
-- 基于以上信息，建议...
+### 判断
+- 基于以上证据，建议...
 ```
 
-### 5.2 子结果引用
-
-综合时**必须附带** subagent 返回的关键发现：
-- 关键文件路径 + 行号
-- 调用链摘要 / commit hash
-- 置信度评估
-- 需要进一步确认的疑点
+综合时必须带上的内容：关键文件路径 + 行号、调用链摘要或 commit hash、置信度、
+仍需确认的疑点。**没有亲眼验证的结果不写成已通过。**
 
 ---
 
-## 6. 编排工作流
+## 7. Task Prompt 写法
 
-### 6.1 完整工作流（实施 + 审查）
-
-```
-用户请求
-  │
-  ├── 需要代码探索/Git 溯源/MCP？ → worker（只读 task）
-  ├── 需要外部调研？ → researcher
-  │
-  ├── 综合结果 → 回复用户
-  │
-  ├── 需要实施？ → worker（主 agent 自行定计划）
-  │
-  └── 实施完成 → reviewer × N
-       → 综合审查反馈
-       → worker 应用修复（如需）
-       → 验证 → 完成
-```
-
-### 6.2 轻量工作流（仅调研）
+一次性 task 用紧凑契约风格（Goal / Context / Validation / Output）：
 
 ```
-用户提问
-  │
-  ├── 简单问题（< 3 步） → 直接做
-  ├── 复杂问题 → worker（只读）+ 可选 researcher
-  │
-  └── 综合 → 回复
+Goal: 用 gitnexus 查 UserService.findByEmail 的调用链，输出关键文件 + 行号
+Context: 只读，不要修改任何文件
+Validation: 每个结论附带文件路径与行号
+Output: 列表，按调用层级排序
 ```
 
----
-
-## 7. Task Prompt 编写指南
-
-给 subagent 的 task 要遵循 **紧凑契约** 风格：
-
-### 好例子
+避免：
 
 ```
-"用 gitnexus 查询 UserService.findByEmail 的调用链，输出 key files + 行号"
-"grep 搜索 src/auth/ 下所有 'permission' 相关代码，列出关键函数和文件"
-"用 git log 追溯 feature-X 的完整提交史，输出每个 commit 的 hash + 标题 + 改动文件"
-```
-
-### 避免
-
-```
-"审查所有代码"（太模糊）
-"请帮我理解一下这个代码库，然后...然后..."（太长）
-```
-
-### 紧凑契约模板
-
-```
-Goal: <具体产出>
-Context: <关键路径/决策/约束>
-Validation: <如何验证产出正确>
-Output: <期望的格式>
+"审查所有代码"                                    （太模糊）
+"请理解这个代码库，然后...然后..."                  （需要多轮，不适用）
 ```
 
 ---
 
 ## 8. 底线约束
 
-### 必须 delegate
+### 必须 `subagent()`
 
-- **涉及 3+ 跨文件的分析** → worker（只读）
-- **调用返回大量数据的 MCP/gitnexus 工具** → worker（只读）
-- **Git 多步溯源（log + blame + diff 组合）** → worker（只读）
-- **外部资料调研** → researcher
-- **实施完成后** → reviewer
+- 涉及 3+ 跨文件分析且只要结论 → `worker`（只读）
+- 返回大量数据的 MCP/gitnexus 组合调用 → `worker`（只读）
+- 多步 Git 溯源（log + blame + diff）→ `worker`（只读）
+- 外部资料调研 → `researcher`
+- 一次性审查报告 → `reviewer`
 
-### 不要 delegate
+### 不要 `subagent()`
 
-- 单次 `lsp definition` / `references` 查询
-- 单次 grep 搜索
-- 简单文件读取
-- 用户直接要求的单步操作
-- 需要在主 session 上下文中才能准确判断的决策
+- 实施类改动（多文件编辑、构建/测试循环、按反馈迭代）→ hc worker
+- 长任务与并行工作 → hc worker / `hc run --bg`
+- 单次 `lsp` / `grep` / 文件读取 → 自己做
+- 需要主 session 上下文才能准确判断的决策 → 自己做
+- 已经是被委派的子终端 → 守范围，不再开 agent（见 AGENTS.md 反递归护栏）
 
 ### 其他约束
 
-- **写操作单线程**：修改必须串行，通过 worker 执行
-- **subagent 不能嵌套 subagent**：所有编排在主 agent
-- **决策权在主 agent**：综合、判断、回复由主 agent 完成
-- **每次 subagent 调用只传 agent + task**：无 action/output/context/concurrency 参数
+- **不嵌套子 agent**：一次性调用不做编排，编排全部在主 agent。
+- **决策权在主 agent**：综合、判断、回复由主 agent 完成。
+- **每次调用只传 `agent` + `task`**（+ 可选 `cwd`）：没有 action/output/context/concurrency。
+- **并行写文件**：不在 `subagent()` 层面并行改同一工作区；需要并行实施时用 hc worker + `$worktrunk-isolation`。

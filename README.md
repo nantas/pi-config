@@ -20,6 +20,7 @@
 ┌──────────────────────────────────────────────────────────────┐
 │                     .pi/ (仓库管理源)                        │
 │  settings.json  extensions/  agents/  packages/  prompts/   │
+│  herdr-templates/  — hc 终端模板（→ ~/.config/herdr-core/） │
 │  Pi 运行时的直接配置源，通过 sync 脚本部署到 ~/.pi/agent/    │
 ├──────────────────────────────────────────────────────────────┤
 │                     .agents/ (跨 Agent 共享层)                │
@@ -297,6 +298,14 @@ catalog:
 | `reviewer` | `magpie/group/grunt` | 实施后审查 |
 | `researcher` | `magpie/group/workhorse` | 外部资料调研 |
 
+仓库同时托管 hc（herdr-core）终端模板 `.pi/herdr-templates/`，经 `global.hc_templates` 同步到 `~/.config/herdr-core/templates/`（只增不删）：
+
+| 模板 | 模型 | 用途 |
+|------|------|------|
+| `grunt` | `magpie/group/grunt` | 常规实施：多文件编辑、批量改动、审查、探索 |
+| `workhorse` | `magpie/group/workhorse` | 复杂实施：架构级改动、难调试、深度调研 |
+| `peer` | 默认模型 | 同空间 peer 协作（发现同空间 agent 并互发消息） |
+
 ---
 
 ### 工作流技能
@@ -482,6 +491,7 @@ openspec/
 | `.pi/settings.json` | 全局配置：provider、model、packages、subagent overrides |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
 | `.pi/agents/` | Agent 定义（worker / researcher / reviewer） |
+| `.pi/herdr-templates/` | hc 终端模板（global.hc_templates → `~/.config/herdr-core/templates/`，只增不删） |
 | `.pi/skills/` | 同步技能源（global.skills → `~/.pi/agent/skills/`；global.shared_skills → `~/.agents/skills/`） |
 | `.agents/skills/` | OpenSpec 10 步工作流技能 + 全局 Superpowers |
 | `openspec/manifest.json` | 能力清单（specs 映射） |

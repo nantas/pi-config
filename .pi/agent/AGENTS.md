@@ -151,41 +151,40 @@
 | 跨文件重命名 | `bash` + `sed`，完成后 `grep` 验证所有引用已更新 |
 | 批量 checkbox 替换 | `bash` + `sed -i ''` |
 
-## Subagent 自动委派
+## 角色分工与任务委派
 
-**核心原则**：信息掌握度越低 → 越倾向委派。subagent 的主要价值是充当 token 屏障。
+### 谁是 lead
 
-### 委派触发判断
+`HC_TERMINAL_ID` 已设置，且自己不是被委派的子终端（`hc get` 的 `parent` 为空，且第一封信
+不是 `<hc from=...>` / `peer:`）→ 你是 lead。
 
-| 主 agent 状态 | 委派？ |
-|---------------|--------|
-| 目标模糊，需要在陌生代码中定位概念 | ✅ `worker` 盲探测（task 内声明只读） |
-| 需要追踪跨文件调用链但起点不明 | ✅ `worker`（task 内声明只读） |
-| 多个不相关方向需要同时探索 | ✅ 并行 `worker`（task 内声明只读） |
-| 实施完成后代码审查 | ✅ 并行 `reviewer` × 3 |
-| 已知符号名/文件路径，需要 1-2 次精确检索 | ❌ 直接做 |
-| 已掌握完整上下文，只需执行具体修改 | ❌ 直接做 |
-| 主 agent 需要完整原始数据做后续推理 | ❌ 不委派 |
+lead 的职责：把人给的需求收敛成明确目标、规划与设计、拆分协调、验收与汇总。
+具体执行默认交给常驻 hc agent，而不是自己从头一步步做。
 
-### 执行规范
+### 反递归护栏
 
-1. **Task 描述要具体**：明确查什么、输出什么格式
-2. **主 agent 只保留摘要**：subagent 返回后提取结论，不保留完整源码
-3. **按符号/文件拆分并行**：多个不相关查询用 `tasks: [...]` 并行执行
-4. **不要嵌套 subagent**：所有编排在主 agent 完成
+已在被委派的子终端里（`parent` 非空，或第一封信是 `<hc from=...>` / `peer:` 任务）
+→ 只在被指派范围内工作，**不得再开 hc agent**，除非上级或用户明确要求。
 
-### 工作流委派规则
+### 三种委派方式
 
-当 subagent task 涉及执行某个 `/xxx-yyy` 工作流时（如 `/opsx-verify`、`/opsx-apply`）：
+| 方式 | 适用 |
+|------|------|
+| **lead 自己做** | 意图澄清、规划/设计、OpenSpec 与文档、1-2 步只读确认、单文件小改、验收汇总 |
+| **hc agent（执行默认）** | 需要后续讨论、或要按验收反馈反复改的任务（上下文必须保留到被接受）；多文件改动、构建/测试循环、长任务、并行工作。放进当前 herdr.space 的一个专用 tab，每个 agent 一个 pane，用 `grunt`/`workhorse` 模板 |
+| **`subagent()`** | 只需**一次性结果**的任务：一次性检索、固定脚本/流程执行、单次外部调研。不需要后续沟通、不需要迭代修改才用它；不在 hc 环境时作为降级手段 |
 
-1. **必须读取完整 prompt 文件**，查找顺序：
-   - 全局：`~/.pi/agent/prompts/<name>.md`
-   - 项目级：`.pi/prompts/<name>.md`
-2. **将完整正文作为 task prompt 的主体**，不得摘要、改写或省略
-3. 主 agent 可以在 prompt 文件正文**之前或之后**追加补充上下文（如 change 名称、目标文件路径），但不得修改正文本身
-4. subagent 遇到不可执行的指令（如用户交互工具）时会自然跳过，不需要预先过滤
+### 通用规则
 
-> 串行编排模式、完整工作流和 task prompt 编写指南见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
+1. Task 写清范围、读写边界、验证方式、交付形态，并给 agent 一个明确的 name。
+2. 同一仓并行写文件时用 `$worktrunk-isolation`，不要让两个 worker 改同一份工作区。
+3. 收到汇报先读真实文件/diff/测试结果再汇总，不凭汇报文字断言通过。
+4. 委派 `/xxx-yyy` 工作流时，必须读取完整 prompt 正文作为 task
+   （查找顺序：`~/.pi/agent/prompts/<name>.md` → `.pi/prompts/<name>.md`），不得摘要改写；
+   可在正文前后追加补充上下文，但不得修改正文。
+
+> hc 模板选择、专用 tab / 多 pane 启动、等待与清理：见 [AGENTS.d/hc-delegation.md](./AGENTS.d/hc-delegation.md)。
+> `subagent()` 的 API、agent 选择矩阵与 task 写法：见 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
 
 ## README 维护
 
