@@ -126,6 +126,7 @@ Obsidian vault 搜索和知识导出能力。后端使用 jieba（Python）做�
 |----------|---------------|
 | Agent 定义、Agent 文件 | `agent-file-definitions`, `pi-subagent-agent-contract` |
 | Agent 指导、AGENTS.md | `global-agent-guidance`, `global-agent-definitions`, `agent-guidance-simplify` |
+| hc 委派、角色护栏、hc 模板 | `hc-delegation-extension` |
 | Subagent 调度 | `pi-subagent-dispatch-baseline`, `pi-global-subagent-package-delivery` |
 | Subagent 模型覆盖 | `subagent-model-override`, `subagent-settings` |
 | Subagent 提示模板 | `subagent-prompt-guide` |

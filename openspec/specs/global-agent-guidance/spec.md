@@ -72,3 +72,12 @@ AGENTS.md 的 Subagent 自动委派 section 的判断表 MUST 以主 agent 的�
 ### Requirement: grep-find-tool-section
 **Reason**: 内置 grep/find 被 fff 工具替代，相关使用原则已整合到 fff-retrieval spec
 **Migration**: fff 工具自带 smart-case、frecency 排名、git-aware 特性，无需手动约束 glob/path
+
+## ADDED Requirements
+
+### Requirement: Global capability manifest registers hc-delegation
+`.pi/capabilities.yaml` MUST include `hc-delegation` in `global.extensions` so global sync deploys `.pi/extensions/hc-delegation.ts` alongside the slimmed `.pi/agent/AGENTS.md` and `.pi/herdr-templates/*.md`.
+
+#### Scenario: capabilities manifest includes hc-delegation
+- **WHEN** 读取 `.pi/capabilities.yaml` 的 `global.extensions` 列表
+- **THEN** 列表包含 `hc-delegation`，全局同步部署 `.pi/extensions/hc-delegation.ts`

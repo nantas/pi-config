@@ -13,6 +13,7 @@ global:
     - tool-counter-widget
     - init-command
     - bash-search-guard
+    - hc-delegation
 
   # Extensions managed by external tools — sync ignores them entirely:
   # never copied from the repo, never overwritten, never removed during

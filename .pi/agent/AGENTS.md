@@ -19,21 +19,8 @@
 - 修缺陷先查全部调用方，在根因处一次性修复。保留信任边界校验与防数据丢失的错误处理。
 - 改动必须亲眼验证：运行真实测试、核对 diff 与命令输出，未亲眼看到的结果不写为已通过。
 
-## 角色分工与委派
-
-- **Lead 判定**：`HC_TERMINAL_ID` 已设、`hc get` 的 `parent` 为空，且首条消息不以 `<hc from=...>` 或 `peer:` 开头时，你是 lead，负责收敛目标、规划设计、委派协调与验收汇总。
-- **反递归护栏**：若 `parent` 非空或首条消息以 `<hc from=...>` / `peer:` 开头，你是被委派终端，只在指派范围内工作，禁止再启动 `hc` 或 `subagent()`。
-- **三路分流**（按文件数可判定的硬边界）：
-  - 自己做（仅限 ≤1 个文件）：意图澄清、规划与核心设计/spec 文档、1 到 2 步只读确认、单点修复、验收汇总。
-  - `hc` worker（执行默认，≥2 个文件一律走这里）：任何触及 2 个及以上文件的改动——代码、配置、文档都算——以及构建测试循环、需要留住上下文按验收反馈继续改、长任务或并行任务。禁止以“每次改动很小”“只是文档/配置”“开 worker 太费时”为由绕过委派。
-  - `subagent()`（一次性屏障）：结果交回即结束的跨文件检索、静态审查、外部调研，或无 `hc` 环境时的降级。
-- 委派 `/xxx-yyy` 提示模板时，读取完整正文（`~/.pi/agent/prompts/<name>.md` 优先于 `.pi/prompts/<name>.md`）原样传入，只允许在前后补上下文。
-- 同一仓库并行写文件时使用 `$worktrunk-isolation` 隔离 worktree。
-
 ## 按需加载参考
 
 仅在命中对应分支时用 `read` 加载，不提前读：
 
-- 准备启动、等待、验收或清理 `hc` worker：读取 [AGENTS.d/hc-delegation.md](./AGENTS.d/hc-delegation.md)。
-- 准备调用 `subagent()` 做一次性探索、调研或审查：读取 [AGENTS.d/subagent-usage.md](./AGENTS.d/subagent-usage.md)。
 - 需要把图片送入视觉输入（`read` / `webfetch`）或绘制 mermaid 图表：读取 [AGENTS.d/media-and-diagrams.md](./AGENTS.d/media-and-diagrams.md)。

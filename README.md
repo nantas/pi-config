@@ -101,6 +101,13 @@ cat .pi/settings.json
 - **源文件**: `.pi/extensions/bash-search-guard.ts`
 - **测试**: `tests/bash-search-guard.test.ts`（`node --test tests/bash-search-guard.test.ts`，零外部依赖）
 
+#### `hc-delegation`
+
+- **描述**: 按运行时角色（`hc_lead` / `hc_worker` / `hc_peer` / `subagent` / `standalone`）动态管理委派行为的护栏：提供 `hc_worker` / `hc_report` 工具，按角色注入系统提示 `<section>`，实施 Lead 委派硬拦截（仓库无关的多文件写入拦截——对所有路径一视同仁，含 OpenSpec 工件/spec/plan/ADR 等流程化产物，交由 `hc_worker` 按固定流程产出；多次直接探查提醒；裸跑 `hc run <template>` 重定向）、验证分工提醒（Worker 执行构建/测试/lint/验证命令并回报观测输出或日志路径，Lead 直接跑验证套件时收到非阻塞 `[hc-delegation]` 提醒，专注审查证据与 diff）与 Worker/Peer/Subagent 反递归硬拦截，支持 `/hc-guard`、`/hc-role` 命令。
+- **解决的问题**: 原先静态写在 `.pi/agent/AGENTS.md` 与 `AGENTS.d/hc-delegation.md`、`AGENTS.d/subagent-usage.md` 里的委派总则被无条件注入所有角色，易错流程（SPACE_ID/TAB_ID 反查、first_message 校验等）交给模型手写胶水；本扩展改为运行时按角色动态注入与强制拦截，静态文档已删除。
+- **源文件**: `.pi/extensions/hc-delegation.ts`
+- **测试**: `tests/hc-delegation.test.ts`（`node --test tests/hc-delegation.test.ts`，零外部依赖）
+
 ---
 
 ### 外部 Pi 包
@@ -255,7 +262,7 @@ catalog:
 | `reviewer` | `magpie/group/grunt` | 实施后审查 |
 | `researcher` | `magpie/group/workhorse` | 外部资料调研 |
 
-仓库同时托管 hc（herdr-core）终端模板 `.pi/herdr-templates/`，经 `global.hc_templates` 同步到 `~/.config/herdr-core/templates/`（只增不删）：
+仓库同时托管 hc（herdr-core）终端模板 `.pi/herdr-templates/`，经 `global.hc_templates` 同步到 `~/.config/herdr-core/templates/`（只增不删）。模板为纯 YAML frontmatter 启动清单（仅 `description` + `command`，正文为空），worker 角色提示由 `hc-delegation` 扩展在运行时注入：
 
 | 模板 | 模型 | 用途 |
 |------|------|------|
