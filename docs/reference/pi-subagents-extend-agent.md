@@ -1,7 +1,7 @@
 # Pi Subagents — Extending & Creating New Agents
 
 > Reference for creating, configuring, and managing custom agents via the
-> `@johnnywu/pi-subagents` extension (verified against installed v2.2.1:
+> `@johnnywu/pi-subagents` extension (verified against installed v2.3.1:
 > `~/.pi/agent/npm/node_modules/@johnnywu/pi-subagents/`).
 
 ## 1. Agent 文件规范
@@ -19,20 +19,20 @@
 
 ## 2. Frontmatter 完整字段
 
-以下为 v2.2.1 实际支持的全部字段（不在此列的键会被静默忽略）：
+以下为 v2.3.1 实际支持的全部字段（不在此列的键会被静默忽略；值非法时整个 agent 被跳过并给出启动警告）：
 
 | 字段 | 必填 | 默认 | 说明 |
 |------|------|------|------|
 | `name` | **yes** | — | agent 唯一标识 |
 | `description` | no | — | 人类可读摘要 |
-| `tools` | no | _none_ | 工具白名单，逗号分隔（`read, write, bash, grep` 等） |
+| `tools` | no | _none_ | 工具白名单，逗号分隔（`read, write, bash, grep` 等）；留空则不传 `--tools`，子进程用 Pi 默认工具集 |
 | `model` | no | parent's model | `provider/model-id`（如 `deepseek/deepseek-v4-flash`） |
 | `thinking` | no | `off` | `off` \| `minimal` \| `low` \| `medium` \| `high` \| `xhigh` |
 | `systemPrompt` | no | `append` | body 的应用方式（见第 4 节） |
-| `skills` | no | _none_ | 注入的技能，逗号分隔，支持 `*` 和 `obsidian-*` 前缀通配 |
+| `skills` | no | _none_ | 注入的技能，逗号分隔，支持 `*` 与 `obsidian-*` 前缀通配（仅 `*` 是通配符）；从项目 `.agents/skills/`、`.pi/skills/`、全局 `~/.pi/agent/skills/` 或 npm 包解析，匹配的是 skill frontmatter 的 `name` |
 | `allowedAgents` | no | _all_ | 该 agent 可派生的子 agent 白名单 |
 | `maxDepth` | no | `10` | 递归深度上限（`0` = 不可再派生） |
-| `debug` | no | `false` | `true` 时导出运行时 system prompt 到 `debug-system-prompt.md` |
+| `debug` | no | `false` | `true` 时子进程把运行时 system prompt 导出到 `debug-system-prompt.md`（经 `PI_SUBAGENT_DEBUG`） |
 
 frontmatter 是逐行解析的简易 `key: value` 格式（非完整 YAML）：每行必须含 `:`，值可用引号包裹去除。不支持嵌套结构、列表、多行值。
 
@@ -62,8 +62,8 @@ tools: read, grep, find, ls
 验证：
 
 - 启动时无 agent 解析警告
-- `/run {name} "你的任务"` 直接调用
-- 自然语言委托由父 session 的 `subagent` 工具路由
+- `subagent({ agent: "<name>", task: "<task>" })` 由父 session 直接调度（也可用自然语言委托，同样走 `subagent` 工具）
+- **没有**任何斜杠命令：v2.3.1 的扩展只注册 `subagent` 工具（`registerTool`），不注册 slash command —— 传 agent 与 task 靠工具调用，不是命令
 
 ## 4. Prompt 组装（`systemPrompt` 三模式）
 
@@ -84,22 +84,35 @@ tools: read, grep, find, ls
 - **`maxDepth`** — 从最初 agent 起算的硬上限，默认 `10`
 - **`allowedAgents`** — 父 agent 的白名单，子进程看不到白名单之外的 agent
 
-控制变量通过环境变量传递（`PI_SUBAGENT_DEPTH`、`PI_SUBAGENT_MAX_DEPTH`、`PI_SUBAGENT_ALLOWED`）。
+控制变量通过环境变量传递到子进程：
+
+| 变量 | 含义 |
+|------|------|
+| `PI_SUBAGENT_DEPTH` | 当前递归深度（子进程为父深度 +1），也是 `hc-delegation` 判定 `subagent` 角色的信号 |
+| `PI_SUBAGENT_MAX_DEPTH` | 本次派发的 `maxDepth` |
+| `PI_SUBAGENT_ALLOWED` | 该 agent 可见的子 agent 白名单（逗号分隔） |
+| `PI_SUBAGENT_NAME` | 正在运行的 agent 名字 |
+| `PI_SUBAGENT_SYSTEM_PROMPT_MODE` | `append` / `replace` / `replace-all` |
+| `PI_SUBAGENT_SESSION` | `none` / `fork` |
+| `PI_SUBAGENT_DEBUG` | `true` 时子进程把运行时 system prompt 写到 `debug-system-prompt.md` |
 
 ## 6. 已注册的项目 Agent（`.pi/agents/`）
 
-| Agent | systemPrompt | 用途 |
-|-------|--------------|------|
-| `researcher` | append | Web 调研，官方文档/规范/一手来源 |
-| `reviewer` | append | 代码审查，按严重度输出证据化发现 |
-| `worker` | append | 执行已批准计划的目标代码修改 |
+| Agent | systemPrompt | maxDepth | 用途 |
+|-------|--------------|----------|------|
+| `researcher` | replace | 0 | Web 调研，官方文档/规范/一手来源 |
+| `reviewer` | replace | 0 | 代码审查，按严重度输出证据化发现 |
+| `worker` | replace | 0 | 执行已批准计划的目标代码修改 |
 
-## 7. 已知限制（v2.2.1）
+本仓库统一用 `replace`：它只替换 Pi 默认 system prompt、**保留**项目上下文（`AGENTS.md` 等），所以放在 `AGENTS.md` 里的规则会同时进入每个 subagent；`maxDepth: 0` 让这些 agent 不能再派生。
+
+## 7. 已知限制（v2.3.1）
 
 - 不存在 per-agent 覆写机制（无 `subagents.agentOverrides` 之类的 settings 键）；定制 builtin/已有 agent 的唯一方式是建同名文件覆盖。
-- 不存在 `/agents` TUI 或 programmatic `create` action；agent 只能以 `.md` 文件创建。
-- frontmatter 不支持完整 YAML 语法（见第 2 节）。
+- 不存在 `/agents` TUI、没有任何 slash command，也没有 programmatic `create` action；agent 只能以 `.md` 文件创建，只能由 `subagent` 工具调度。
+- frontmatter 不支持完整 YAML 语法（见第 2 节），值非法（如 `thinking: fast`、`maxDepth: -1`）会跳过该 agent 并给启动警告。
 - 解析器只接受 LF 行尾（见第 1 节）。
+- 子进程以 `--mode json -p --no-skills --no-prompt-templates` 启动，工具集由 `tools` 白名单决定（留空 = Pi 默认工具集）；`skills` 字段是在 prompt 里注入 `<available_skills>` 块，不是打开原生技能加载。
 
 ## 8. 参考
 

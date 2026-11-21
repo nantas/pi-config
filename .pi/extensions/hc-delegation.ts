@@ -26,10 +26,17 @@
  *   `read`/`grep`/`find` without delegation is nudged, and
  *   `bash` + `hc run <known-template>` is redirected to `hc_worker`.
  * - Anti-recursion: `hc_worker`, `hc_peer` and `subagent` may not run `hc run`.
- * - `hc_worker` (spawn/send/wait/read/status/interrupt/close) and `hc_report`
+ * - `hc_worker` (spawn/send/read/status/interrupt/close) and `hc_report`
  *   (done/blocked/peer/list_peers) tools own the lifecycle instead of hand-written
  *   bash. Spawn sets the space/tab labels, takes over a still-default tab name,
  *   refuses duplicate live names, and verifies the launch task was delivered.
+ * - Communication is async push-first: a worker pushes `hc_report` when it is done
+ *   or blocked, and that push is what starts the Lead's next turn. There is no
+ *   `wait` action and Lead `bash` + `hc wait` gets a non-blocking nudge, because
+ *   parking the Lead turn blocks the person at the terminal.
+ * - A `hc_report` push that lands on a busy or dialog-locked Lead (exit 9/10, or
+ *   `blocked` / `status_mismatch` in the output) is reported as undelivered
+ *   guidance instead of a retryable error: never retry-spam, never `--force`.
  *
  * Zero dependencies beyond Pi itself and `typebox`.
  *
@@ -370,6 +377,37 @@ export function findHcRun(command: string): HcRunMatch | null {
   return null;
 }
 
+/** `hc wait` flags that consume the following argv token as their value. */
+const HC_WAIT_VALUE_FLAGS = new Set(["--output", "--timeout", "-o", "-t"]);
+
+/**
+ * Find the first `hc wait` invocation in a bash command. Statement and pipeline
+ * aware, so `echo "hc wait t3g"` is not a match. Returns a signature such as
+ * `hc wait t3g`, or `null`.
+ */
+export function detectDirectHcWaitCommand(command: string): string | null {
+  for (const statement of splitStatements(command)) {
+    for (const parsed of statementCommands(statement)) {
+      if (parsed.name !== "hc") continue;
+      if (parsed.argv.length === 0) continue;
+      if (unquote(parsed.argv[0]) !== "wait") continue;
+
+      let target: string | null = null;
+      for (let i = 1; i < parsed.argv.length; i++) {
+        const token = parsed.argv[i];
+        if (token.startsWith("-")) {
+          if (!token.includes("=") && HC_WAIT_VALUE_FLAGS.has(token)) i++;
+          continue;
+        }
+        target = unquote(token);
+        break;
+      }
+      return target ? `hc wait ${target}` : "hc wait";
+    }
+  }
+  return null;
+}
+
 export interface RawTemplateRunResult {
   blocked: boolean;
   template?: string;
@@ -406,7 +444,7 @@ export interface AntiRecursionResult {
 
 /**
  * Non-lead guard: a worker, peer or subagent must never start another agent, so
- * every `hc run` is blocked. `hc get/ls/send/read/wait/kill/rm` stay allowed.
+ * every `hc run` is blocked. `hc get/ls/send/read/interrupt/kill/rm` stay allowed.
  */
 export function detectAntiRecursionHcRun(command: string): AntiRecursionResult {
   const match = findHcRun(command);
@@ -416,8 +454,8 @@ export function detectAntiRecursionHcRun(command: string): AntiRecursionResult {
     reason:
       "hc-delegation: blocked `hc run` inside a delegated role (anti-recursion). " +
       "Workers, peers and subagents never start agents. " +
-      "Finish the assigned scope, then report with hc_report({ action: \"done\" | \"blocked\", summary }). " +
-      "hc get/ls/read/send/wait/interrupt/kill/rm are still allowed.",
+      "Finish the assigned scope, then report with hc_report({ action: \"done\" | \"blocked\", summary, report_file }). " +
+      "hc get/ls/read/send/interrupt/kill/rm are still allowed.",
   };
 }
 
@@ -654,7 +692,10 @@ function leadSection(role: Extract<RuntimeRole, { kind: "hc_lead" }>, agents: Ag
     "- `subagent()` is a one-shot read-only barrier: the result comes back and the agent ends, so a follow-up edit needs `hc_worker({ action: \"send\" })` or a new spawn.",
     "- Never start workers with `bash` + `hc run <template>` (blocked). Use `hc_worker({ action: \"spawn\" })`: it sets the space/tab labels, tracks ownership, and verifies the first message landed.",
     "",
-    "`hc_worker` actions: `spawn` (name, template, task, cwd?), `send`, `wait` (optional `output`), `read`, `status`, `interrupt`, `close`. Send follow-up edits to the existing worker with `send`.",
+    "`hc_worker` actions: `spawn` (name, template, task, cwd?), `send`, `read`, `status`, `interrupt`, `close`. Send follow-up edits to the existing worker with `send`.",
+    "",
+    "Async push-first: dispatch, confirm `first_message.sent`, tell the person in one line that the worker is running, then end your turn. The worker pushes `hc_report` when it is done or blocked and that push starts your next turn. Never park the conversation in `hc wait` — it is not an action here and it freezes the human-facing turn. While the worker runs, keep only non-blocking local work; `hc_worker({ action: \"status\" })` is the cheap liveness check.",
+    "After you close an interactive dialog (`ask_user` etc.), run a lightweight `hc_worker({ action: \"status\" })` per live worker (never a bulk `read`) and ping only `idle`/`done` workers asking for any undelivered report; never disturb a `working` worker.",
   ];
 
   if (role.templates.length > 0) {
@@ -697,7 +738,8 @@ function workerSection(
     }\`${role.spaceId ? `, space \`${role.spaceId}\`` : ""}).`,
     "- Work only inside the assigned scope. Do not widen it, and do not re-decide the goal.",
     noNestedAgentsLine(allowSubagents),
-    "- Report with `hc_report({ action: \"done\", summary })` or `hc_report({ action: \"blocked\", summary })`, including the verification command and its actual result.",
+    "- Report with `hc_report({ action: \"done\" | \"blocked\", summary, report_file })`: write the full 4-section report (`Goal / Changes / Verification / Blockers`) to a report file (e.g. `/tmp/hc-report-<name>.md`) or an ignored scratch file, keep it in this terminal, and push ONLY a one-line `summary` plus that `report_file`. Our pushes are async: the Lead reads the file, not a wall of text.",
+    "- Verification evidence must come from real runs in this turn — the command, its exit code, the paths. Never delete, skip or weaken a check to turn it green; a pre-existing baseline failure is reported in one line instead of being hidden.",
     "- Stay alive after reporting: follow-up tweaks arrive as messages in this same terminal.",
     `</${SECTION_WORKER}>`,
   ].join("\n");
@@ -902,7 +944,6 @@ export function shouldRenameTab(tabName: string | null): boolean {
 const HC_WORKER_ACTIONS = [
   "spawn",
   "send",
-  "wait",
   "read",
   "status",
   "interrupt",
@@ -917,7 +958,7 @@ const hcWorkerParameters = Type.Object(
       HC_WORKER_ACTIONS.map((action) => Type.Literal(action)),
       {
         description:
-          "spawn: start a worker in this Herdr space/tab. send/read/wait/status/interrupt/close: operate on a worker this session owns.",
+          "spawn: start an async worker in this Herdr space/tab; it pushes hc_report back when done or blocked. send/read/status/interrupt/close: operate on a worker this session owns. close: only once its evidence is collected and no stray background process, temporary worktree or scratch file from it is left behind.",
       },
     ),
     name: Type.Optional(
@@ -934,7 +975,7 @@ const hcWorkerParameters = Type.Object(
     task: Type.Optional(
       Type.String({
         description:
-          "The worker's first message: scope, boundaries, acceptance bar, and what to report. Required for spawn.",
+          "The worker's first message. List explicitly: the scope, the boundaries (what not to touch), the verification commands to run, and the required report format plus its report file path. Required for spawn.",
       }),
     ),
     cwd: Type.Optional(
@@ -942,12 +983,6 @@ const hcWorkerParameters = Type.Object(
     ),
     text: Type.Optional(
       Type.String({ description: "Message body for send. hc_worker never passes --force." }),
-    ),
-    output: Type.Optional(
-      Type.String({ description: "With wait: wait until the worker prints this text." }),
-    ),
-    timeout: Type.Optional(
-      Type.Integer({ minimum: 1, description: "With wait: seconds before checking in." }),
     ),
   },
   { additionalProperties: false },
@@ -965,7 +1000,13 @@ const hcReportParameters = Type.Object(
     summary: Type.Optional(
       Type.String({
         description:
-          "Report body for done/blocked/peer. Include the verification command and its actual result.",
+          "One-line outcome for done/blocked/peer: the verification command and its actual result. Keep the detail in report_file.",
+      }),
+    ),
+    report_file: Type.Optional(
+      Type.String({
+        description:
+          "Path holding the full 4-section report (Goal / Changes / Verification / Blockers), e.g. /tmp/hc-report-<name>.md. Pushed to the recipient as `report: <path>`.",
       }),
     ),
     target: Type.Optional(
@@ -982,13 +1023,12 @@ type HcWorkerParams = {
   task?: string;
   cwd?: string;
   text?: string;
-  output?: string;
-  timeout?: number;
 };
 
 type HcReportParams = {
   action: (typeof HC_REPORT_ACTIONS)[number];
   summary?: string;
+  report_file?: string;
   target?: string;
 };
 
@@ -1004,6 +1044,20 @@ function textResult(text: string, details: Record<string, unknown> = {}): ToolRe
 
 function errorResult(text: string, details: Record<string, unknown> = {}): ToolResult {
   return { content: [{ type: "text", text }], details, isError: true };
+}
+
+/** `hc send` exit codes that mean "the recipient is busy or in a dialog". */
+const UNDELIVERED_SEND_CODES = new Set([9, 10]);
+
+/**
+ * A push that cannot land right now is not a failure to retry: `hc send` exits 9
+ * or 10, or says `blocked` / `status_mismatch`, while the recipient is working or
+ * sitting in a human dialog.
+ */
+function isUndeliveredReport(sent: CommandResult): boolean {
+  if (UNDELIVERED_SEND_CODES.has(sent.code)) return true;
+  const combined = `${sent.stderr}\n${sent.stdout}`.toLowerCase();
+  return combined.includes("blocked") || combined.includes("status_mismatch");
 }
 
 // ---------------------------------------------------------------------------
@@ -1245,16 +1299,33 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
         ? (eventContent as Array<{ type: string; text?: string }>)
         : [];
 
-      // Verification execution belongs to the worker: nudge, never block.
+      // Verification execution belongs to the worker, and parking this turn in
+      // `hc wait` defeats async push-first: nudge, never block.
       if (toolName === "bash") {
         const command = ((event as { input?: { command?: unknown } }).input?.command ?? "") as string;
+        const nudges: string[] = [];
+
         const verification = typeof command === "string" ? detectDirectVerificationCommand(command) : null;
-        if (!verification) return undefined;
-        const nudge =
-          `[hc-delegation] \`${verification}\` is verification execution, which belongs to the worker. ` +
-          `Require it in each worker task (exact commands, observed output, or log paths), then audit that ` +
-          `evidence here instead of re-running the suite in Lead bash.`;
-        return { content: [...parts, { type: "text", text: nudge }] };
+        if (verification) {
+          nudges.push(
+            `[hc-delegation] \`${verification}\` is verification execution, which belongs to the worker. ` +
+              `Require it in each worker task (exact commands, observed output, or log paths), then audit that ` +
+              `evidence here instead of re-running the suite in Lead bash.`,
+          );
+        }
+
+        const hcWait = typeof command === "string" ? detectDirectHcWaitCommand(command) : null;
+        if (hcWait) {
+          nudges.push(
+            `[hc-delegation] \`${hcWait}\` blocks this human-facing Lead turn, and delegation is async push-first: ` +
+              `the worker pushes \`hc_report\` when it is done or blocked, and that push starts your next turn. ` +
+              `End the turn and rely on the reactive push; use the non-blocking ` +
+              `\`hc_worker({ action: "status" })\` for a liveness check instead of waiting.`,
+          );
+        }
+
+        if (nudges.length === 0) return undefined;
+        return { content: [...parts, ...nudges.map((text) => ({ type: "text" as const, text }))] };
       }
 
       if (!DIRECT_INSPECTION_TOOLS.has(toolName)) return undefined;
@@ -1279,14 +1350,16 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
       name: "hc_worker",
       label: "hc worker",
       description:
-        "Manage hc workers in this Herdr space: spawn, send, wait, read, status, interrupt, close. " +
+        "Manage hc workers in this Herdr space: spawn, send, read, status, interrupt, close. " +
         "Spawn places every worker of this session into one shared tab with the space and tab labels set, " +
-        "takes over a tab that still has its default numeric name, and verifies the launch task was actually delivered.",
+        "takes over a tab that still has its default numeric name, and verifies the launch task was actually delivered. " +
+        "Workers run asynchronously and push hc_report back when done or blocked; there is no wait action.",
       promptSnippet:
-        "Start or manage an hc worker terminal (spawn/send/wait/read/status/interrupt/close)",
+        "Start or manage an async hc worker terminal (spawn/send/read/status/interrupt/close)",
       promptGuidelines: [
         "Use hc_worker({ action: \"spawn\" }) instead of bash + `hc run <template>`: it sets the space/tab labels, tracks ownership, and verifies first_message delivery.",
-        "Use hc_worker({ action: \"close\" }) only for workers this session started; it refuses terminals it does not own.",
+        "After spawn the worker is asynchronous: tell the person it is running and end the turn; never park the turn in `hc wait`. Its hc_report push starts your next turn.",
+        "Use hc_worker({ action: \"close\" }) only for workers this session started, after its evidence is collected and no stray background process, temporary worktree or scratch file from it is left behind.",
       ],
       parameters: hcWorkerParameters,
       defaultActive: false,
@@ -1322,6 +1395,18 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
           }
 
           const cwd = nonEmpty(params.cwd);
+
+          // A tab the person closed must not be resurrected: drop the stale label
+          // so Herdr opens a fresh tab. `herdr-app ls` failing keeps the old
+          // conservative behaviour of reusing the recorded label.
+          if (role.spaceId && sessionState.tabId) {
+            const listed = await run("herdr-app", ["ls"]);
+            if (listed.code === 0 && findTabName(listed.stdout, sessionState.tabId) === null) {
+              sessionState.tabId = null;
+              sessionState.tabName = null;
+            }
+          }
+
           const args = buildSpawnArgs({
             name,
             template,
@@ -1399,7 +1484,9 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
             `spawned \`${name}\` → ${address} (template \`${template}\`)${
               sessionState.tabId ? ` in tab \`${sessionState.tabId}\`` : ""
             }`,
-            `next: hc_worker({ action: "wait", name: "${name}" }) to block until it stops working.`,
+            `the worker runs asynchronously: it pushes \`hc_report\` when it is done or blocked, and that push starts your next turn. ` +
+              `Do not wait. Tell the person in one line that it is running, then end your turn (or keep only non-blocking local work); ` +
+              `\`hc_worker({ action: "status", name: "${name}" })\` is the cheap liveness check.`,
           ];
           for (const warning of warnings) lines.push(`warning: ${warning}`);
           return textResult(lines.join("\n"), {
@@ -1452,21 +1539,6 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
           return textResult(`sent to \`${name}\``, { name });
         }
 
-        if (params.action === "wait") {
-          const args = ["wait", name];
-          const output = nonEmpty(params.output);
-          if (output) args.push("--output", output);
-          if (typeof params.timeout === "number" && params.timeout > 0) {
-            args.push("--timeout", String(params.timeout));
-          }
-          const waited = await run("hc", args);
-          const body = waited.stdout.trim() || waited.stderr.trim();
-          if (waited.code !== 0) {
-            return errorResult(`hc wait failed (exit ${waited.code}): ${body}`, { name });
-          }
-          return textResult(body || `\`${name}\` is no longer working`, { name });
-        }
-
         if (params.action === "read") {
           const read = await run("hc", ["read", name]);
           if (read.code !== 0) {
@@ -1506,11 +1578,13 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
       label: "hc report",
       description:
         "Report to the parent terminal (done/blocked) or message another agent in this Herdr space (peer/list_peers). " +
+        "Pushes are one line plus a report file path; the full Goal / Changes / Verification / Blockers report lives in that file. " +
         "Messages are formatted and sent with hc; --force is never used.",
       promptSnippet: "Report done/blocked to the parent terminal, or message a peer in this space",
       promptGuidelines: [
-        "Use hc_report({ action: \"done\", summary }) when a delegated scope is finished, including the verification command and its result.",
-        "Use hc_report({ action: \"blocked\", summary }) when a delegated scope cannot proceed; say what you need and what you already tried.",
+        "Use hc_report({ action: \"done\", summary, report_file }) when a delegated scope is finished: `summary` is one line with the verification command and its result, `report_file` holds the full Goal / Changes / Verification / Blockers report.",
+        "Use hc_report({ action: \"blocked\", summary, report_file }) when a delegated scope cannot proceed; say what you need and what you already tried.",
+        "If hc_report says the push is undelivered, do not retry-spam it and never use --force: keep the report file and wait for the Lead to ping you after its dialog closes.",
       ],
       parameters: hcReportParameters,
       defaultActive: false,
@@ -1525,6 +1599,14 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
         }
 
         const summary = nonEmpty(params.summary);
+        const reportFile = nonEmpty(params.report_file);
+        // `report: <path>` keeps the pushed line one line while the file holds the detail.
+        const withReport = (message: string): string =>
+          reportFile ? `${message} report: ${reportFile}` : message;
+        const lengthNote =
+          summary && summary.length > 300
+            ? `note: this pushed summary is ${summary.length} chars. Keep pushed summaries one line and move the detail into report_file (Goal / Changes / Verification / Blockers).`
+            : null;
 
         if (params.action === "done" || params.action === "blocked") {
           if (!summary) return errorResult(`hc_report ${params.action} requires \`summary\`.`);
@@ -1538,15 +1620,39 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
               `No parent terminal found for \`${role.terminalId}\`; nothing to report to.`,
             );
           }
-          const message = `${params.action}: ${summary}`;
+          const message = withReport(`${params.action}: ${summary}`);
           const sent = await run("hc", ["send", parent, message]);
+          if (isUndeliveredReport(sent)) {
+            // Not an error and not retryable: the Lead is busy or in a human dialog.
+            return textResult(
+              [
+                `status: undelivered (lead_blocked) — hc send to \`${parent}\` did not land (exit ${sent.code}).`,
+                "The Lead is busy or in a human dialog. Do NOT retry-spam this report and NEVER use --force.",
+                `The full report stays in ${reportFile ?? "this terminal's visible output"} and is remembered as undelivered.`,
+                "Wait silently: the Lead pings you after it closes its dialog.",
+              ].join("\n"),
+              {
+                parent,
+                message,
+                status: "undelivered (lead_blocked)",
+                code: sent.code,
+                reportFile,
+                undelivered: true,
+              },
+            );
+          }
           if (sent.code !== 0) {
             return errorResult(
               `hc send to parent \`${parent}\` failed: ${sent.stderr.trim() || sent.stdout.trim()}`,
               { parent },
             );
           }
-          return textResult(`reported ${params.action} to \`${parent}\``, { parent, message });
+          const reported = `reported ${params.action} to \`${parent}\``;
+          return textResult(lengthNote ? `${reported}\n${lengthNote}` : reported, {
+            parent,
+            message,
+            reportFile,
+          });
         }
 
         if (params.action === "list_peers") {
@@ -1583,7 +1689,7 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
         const target = nonEmpty(params.target);
         if (!target) return errorResult("hc_report peer requires `target` (a peer address).");
         if (!summary) return errorResult("hc_report peer requires `summary`.");
-        const message = `peer: ${role.terminalId} ${summary}`;
+        const message = withReport(`peer: ${role.terminalId} ${summary}`);
         const sent = await run("hc", ["send", target, message]);
         if (sent.code !== 0) {
           return errorResult(
@@ -1591,7 +1697,12 @@ export function createHcDelegationExtension(deps: HcDelegationDeps = {}) {
             { target },
           );
         }
-        return textResult(`sent peer message to \`${target}\``, { target, message });
+        const sentLine = `sent peer message to \`${target}\``;
+        return textResult(lengthNote ? `${sentLine}\n${lengthNote}` : sentLine, {
+          target,
+          message,
+          reportFile,
+        });
       },
     });
 

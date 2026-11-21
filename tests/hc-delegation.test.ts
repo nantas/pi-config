@@ -111,6 +111,7 @@ type ExtensionModule = {
   ) => RolePlan;
   applyToolPlan: (active: readonly string[], plan: RolePlan) => string[];
   detectDirectVerificationCommand: (command: string) => string | null;
+  detectDirectHcWaitCommand: (command: string) => string | null;
   detectRawHcTemplateRun: (
     command: string,
     knownTemplates: readonly string[],
@@ -470,16 +471,41 @@ test("both tools register inactive with strict-provider-safe parameters", async 
   }
 });
 
-test("hc_worker schema covers every lifecycle action", async () => {
+test("hc_worker schema covers every lifecycle action and has no wait action", async () => {
   const h = await harness();
   const actions = h.tools.hc_worker.parameters.properties.action.anyOf.map((entry: any) => entry.const);
-  assert.deepEqual(actions, ["spawn", "send", "wait", "read", "status", "interrupt", "close"]);
+  assert.deepEqual(actions, ["spawn", "send", "read", "status", "interrupt", "close"]);
+  assert.equal(actions.includes("wait"), false);
+  // The wait-only parameters are gone too.
+  const properties = h.tools.hc_worker.parameters.properties;
+  assert.equal("timeout" in properties, false);
+  assert.equal("output" in properties, false);
+  assert.equal("wait_mode" in properties, false);
 });
 
 test("hc_report schema covers every reporting action", async () => {
   const h = await harness();
   const actions = h.tools.hc_report.parameters.properties.action.anyOf.map((entry: any) => entry.const);
   assert.deepEqual(actions, ["done", "blocked", "peer", "list_peers"]);
+});
+
+test("schemas carry the async push-first contract", async () => {
+  const h = await harness();
+  const workerProperties = h.tools.hc_worker.parameters.properties;
+  const reportProperties = h.tools.hc_report.parameters.properties;
+
+  // Report-file-first pushes: the summary stays one line, the file holds the detail.
+  assert.equal(reportProperties.report_file.type, "string");
+  assert.match(reportProperties.report_file.description, /Goal \/ Changes \/ Verification \/ Blockers/);
+  assert.match(reportProperties.report_file.description, /report: <path>/);
+  assert.match(reportProperties.summary.description, /One-line outcome/);
+
+  // A spawn kickoff must state scope, boundaries, verification and report format.
+  for (const hint of ["scope", "boundaries", "verification commands", "report format", "report file path"]) {
+    assert.match(workerProperties.task.description, new RegExp(hint), hint);
+  }
+  // close is gated on collected evidence and no leftovers.
+  assert.match(workerProperties.action.description, /no stray background process, temporary worktree or scratch file/);
 });
 
 // ===========================================================================
@@ -518,6 +544,44 @@ test("buildRolePlan: hc_lead adds hc_worker without forcing subagent on", async 
   assert.match(plan.sections.delegation!, /grunt/);
   assert.match(plan.sections.delegation!, /`reviewer` \(project\)/);
   assert.ok(plan.subagentSnippet);
+});
+
+test("buildRolePlan: the lead section is async push-first and never recommends waiting", async () => {
+  const mod = await loadModule();
+  const plan = mod.buildRolePlan(
+    { kind: "hc_lead", terminalId: "t18", spaceId: SPACE, templates: templatesPayload.templates },
+    baseState(),
+  );
+  const section = plan.sections.delegation!;
+  assert.match(section, /Async push-first/);
+  assert.match(section, /confirm `first_message\.sent`/);
+  assert.match(section, /then end your turn/);
+  assert.match(section, /Never park the conversation in `hc wait`/);
+  assert.match(section, /`hc_worker\(\{ action: "status" \}\)` is the cheap liveness check/);
+  // Dialog-close recovery: status sweep, ping only idle/done workers.
+  assert.match(section, /close an interactive dialog/);
+  assert.match(section, /per live worker \(never a bulk `read`\)/);
+  assert.match(section, /never disturb a `working` worker/);
+  // `wait` is neither advertised nor suggested.
+  assert.match(section, /^- `subagent\(\)` is a one-shot read-only barrier/m);
+  assert.doesNotMatch(section, /action: "wait"/);
+  assert.doesNotMatch(section, /`wait` \(optional `output`\)/);
+  assert.match(section, /`hc_worker` actions: `spawn`[^\n]*`close`/);
+});
+
+test("buildRolePlan: the worker section is report-file-first and verification-honest", async () => {
+  const mod = await loadModule();
+  const plan = mod.buildRolePlan(
+    { kind: "hc_worker", terminalId: "t3g", parent: "t18", template: "workhorse", spaceId: SPACE },
+    baseState(),
+  );
+  const section = plan.sections.hc_worker_role!;
+  assert.match(section, /Goal \/ Changes \/ Verification \/ Blockers/);
+  assert.match(section, /report_file/);
+  assert.match(section, /one-line `summary`/);
+  assert.match(section, /real runs in this turn/);
+  assert.match(section, /Never delete, skip or weaken a check/);
+  assert.match(section, /baseline failure/);
 });
 
 test("buildRolePlan: hc_worker loses subagent and hc_worker, gains hc_report", async () => {
@@ -651,6 +715,45 @@ test("detectDirectVerificationCommand ignores inspection, hc and quoted text", a
     "",
   ]) {
     assert.equal(mod.detectDirectVerificationCommand(command), null, command);
+  }
+});
+
+// ===========================================================================
+// hc wait detection (async push-first)
+// ===========================================================================
+
+test("detectDirectHcWaitCommand matches hc wait across statements and pipelines", async () => {
+  const mod = await loadModule();
+  const matches: Array<[string, string]> = [
+    ["hc wait t3g", "hc wait t3g"],
+    ["hc wait --timeout 30 t3g", "hc wait t3g"],
+    ["hc wait --timeout=60 t3g", "hc wait t3g"],
+    ["hc wait --output done", "hc wait"],
+    ["hc wait", "hc wait"],
+    ["cd repo && hc wait t3g", "hc wait t3g"],
+    ["git status; hc wait t3g", "hc wait t3g"],
+    ["echo x | tee log | hc wait t3g", "hc wait t3g"],
+    ["command hc wait t3g", "hc wait t3g"],
+  ];
+  for (const [command, expected] of matches) {
+    assert.equal(mod.detectDirectHcWaitCommand(command), expected, command);
+  }
+});
+
+test("detectDirectHcWaitCommand ignores non-wait commands and quoted text", async () => {
+  const mod = await loadModule();
+  for (const command of [
+    "hc ls --json",
+    "hc get t18 --json",
+    "hc read t3g",
+    'hc send t18 "done: ok"',
+    "hc run grunt \"x\"",
+    'echo "hc wait t3g"',
+    "git commit -m 'hc wait t3g'",
+    "wait t3g",
+    "",
+  ]) {
+    assert.equal(mod.detectDirectHcWaitCommand(command), null, command);
   }
 });
 
@@ -1370,6 +1473,85 @@ test("hc_worker spawn: second worker reuses the captured tab label", async () =>
   assert.equal(runCalls[1].args.includes(`herdr.tab=${TAB}`), true);
 });
 
+test("hc_worker spawn: the output is async push-first and never recommends waiting", async () => {
+  const h = await harness({ env: { HC_TERMINAL_ID: "t18" }, exec: spawnExec({ tabName: "1" }) });
+  await h.fire("before_agent_start", beforeStartEvent());
+  const result = await h.callTool("hc_worker", { action: "spawn", name: "w1", template: "grunt", task: "x" });
+  const text = result.content[0].text as string;
+  assert.match(text, /runs asynchronously/);
+  assert.match(text, /pushes `hc_report`/);
+  assert.match(text, /end your turn/);
+  assert.match(text, /hc_worker\(\{ action: "status", name: "w1" \}\)/);
+  assert.doesNotMatch(text, /action: "wait"/);
+  assert.doesNotMatch(text, /block until/);
+});
+
+/** A lead plus a pre-seeded tab, for the stale-tab checks. */
+function restoredTabHarness(appList: CommandResult) {
+  const stateEntry = {
+    type: "custom",
+    customType: "hc-delegation-state",
+    data: { tabId: TAB, tabName: "hc-work", guardEnabled: true, roleOverride: null, ownedWorkers: {} },
+  };
+  return harness({
+    env: { HC_TERMINAL_ID: "t18" },
+    entries: [stateEntry],
+    exec: async (command, args) => {
+      if (command === "hc" && args[0] === "get" && args[1] === "t18") return ok(leadTerminal());
+      if (command === "hc" && args[0] === "templates") return ok(templatesPayload);
+      if (command === "hc" && args[0] === "get") return fail("absent");
+      if (command === "hc" && args[0] === "run") return ok({ address: "t50", first_message: { sent: true } });
+      if (command === "herdr-app" && args[0] === "ls") return appList;
+      return ok("");
+    },
+  });
+}
+
+test("hc_worker spawn: a closed tab is dropped instead of being resurrected", async () => {
+  // `herdr-app ls` succeeds but no longer contains the recorded tab.
+  const h = await restoredTabHarness(
+    ok({
+      spaces: [
+        {
+          id: SPACE,
+          name: "repo",
+          tabs: [{ id: "tab999", name: "1", terminals: [{ terminal: "t18" }] }],
+        },
+      ],
+    }),
+  );
+  await h.fire("session_start", { type: "session_start" });
+  await h.fire("before_agent_start", beforeStartEvent());
+  await h.callTool("hc_worker", { action: "spawn", name: "w1", template: "grunt", task: "x" });
+
+  const runCall = h.execCalls.find((call) => call.command === "hc" && call.args[0] === "run");
+  assert.ok(runCall);
+  assert.equal(runCall!.args.includes(`herdr.tab=${TAB}`), false, "the stale tab label is not reused");
+  assert.equal(runCall!.args.includes(`herdr.space=${SPACE}`), true, "the space label survives");
+});
+
+test("hc_worker spawn: a still-live tab keeps its label", async () => {
+  const h = await restoredTabHarness(ok(appListPayload("hc-work", ["t18"])));
+  await h.fire("session_start", { type: "session_start" });
+  await h.fire("before_agent_start", beforeStartEvent());
+  await h.callTool("hc_worker", { action: "spawn", name: "w1", template: "grunt", task: "x" });
+
+  const runCall = h.execCalls.find((call) => call.command === "hc" && call.args[0] === "run");
+  assert.ok(runCall);
+  assert.equal(runCall!.args.includes(`herdr.tab=${TAB}`), true);
+});
+
+test("hc_worker spawn: an unreadable herdr-app ls keeps the recorded tab", async () => {
+  const h = await restoredTabHarness(fail("app not open"));
+  await h.fire("session_start", { type: "session_start" });
+  await h.fire("before_agent_start", beforeStartEvent());
+  await h.callTool("hc_worker", { action: "spawn", name: "w1", template: "grunt", task: "x" });
+
+  const runCall = h.execCalls.find((call) => call.command === "hc" && call.args[0] === "run");
+  assert.ok(runCall);
+  assert.equal(runCall!.args.includes(`herdr.tab=${TAB}`), true, "failing closed keeps the old behaviour");
+});
+
 test("hc_worker spawn: falls back to herdr-app ls by address when the tab label is missing", async () => {
   const h = await harness({
     env: { HC_TERMINAL_ID: "t18" },
@@ -1490,15 +1672,9 @@ test("hc_worker send never passes --force", async () => {
   assert.equal(send!.args.includes("--force"), false);
 });
 
-test("hc_worker wait/read/status/interrupt map to the right hc commands", async () => {
+test("hc_worker read/status/interrupt map to the right hc commands", async () => {
   const h = await harness({ env: { HC_TERMINAL_ID: "t18" }, exec: leadExec() });
   await h.fire("before_agent_start", beforeStartEvent());
-
-  await h.callTool("hc_worker", { action: "wait", name: "w1", output: "done", timeout: 30 });
-  assert.deepEqual(
-    h.execCalls.find((call) => call.command === "hc" && call.args[0] === "wait")!.args,
-    ["wait", "w1", "--output", "done", "--timeout", "30"],
-  );
 
   await h.callTool("hc_worker", { action: "read", name: "w1" });
   assert.deepEqual(
@@ -1551,6 +1727,86 @@ test("hc_report blocked sends a prefixed blocker report", async () => {
   await h.callTool("hc_report", { action: "blocked", summary: "need the vault path" });
   const send = h.execCalls.find((call) => call.command === "hc" && call.args[0] === "send");
   assert.deepEqual(send!.args, ["send", "t18", "blocked: need the vault path"]);
+});
+
+test("hc_report appends the report file path to the pushed line", async () => {
+  const h = await workerHarness();
+  await h.callTool("hc_report", {
+    action: "done",
+    summary: "tests green: node --test -> 42 pass",
+    report_file: "/tmp/hc-report-async-impl.md",
+  });
+  const send = h.execCalls.find((call) => call.command === "hc" && call.args[0] === "send");
+  assert.deepEqual(send!.args, [
+    "send",
+    "t18",
+    "done: tests green: node --test -> 42 pass report: /tmp/hc-report-async-impl.md",
+  ]);
+
+  await h.callTool("hc_report", { action: "peer", target: "t39", summary: "look", report_file: "/tmp/p.md" });
+  const peerSend = h.execCalls.filter((call) => call.command === "hc" && call.args[0] === "send").at(-1);
+  assert.deepEqual(peerSend!.args, ["send", "t39", "peer: t3g look report: /tmp/p.md"]);
+});
+
+test("hc_report reminds the worker when a pushed summary is not one line", async () => {
+  const h = await workerHarness();
+  const short = await h.callTool("hc_report", { action: "done", summary: "ok: node --test -> 3 pass" });
+  assert.doesNotMatch(short.content[0].text, /note:/);
+
+  const long = await h.callTool("hc_report", {
+    action: "done",
+    summary: `done: ${"x".repeat(320)}`,
+    report_file: "/tmp/hc-report-long.md",
+  });
+  assert.equal(long.isError, undefined);
+  assert.match(long.content[0].text, /note: this pushed summary is \d+ chars/);
+  assert.match(long.content[0].text, /one line/);
+  assert.match(long.content[0].text, /report_file/);
+});
+
+/** Worker harness whose `hc send` fails in a specific way. */
+function undeliveredHarness(failure: CommandResult) {
+  return workerHarness(async (command, args) => {
+    if (command === "hc" && args[0] === "send") return failure;
+    return undefined;
+  });
+}
+
+for (const [label, failure] of [
+  ["exit 9", { code: 9, stdout: "", stderr: "" }],
+  ["exit 10", { code: 10, stdout: "", stderr: "" }],
+  ["blocked text", { code: 1, stdout: "", stderr: "terminal is blocked" }],
+  ["status_mismatch text", { code: 1, stdout: "status_mismatch", stderr: "" }],
+] as Array<[string, CommandResult]>) {
+  test(`hc_report treats a ${label} send as undelivered, not as a retryable error`, async () => {
+    const h = await undeliveredHarness(failure);
+    const result = await h.callTool("hc_report", {
+      action: "done",
+      summary: "ok",
+      report_file: "/tmp/hc-report-async-impl.md",
+    });
+
+    assert.equal(result.isError, undefined, "undelivered is guidance, not an error");
+    assert.equal(result.details.status, "undelivered (lead_blocked)");
+    assert.equal(result.details.undelivered, true);
+    assert.match(result.content[0].text, /undelivered \(lead_blocked\)/);
+    assert.match(result.content[0].text, /Do NOT retry-spam/);
+    assert.match(result.content[0].text, /NEVER use --force/);
+    assert.match(result.content[0].text, /\/tmp\/hc-report-async-impl\.md/);
+    assert.match(result.content[0].text, /Wait silently/);
+
+    // Exactly one attempt: no retry loop, and never --force.
+    const sends = h.execCalls.filter((call) => call.command === "hc" && call.args[0] === "send");
+    assert.equal(sends.length, 1);
+    assert.equal(sends[0].args.includes("--force"), false);
+  });
+}
+
+test("hc_report keeps a genuine send failure as an error", async () => {
+  const h = await undeliveredHarness({ code: 1, stdout: "", stderr: "no such terminal" });
+  const result = await h.callTool("hc_report", { action: "done", summary: "ok" });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /hc send to parent `t18` failed/);
 });
 
 test("hc_report falls back to re-reading the parent from hc get", async () => {
@@ -1736,6 +1992,15 @@ test("hc_worker rejects an action outside the schema", async () => {
   const result = await h.callTool("hc_worker", { action: "destroy", name: "w1" });
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /Unknown hc_worker action: destroy/);
+});
+
+test("hc_worker rejects the removed wait action and never runs hc wait", async () => {
+  const h = await harness({ env: { HC_TERMINAL_ID: "t18" }, exec: leadExec() });
+  await h.fire("before_agent_start", beforeStartEvent());
+  const result = await h.callTool("hc_worker", { action: "wait", name: "w1", timeout: 30 });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /Unknown hc_worker action: wait/);
+  assert.equal(h.execCalls.some((call) => call.command === "hc" && call.args[0] === "wait"), false);
 });
 
 test("hc_worker spawn forwards cwd to hc run", async () => {
@@ -2008,4 +2273,96 @@ test("the verification nudge does not disturb the inspection counter", async () 
   await h.fire("tool_result", readResult());
   const third = await h.fire("tool_result", readResult());
   assert.match(third.content[1].text, /3 direct/);
+});
+
+test("lead: bash hc wait gets a non-blocking async push-first nudge", async () => {
+  const h = await leadHarness();
+  const result = await h.fire("tool_result", bashResult("hc wait t3g", "still working"));
+  assert.ok(result);
+  assert.equal(result.content.length, 2);
+  assert.equal(result.content[0].text, "still working", "original output is preserved");
+  const nudge = result.content[1].text as string;
+  assert.match(nudge, /\[hc-delegation\]/);
+  assert.match(nudge, /hc wait t3g/);
+  assert.match(nudge, /blocks this human-facing Lead turn/);
+  assert.match(nudge, /pushes `hc_report`/);
+  assert.match(nudge, /hc_worker\(\{ action: "status" \}\)/);
+});
+
+test("lead: a bash line with both a suite and hc wait gets both nudges", async () => {
+  const h = await leadHarness();
+  const result = await h.fire("tool_result", bashResult("hc wait t3g && npm test"));
+  assert.equal(result.content.length, 3);
+  assert.match(result.content[1].text, /belongs to the worker/);
+  assert.match(result.content[2].text, /blocks this human-facing Lead turn/);
+});
+
+test("the hc wait nudge is silent outside a guarded Lead", async () => {
+  const guardedOff = await leadHarness();
+  await guardedOff.callCommand("hc-guard", "off");
+  assert.equal(await guardedOff.fire("tool_result", bashResult("hc wait t3g")), undefined);
+
+  const worker = await roleHarness({
+    address: "t3g",
+    parent: "t18",
+    template: "grunt",
+    labels: { "herdr.space": SPACE },
+  });
+  await worker.fire("before_agent_start", beforeStartEvent());
+  assert.equal(await worker.fire("tool_result", bashResult("hc wait t3g")), undefined);
+});
+
+// ===========================================================================
+// Default export: globalThis dedup and re-registration
+// ===========================================================================
+
+test("default export dedups in one load cycle and re-registers after session_shutdown", async () => {
+  const mod = await loadModule();
+  const store = globalThis as Record<string, unknown>;
+  const KEY = "__pi_ext_hc_delegation_loaded";
+  delete store[KEY];
+
+  const registered: string[] = [];
+  const shutdowns: Array<() => void> = [];
+  const makePi = () => ({
+    on(event: string, handler: () => void) {
+      registered.push(`on:${event}`);
+      if (event === "session_shutdown") shutdowns.push(handler);
+      return () => {};
+    },
+    registerTool(definition: any) {
+      registered.push(`tool:${definition.name}`);
+    },
+    registerCommand(name: string) {
+      registered.push(`cmd:${name}`);
+    },
+    appendEntry() {},
+    async exec() {
+      return ok("");
+    },
+    getActiveTools: () => [],
+    setActiveTools() {},
+  });
+
+  try {
+    mod.default(makePi() as any);
+    const firstCycle = registered.length;
+    assert.ok(firstCycle > 0, "the default export registers something");
+    assert.equal(store[KEY], true);
+    assert.ok(registered.includes("tool:hc_worker"));
+    assert.ok(registered.includes("tool:hc_report"));
+
+    // Project + global autodiscovery in one cycle: the second load is a no-op.
+    mod.default(makePi() as any);
+    assert.equal(registered.length, firstCycle);
+    assert.equal(shutdowns.length, 1);
+
+    // session_shutdown clears the flag so /reload, /new and /resume re-register.
+    shutdowns[0]();
+    assert.equal(store[KEY], undefined);
+    mod.default(makePi() as any);
+    assert.equal(registered.length, firstCycle * 2);
+  } finally {
+    delete store[KEY];
+  }
 });

@@ -90,11 +90,27 @@ When the role is `hc_worker`, `hc_peer`, or `subagent`, the extension MUST block
 - **THEN** the `tool_call` handler blocks the call with an anti-recursion reason
 
 ### Requirement: hc_worker tool manages full Lead worker lifecycle
-The `hc_worker` tool MUST support `spawn`, `send`, `wait`, `read`, `status`, `interrupt`, and `close`.
+The `hc_worker` tool MUST support exactly `spawn`, `send`, `read`, `status`, `interrupt`, and `close`. It MUST NOT expose a blocking `wait` action: after `spawn` verifies first-message delivery the Lead reports to the human and ends its turn, and the worker pushes its result back when it finishes.
 
 #### Scenario: Spawn places workers into one shared Herdr tab and verifies first_message
 - **WHEN** `hc_worker({ action: "spawn", name, template, task, cwd? })` runs in a Herdr space
 - **THEN** it checks for duplicate live worker names, attaches `herdr.space`, attaches `herdr.tab` only when a non-empty `tabId` is known, falls back to `herdr-app ls` matched by terminal `address` on the first worker to capture `tabId` and run `herdr-app do tab.rename`, verifies `first_message.sent`, and persists `{ tabId, ownedWorkers }` via `pi.appendEntry`
+
+#### Scenario: Spawn hands the turn back instead of blocking
+- **WHEN** `spawn` returns with `first_message.sent === true`
+- **THEN** the Lead informs the human that the worker started and ends its turn, leaving the result to arrive as a worker push (`hc_report`) rather than polling
+
+#### Scenario: Blocking wait is not part of the tool surface
+- **WHEN** the Lead (or any role) tries to block on a worker result through the tool
+- **THEN** no such action exists: the tool rejects the call as an unknown action, and progress is obtained through `hc_worker({ action: "status" })` or `hc_worker({ action: "read" })` instead
+
+#### Scenario: Stale cached tab is re-resolved before reuse
+- **WHEN** a persisted `herdr.tab` label is reused for the next spawn but `herdr-app ls` does not contain that `tabId` (the tab was closed or renamed)
+- **THEN** the tool discards the stale `tabId`, re-resolves the tab from the terminal `address`, and renames it again instead of attaching a dead label
+
+#### Scenario: Close pre-checks stray processes and worktrees
+- **WHEN** `hc_worker({ action: "close", name })` targets an owned worker
+- **THEN** it first inspects the terminal for still-running processes and the worker's worktree state, and reports what it found instead of silently removing a terminal that is still writing files
 
 #### Scenario: Close refuses terminals not owned by this session
 - **WHEN** `hc_worker({ action: "close", name })` targets a terminal neither in `ownedWorkers` nor having `parent === role.terminalId`
@@ -102,6 +118,50 @@ The `hc_worker` tool MUST support `spawn`, `send`, `wait`, `read`, `status`, `in
 
 ### Requirement: hc_report tool manages Worker reporting and Peer messaging
 The `hc_report` tool MUST support `done`, `blocked`, `peer`, and `list_peers`, auto-formatting parent reports and `peer: $HC_TERMINAL_ID ...` messages without `--force`.
+
+### Requirement: Async push-first delegation, not blocking waits
+Delegation MUST be push-first: the Lead starts a worker, ends its turn, and waits for the worker's `hc_report` to drive the next turn. The extension MUST NOT offer a blocking wait primitive, and MUST nudge (never block) the Lead that runs `hc wait` through `bash`.
+
+#### Scenario: Nudge Lead who polls with bash hc wait
+- **WHEN** the role is `hc_lead` with the guard enabled and the Lead runs `hc wait ...` in `bash`
+- **THEN** a non-blocking `[hc-delegation]` nudge is appended to the `bash` tool result explaining that the worker push ends the wait, that the turn should end after `spawn`, and that `hc_worker({ action: "status" })` / `read` are the non-blocking progress checks; the command itself is not blocked
+
+#### Scenario: No nudge outside lead role or when guard disabled
+- **WHEN** the role is not `hc_lead`, or the Lead disabled the guard with `/hc-guard off`
+- **THEN** `hc wait` through `bash` produces no `[hc-delegation]` nudge
+
+### Requirement: Undelivered worker notifications follow a fixed protocol
+The extension MUST handle `hc send` delivery failures deterministically. A worker blocked by an interactive dialog returns `kind=blocked` (CLI exit 9) and a `--if` status mismatch returns `kind=status_mismatch` (CLI exit 10); neither side may retry-spam or escalate with `--force`.
+
+#### Scenario: Worker keeps its report and waits silently
+- **WHEN** a worker's `hc_report` push to the parent fails with `kind=blocked` or `kind=status_mismatch`
+- **THEN** the worker does not retry in a loop and does not add `--force`; it writes the full report to its `report_file`, leaves it visible in its own terminal, and waits silently for the human to clear the dialog
+
+#### Scenario: Lead pings only idle or done workers after the dialog is cleared
+- **WHEN** the Lead discovers that a worker notification was undelivered and the interactive dialog has been closed
+- **THEN** the Lead issues a lightweight `hc_worker({ action: "status" })` first, and only sends a follow-up to workers whose status is `idle` or `done`; a worker reporting `working` is left alone
+
+### Requirement: Report-file-first reporting
+`hc_report` MUST accept an optional `report_file` parameter. The full four-section report (`Goal`, `Changes`, `Verification`, `Blockers`) MUST live in that file and in the worker's visible terminal, while the pushed parent report is a one-line summary plus the `report_file` path.
+
+#### Scenario: Worker reports with a report file
+- **WHEN** a worker calls `hc_report({ action: "done", summary, report_file })`
+- **THEN** the file holds the four sections, the worker terminal shows the same report, and the parent receives only the short summary line and the path
+
+#### Scenario: Report without a file still works
+- **WHEN** `hc_report` is called without `report_file`
+- **THEN** the behaviour is unchanged: the summary is pushed to the parent and no file is referenced
+
+### Requirement: Verification honesty discipline
+The extension MUST state, in `<hc_worker_role>` and in the global `AGENTS.md` guidance it complements, that verification is executed for real in the current turn, that no check may be deleted, skipped, or weakened to make a result pass, and that pre-existing baseline failures are noted in one line instead of being silently fixed or hidden.
+
+#### Scenario: Worker contract carries the honesty rule
+- **WHEN** the role is `hc_worker`
+- **THEN** `sections.hc_worker_role` requires the real command, the observed output or log path, no deletion/skip/weakening of checks, and a one-line note for pre-existing baseline failures
+
+#### Scenario: Lead audits evidence instead of re-running suites
+- **WHEN** a worker reports verification results
+- **THEN** the Lead checks the claimed commands and outputs against the diff, and direct verification runs in Lead `bash` remain a nudge rather than the expected path
 
 ### Requirement: Frontmatter-only Pi hc templates
 The repository's Pi `hc` templates (`.pi/herdr-templates/{grunt,workhorse,peer}.md`) MUST contain only YAML frontmatter (`description` and `command`) with empty body text, delegating runtime role instructions to `hc-delegation.ts`.

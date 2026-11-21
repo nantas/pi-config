@@ -86,7 +86,7 @@ pi login <provider>
 
 | 类型 | 数量 | 项目 |
 |------|------|------|
-| **扩展** | 4 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`bash-search-guard` |
+| **扩展** | 5 | `dollar-skill-invoke`、`tool-counter-widget`、`init-command`、`bash-search-guard`、`hc-delegation` |
 | **Agent** | 3 | `worker`（`magpie/group/grunt`）、`reviewer`（`magpie/group/grunt`）、`researcher`（`magpie/group/workhorse`） |
 | **技能** | 4 | `install-from-pi-config`、`notion`、`x-reach`、`worktrunk-isolation` |
 | **共享层技能** | 1 | `agent-reach`（经 `global.shared_skills` 同步到 `~/.agents/skills/`，跨 harness 共用） |
@@ -136,11 +136,14 @@ pi login <provider>
 ```
 
 同步内容（基于 `capabilities.yaml`）：
-- `.pi/capabilities.yaml` 的 `global.settings` → `~/.pi/agent/settings.json`，本机的模型设置随未托管键一起保留
+- `.pi/capabilities.yaml` 的 `global.settings` → `~/.pi/agent/settings.json`（生成，不是拷贝；本机的模型设置随未托管键一起保留）
 - `.pi/extensions/` → `~/.pi/agent/extensions/`（`global.external_extensions` 声明的扩展由外部工具管理，同步完全忽略：不复制、不覆盖、不清理）
 - `.pi/agents/` → `~/.pi/agent/agents/`
 - `.pi/skills/` → `~/.pi/agent/skills/`
 - `.pi/prompts/` → `~/.pi/agent/prompts/`
+- `.pi/agent/AGENTS.md` + `.pi/agent/AGENTS.d/` → `~/.pi/agent/`
+- `global.shared_skills` 声明的技能 → `~/.agents/skills/`（只增不删）
+- `.pi/herdr-templates/` → `~/.config/herdr-core/templates/`（只增不删）
 
 > ⚠️ **注意**：这是**单向覆盖式同步**。运行时（`~/.pi/agent/`）的独立编辑不会在同步时回写仓库。
 

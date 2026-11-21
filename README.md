@@ -14,39 +14,45 @@
 
 ## 架构分层概览
 
-仓库按数据类型分为五个层级，每层承担不同角色：
+仓库按数据类型与部署目标分层：`.pi/` 是唯一真源，同步脚本把它单向推到三个运行时位置（全局运行时、跨 harness 共享层、hc 模板目录），`catalog` 则供其他仓库按需安装。
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     .pi/ (仓库管理源)                        │
-│  settings.json  extensions/  agents/  packages/  prompts/   │
-│  herdr-templates/  — hc 终端模板（→ ~/.config/herdr-core/） │
-│  Pi 运行时的直接配置源，通过 sync 脚本部署到 ~/.pi/agent/    │
+│                      .pi/ (仓库管理源)                       │
+│  extensions/  agents/  skills/  prompts/                     │
+│  herdr-templates/  agent/AGENTS.md                           │
+│  capabilities.yaml  managed/                                 │
+│  Pi 运行时配置真源，经 sync 单向部署                         │
 ├──────────────────────────────────────────────────────────────┤
-│                     .agents/ (跨 Agent 共享层)                │
-│  skills/  — OpenSpec 工作流技能等跨仓库共享技能            │
-│  跨平台共享的 skill 工作流定义，通过仓库 git 版本管理          │
+│                  部署目标 (四目标单向同步)                   │
+│  ~/.pi/agent/   ~/.agents/skills/                            │
+│  ~/.config/herdr-core/templates/                             │
+│  catalog -> 其他仓库的 .pi/（按需安装）                      │
 ├──────────────────────────────────────────────────────────────┤
-│                   openspec/ (规划与执行合约层)                 │
-│  specs/  changes/  manifest.json  pkg-backlog.md             │
-│  能力规格说明、变更生命周期管理、决策记录                     │
+│                 openspec/ (规划与执行合约层)                 │
+│  specs/  changes/  manifest.yaml                             │
+│  能力规格、变更生命周期、包决策记录                          │
 ├──────────────────────────────────────────────────────────────┤
-│                     docs/ (研究与参考层)                       │
-│  蓝图设计、治理规则、阶段边界定义、参考资料                   │
+│                     docs/ (研究与参考层)                     │
+│  adr/  reference/  agents/  design/                          │
+│  决策记录、治理规则、参考资料                                │
 ├──────────────────────────────────────────────────────────────┤
-│                   scripts/ (自动化层)                         │
-│  sync-pi-agent.sh  — 仓库到全局运行时的单向同步入口           │
+│                     scripts/ (自动化层)                      │
+│  sync-pi-agent.sh                                            │
+│  仓库 -> 全局运行时的单向同步入口                            │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ### 各层职责
 
-| 层级 | 目录 | 职责 |
+| 层级 | 目录 / 目标 | 职责 |
 |---|---|---|
-| **仓库管理源** | `.pi/` | Pi 运行时配置的真源，通过 `sync-pi-agent.sh` 部署到 `~/.pi/agent/` |
-| **跨 Agent 共享层** | `.agents/` | 跨仓库共享的 Agent 技能/行为定义，不在同步脚本管理范围内 |
+| **仓库管理源** | `.pi/` + `.pi/capabilities.yaml` | 配置与能力清单的唯一真源，经 `sync-pi-agent.sh` 单向部署 |
+| **全局运行时目标** | `~/.pi/agent/` | 白名单覆盖式部署：extensions、agents、skills、prompts、settings.json、AGENTS.md / AGENTS.d |
+| **共享层目标** | `~/.agents/skills/`、`~/.config/herdr-core/templates/` | `global.shared_skills` 与 `global.hc_templates`，只增不删 |
+| **按需安装目标** | 其他仓库的 `.pi/` | `catalog` tier，由 `install-from-pi-config` 技能安装 |
 | **规划与执行合约层** | `openspec/` | 能力规格（specs）、变更（changes）、决策记录（pkg-backlog） |
-| **研究与参考层** | `docs/` | 蓝图、治理文档、阶段边界、参考资料 |
+| **研究与参考层** | `docs/` | ADR、治理规则、参考文档、agent 文档 |
 | **自动化层** | `scripts/` | 同步脚本、自动化工具 |
 
 ---
@@ -104,6 +110,7 @@ cat .pi/settings.json
 #### `hc-delegation`
 
 - **描述**: 按运行时角色（`hc_lead` / `hc_worker` / `hc_peer` / `subagent` / `standalone`）动态管理委派行为的护栏：提供 `hc_worker` / `hc_report` 工具，按角色注入系统提示 `<section>`，实施 Lead 委派硬拦截（仓库无关的多文件写入拦截——对所有路径一视同仁，含 OpenSpec 工件/spec/plan/ADR 等流程化产物，交由 `hc_worker` 按固定流程产出；多次直接探查提醒；裸跑 `hc run <template>` 重定向）、验证分工提醒（Worker 执行构建/测试/lint/验证命令并回报观测输出或日志路径，Lead 直接跑验证套件时收到非阻塞 `[hc-delegation]` 提醒，专注审查证据与 diff）与 Worker/Peer/Subagent 反递归硬拦截，支持 `/hc-guard`、`/hc-role` 命令。
+- **异步委派契约**: `hc_worker` 只有 `spawn` / `send` / `read` / `status` / `interrupt` / `close`（无阻塞 `wait`）：`spawn` 校验 `first_message.sent` 后 Lead 结束本回合，worker 收尾时主动 push 回来（Lead 在 `bash` 里跑 `hc wait` 会收到非阻塞提醒）；投递失败（`kind=blocked` exit 9 / `kind=status_mismatch` exit 10）时 worker 不重试不加 `--force`，而是把完整报告写进 `report_file` 并静默等待，Lead 关掉交互对话框后先轻量 `status` 复核、只戳 `idle` / `done` 的 worker；`hc_report` 支持可选 `report_file`（四段报告 Goal / Changes / Verification / Blockers 落文件，推送只带一行摘要 + 路径）；复用缓存的 `herdr.tab` 前用 `herdr-app ls` 验活。
 - **解决的问题**: 原先静态写在 `.pi/agent/AGENTS.md` 与 `AGENTS.d/hc-delegation.md`、`AGENTS.d/subagent-usage.md` 里的委派总则被无条件注入所有角色，易错流程（SPACE_ID/TAB_ID 反查、first_message 校验等）交给模型手写胶水；本扩展改为运行时按角色动态注入与强制拦截，静态文档已删除。
 - **源文件**: `.pi/extensions/hc-delegation.ts`
 - **测试**: `tests/hc-delegation.test.ts`（`node --test tests/hc-delegation.test.ts`，零外部依赖）
@@ -294,7 +301,7 @@ catalog:
 - **描述**: 专门用于 X/Twitter 的稳定检索通道，twscrape 账号池驱动（账号轮换抗限流 + SQLite 持久会话 + JSONL 输出）。
 - **解决的问题**: X 检索容易限流、账户容易被风控，单账号跑批量任务经常中断；本 skill 用账号池与持久会话把批量检索做成可复现流程。
 - **源文件**: `.pi/skills/x-reach/SKILL.md`
-- **依赖**: `twscrape` CLI；未初始化时先跑 `scripts/x-reach-init.sh`。
+- **依赖**: `twscrape` CLI；未初始化时先跑 `.pi/skills/x-reach/scripts/x-reach-init.sh`。
 - **范围**: 只读，不支持发帖/点赞/关注。
 
 ##### `worktrunk-isolation`
@@ -336,7 +343,7 @@ catalog:
 
 OpenSpec 定义了完整的变更管理工作流（探索 → 提案 → 规格 → 设计 → 任务 → 实现 → 验证 → 同步 → 归档），详见 [OpenSpec 项目](https://github.com/Fission-AI/OpenSpec)。
 
-本仓库的 OpenSpec 工作流技能位于 `.agents/skills/` 目录下。
+本仓库的 OpenSpec 工作流入口是 `.pi/prompts/` 下的 10 个 `opsx-*` 提示模板（`/opsx-new`、`/opsx-propose`、`/opsx-apply`、`/opsx-verify`、`/opsx-sync`、`/opsx-archive` 等），经 `global.prompts` 同步到 `~/.pi/agent/prompts/`。
 
 ---
 
@@ -360,7 +367,7 @@ Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段，�
 
 #### `.pi/settings.json` 配置
 
-`.pi/settings.json` 是仓库管理的 Pi 运行时配置文件，支持以下核心参数：
+`.pi/settings.json` 是本仓库作为项目运行时的本地 Pi 配置（全局 `~/.pi/agent/settings.json` 由 `capabilities.yaml` 的 `global.settings` 生成，不从本文件同步），支持以下核心参数：
 
 ```json
 {
@@ -377,12 +384,19 @@ Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段，�
 
 #### `scripts/sync-pi-agent.sh` 同步机制
 
-将仓库管理范围内的路径（`.pi/settings.json`、`.pi/extensions/`、`.pi/prompts/`、`.pi/themes/`、`.pi/agents/`、`.pi/agent/mcp.json`）同步到 `~/.pi/agent/`。
+按 `capabilities.yaml` 把仓库资源同步到四个目标：
+
+| 目标 | 来源 | 语义 |
+|---|---|---|
+| `~/.pi/agent/` | `global.extensions` / `agents` / `skills` / `prompts` / `settings` / `files`，加 `AGENTS.md` + `AGENTS.d/`、`themes/`、`mcp.json` | 白名单覆盖式，仓库移除的条目在目标端清理；`settings.json` 由 `global.settings` 生成并保留目标机未托管键 |
+| `~/.agents/skills/` | `global.shared_skills` | 跨 harness 共享层，只增不删 |
+| `~/.config/herdr-core/templates/` | `global.hc_templates` | hc 终端模板，只增不删 |
+| 其他仓库的 `.pi/` | `catalog` | 按需安装，不进入全局运行时 |
 
 关键约束：
 - **单向同步**: 仓库 → 运行时，运行时编辑不回写
-- **覆盖式部署**: 每次同步完整覆盖目标路径
-- **删除同步**: 仓库移除的路径，运行时对应路径也会被删除
+- **覆盖式部署**: 每次同步完整覆盖目标路径；`models.json` 仅在清单声明 `global.models` 时重写（当前未声明，保留本机配置）
+- **删除同步**: 仓库移除的路径，运行时对应路径也会被删除（`~/.agents/skills/` 与 hc 模板只增不删，是例外）
 - **运行时保留**: 管理集合之外的运行时内容不受影响（`global.external_extensions` 声明的扩展由外部工具管理，同步不触碰）
 
 #### Closeout 治理流程
@@ -404,9 +418,9 @@ Agent 的模型写在 `.pi/agents/<name>.md` 的 frontmatter `model:` 字段，�
 
 ```
 openspec/
-├── manifest.json    # 能力清单
-├── specs/           # 能力规格说明（25+ 项）
-├── changes/         # 活跃变更 & 已归档变更
+├── manifest.yaml    # 能力清单
+├── specs/           # 能力规格说明（68 项）
+├── changes/         # 活跃变更 & 已归档变更（89 个归档）
 └── pkg-backlog.md   # 外部包决策记录
 ```
 
@@ -418,10 +432,11 @@ openspec/
 |---|---|---|
 | **评估第三方 Pi 包** | `pkg-research` | `.pi/settings.json` → `packages` |
 | **创建 Pi 扩展** | `pi-extension-dev` | `.pi/extensions/<name>.ts` |
-| **启动新变更** | `openspec-new-change` / `openspec-propose` | `openspec/changes/<name>/` |
-| **实现现有变更** | `openspec-apply-change` | `openspec/changes/<name>/tasks.md` |
-| **验证变更完整性** | `openspec-verify-change` | `openspec/changes/<name>/verification.md` |
-| **归档已完成变更** | `openspec-archive-change` | `openspec/changes/archive/` |
+| **启动新变更** | `/opsx-new` / `/opsx-propose` | `openspec/changes/<name>/` |
+| **实现现有变更** | `/opsx-apply` | `openspec/changes/<name>/tasks.md` |
+| **验证变更完整性** | `/opsx-verify` | `openspec/changes/<name>/verification.md` |
+| **同步 delta specs** | `/opsx-sync` | `openspec/specs/` |
+| **归档已完成变更** | `/opsx-archive` | `openspec/changes/archive/` |
 | **同步配置到全局** | — | `scripts/sync-pi-agent.sh`（需确认） |
 | **查阅 closeout 治理** | — | `docs/pi-change-closeout-governance.md` |
 | **OpenSpec 文档** | — | [github.com/Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) |
@@ -430,7 +445,7 @@ openspec/
 
 ## 项目演进历史
 
-仓库目前已完成 **14 个变更归档**，按类别统计：
+仓库目前已完成 **89 个变更归档**，以下是早期归档的分类示例（完整列表见 `openspec/changes/archive/`）：
 
 | 类别 | 数量 | 归档示例 |
 |---|---|---|
@@ -448,13 +463,15 @@ openspec/
 
 | 路径 | 说明 |
 |---|---|
-| `.pi/settings.json` | 全局配置：provider、model、packages |
+| `.pi/settings.json` | 本仓库项目级 Pi 配置（全局 settings.json 由 `capabilities.yaml` 生成） |
 | `.pi/extensions/` | 自定义 TypeScript 扩展 |
 | `.pi/agents/` | Agent 定义（worker / researcher / reviewer） |
 | `.pi/herdr-templates/` | hc 终端模板（global.hc_templates → `~/.config/herdr-core/templates/`，只增不删） |
-| `.pi/skills/` | 同步技能源（global.skills → `~/.pi/agent/skills/`；global.shared_skills → `~/.agents/skills/`） |
-| `.agents/skills/` | OpenSpec 10 步工作流技能 + 全局 Superpowers |
-| `openspec/manifest.json` | 能力清单（specs 映射） |
+| `.pi/skills/` | 技能源（global.skills → `~/.pi/agent/skills/`；global.shared_skills → `~/.agents/skills/`；catalog.skills 供其他仓库按需安装） |
+| `.pi/prompts/` | OpenSpec 工作流提示模板（`opsx-*`，10 个） |
+| `docs/adr/` | 架构决策记录（ADR） |
+| `docs/agents/` | issue tracker 与 domain 文档治理规则 |
+| `openspec/manifest.yaml` | 能力清单（specs 映射） |
 | `openspec/specs/` | 能力规格说明 |
 | `openspec/changes/` | 活跃变更 & 存档 |
 | `openspec/pkg-backlog.md` | 包决策记录 |
@@ -467,7 +484,7 @@ openspec/
 
 ## README 维护工作流
 
-本 README 是仓库的"活文档"，需要随仓库能力演化而持续更新。维护治理规则定义在 [AGENTS.d/readme-governance.md](.pi/agent/AGENTS.d/readme-governance.md)，能力列表以 `.pi/capabilities.yaml` 为准。
+本 README 是仓库的"活文档"，需要随仓库能力演化而持续更新。维护治理规则定义在 [docs/reference/readme-governance.md](docs/reference/readme-governance.md)，能力列表以 `.pi/capabilities.yaml` 为准。
 
 ### 异常处理
 
@@ -479,4 +496,4 @@ openspec/
 
 ---
 
-*README 最后更新: 2026-05-06*
+*README 最后更新: 2026-11-21*
